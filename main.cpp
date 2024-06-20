@@ -64,7 +64,7 @@ int SDL_AppInit(void** appstate, int argc, char* argv[]) {
 
     SDL_Log("Application started successfully!");
 
-    logger* LOGGER = logger::of("dodk");
+    logger* LOGGER = logger::of("dodk", 35);
     const char* str = "devihl";
     LOGGER->log("daun $ $ $", 2, 1, 5);
 
