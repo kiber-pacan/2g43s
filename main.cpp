@@ -35,6 +35,7 @@ int SDL_AppInit(void** appstate, int argc, char* argv[]) {
         return SDL_Fail();
     }
 
+    logger* LOGGER = logger::of("INFO");
 
     // print some information about the window
     SDL_ShowWindow(window);
@@ -42,12 +43,12 @@ int SDL_AppInit(void** appstate, int argc, char* argv[]) {
         int width, height, bbwidth, bbheight;
         SDL_GetWindowSize(window, &width, &height);
         SDL_GetWindowSizeInPixels(window, &bbwidth, &bbheight);
-        SDL_Log("Window size: %ix%i", width, height);
-        SDL_Log("Backbuffer size: %ix%i", bbwidth, bbheight);
+        LOGGER->printLog(logger::INFO,"Window size: $x$", width, height);
+        LOGGER->printLog(logger::INFO,"Backbuffer size: $x$", bbwidth, bbheight);
         if (width != bbwidth){
-            SDL_Log("This is a highdpi environment.");
+            LOGGER->printLog(logger::INFO,"This is a highdpi environment.", nullptr);
         }
-        SDL_Log("Random number: %i (between 1 and 100)", tools::randomNum<uint32_t>(1,100));
+        LOGGER->printLog(logger::INFO,"Random number: $ (between 1 and 100)", tools::randomNum<uint32_t>(1,100));
     }
 
     // set up the application data
@@ -60,13 +61,13 @@ int SDL_AppInit(void** appstate, int argc, char* argv[]) {
 
     //Set up Vulkan engine
     app->vulkan_engine.init();
-    SDL_Log("Session ID: %i", app->vulkan_engine.sid);
+    LOGGER->printLog(logger::INFO,"Session ID: $", app->vulkan_engine.sid);
 
-    SDL_Log("Application started successfully!");
+    LOGGER->printLog(logger::INFO,"Application started successfully!", nullptr);
 
-    logger* LOGGER = logger::of("dodk", 35);
-    const char* str = "devihl";
-    LOGGER->log("daun $ $ $", 2, 1, 5);
+    LOGGER->printLog(logger::INFO,"Hello $", "world");
+    LOGGER->printLog(logger::WARNING,"Hello $", "world");
+    LOGGER->printLog(logger::ERROR,"Hello $", "world");
 
     return 0;
 }
