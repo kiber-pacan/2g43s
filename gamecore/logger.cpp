@@ -20,24 +20,36 @@ white   37 47
 class logger {
 public:
     const char* name;
-    int color;
     bool st = false;
 
+    enum Severity {
+        INFO = 97,
+        WARNING = 93,
+        ERROR = 91
+    };
+
     //I just want to create object what way because it is prettier for me
-    static logger* of(const char* name, int color) {
-        return new logger(name, color);
-    }
-
-    //Stub method for compiler
-    static void log(const std::string& str) {
-        std::cout << "" << std::endl;
-
+    static logger* of(const char* name) {
+        return new logger(name);
     }
 
     //Main method for logging
     template<typename T>
+    void printLog(int color, const char* str, T value, auto... args) {
+        start(color);
+        log(str, value, args...);
+        st = false;
+        std::cout << "" << std::endl ;
+    }
+
+private:
+    //Stub method for compiler
+    static void log(const std::string& str) {
+        std::cout << "";
+    }
+
+    template<typename T>
     void log(const char* str, T value, auto... args) {
-        start();
         /*
          *Basically erasing and printing char by char,
          *also replacing $ with value and then doing recursion with value as args[0]
@@ -54,19 +66,13 @@ public:
         }
     }
 
-private:
     //Private constructor so ppl gonna use logger::of(name)
-    explicit logger(const char* name, int color) {
+    explicit logger(const char* name) {
         this->name = name;
-        this->color = color;
     }
 
-    //Method for printing (easier readability)
-    void static print(auto x) {
-        std::cout << x << std::endl;
-    }
-
-    void start() {
+    //Start of print
+    void start(int color) {
         if (!st) {
             st = true;
             std::cout
