@@ -1,0 +1,9 @@
+{
+  "revision": 0,
+  "rules": [
+    {
+      "primary-output": "CMakeFiles/2g43s.dir/gamecore/logger.cpp.o"
+    }
+  ],
+  "version": 1
+}

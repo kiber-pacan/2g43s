@@ -1,0 +1,8 @@
+/home/daunita/CLionProjects/vulkanbro/cmake-build-debug/CMakeFiles/2g43s.dir
+/home/daunita/CLionProjects/vulkanbro/cmake-build-debug/CMakeFiles/edit_cache.dir
+/home/daunita/CLionProjects/vulkanbro/cmake-build-debug/CMakeFiles/rebuild_cache.dir
+/home/daunita/CLionProjects/vulkanbro/cmake-build-debug/SDL3/CMakeFiles/SDL3-shared.dir
+/home/daunita/CLionProjects/vulkanbro/cmake-build-debug/SDL3/CMakeFiles/SDL3_test.dir
+/home/daunita/CLionProjects/vulkanbro/cmake-build-debug/SDL3/CMakeFiles/uninstall.dir
+/home/daunita/CLionProjects/vulkanbro/cmake-build-debug/SDL3/CMakeFiles/edit_cache.dir
+/home/daunita/CLionProjects/vulkanbro/cmake-build-debug/SDL3/CMakeFiles/rebuild_cache.dir
