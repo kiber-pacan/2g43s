@@ -33,10 +33,10 @@ ALSA_LIBRARY:FILEPATH=/usr/lib/libasound.so
 ASOUND_LIB:FILEPATH=/usr/lib/libasound.so
 
 //Path to a program.
-CMAKE_ADDR2LINE:FILEPATH=/run/media/daunita/d1027e9e-f09a-4156-b547-27ac5ba4a095/llvm/bin/llvm-addr2line
+CMAKE_ADDR2LINE:FILEPATH=/usr/bin/addr2line
 
 //Path to a program.
-CMAKE_AR:FILEPATH=/run/media/daunita/d1027e9e-f09a-4156-b547-27ac5ba4a095/llvm/bin/llvm-ar
+CMAKE_AR:FILEPATH=/usr/bin/ar
 
 //Choose the type of build, options are: None Debug Release RelWithDebInfo
 // MinSizeRel ...
@@ -45,8 +45,8 @@ CMAKE_BUILD_TYPE:STRING=Debug
 //Enable colored diagnostics throughout.
 CMAKE_COLOR_DIAGNOSTICS:BOOL=ON
 
-//No help, variable specified on the command line.
-CMAKE_CXX_COMPILER:UNINITIALIZED=/run/media/daunita/d1027e9e-f09a-4156-b547-27ac5ba4a095/llvm/bin/clang++
+//CXX compiler
+CMAKE_CXX_COMPILER:STRING=/run/media/daunita/d1027e9e-f09a-4156-b547-27ac5ba4a095/llvm/bin/clang++
 
 //LLVM archiver
 CMAKE_CXX_COMPILER_AR:FILEPATH=/run/media/daunita/d1027e9e-f09a-4156-b547-27ac5ba4a095/llvm/bin/llvm-ar
@@ -61,19 +61,19 @@ CMAKE_CXX_COMPILER_RANLIB:FILEPATH=/run/media/daunita/d1027e9e-f09a-4156-b547-27
 CMAKE_CXX_FLAGS:STRING=
 
 //Flags used by the CXX compiler during DEBUG builds.
-CMAKE_CXX_FLAGS_DEBUG:STRING=-g
+CMAKE_CXX_FLAGS_DEBUG:STRING=
 
 //Flags used by the CXX compiler during MINSIZEREL builds.
-CMAKE_CXX_FLAGS_MINSIZEREL:STRING=-Os -DNDEBUG
+CMAKE_CXX_FLAGS_MINSIZEREL:STRING=
 
 //Flags used by the CXX compiler during RELEASE builds.
-CMAKE_CXX_FLAGS_RELEASE:STRING=-O3 -DNDEBUG
+CMAKE_CXX_FLAGS_RELEASE:STRING=
 
 //Flags used by the CXX compiler during RELWITHDEBINFO builds.
-CMAKE_CXX_FLAGS_RELWITHDEBINFO:STRING=-O2 -g -DNDEBUG
+CMAKE_CXX_FLAGS_RELWITHDEBINFO:STRING=
 
-//No help, variable specified on the command line.
-CMAKE_C_COMPILER:UNINITIALIZED=/run/media/daunita/d1027e9e-f09a-4156-b547-27ac5ba4a095/llvm/bin/clang
+//C compiler
+CMAKE_C_COMPILER:STRING=/run/media/daunita/d1027e9e-f09a-4156-b547-27ac5ba4a095/llvm/bin/clang
 
 //LLVM archiver
 CMAKE_C_COMPILER_AR:FILEPATH=/run/media/daunita/d1027e9e-f09a-4156-b547-27ac5ba4a095/llvm/bin/llvm-ar
@@ -88,16 +88,16 @@ CMAKE_C_COMPILER_RANLIB:FILEPATH=/run/media/daunita/d1027e9e-f09a-4156-b547-27ac
 CMAKE_C_FLAGS:STRING=
 
 //Flags used by the C compiler during DEBUG builds.
-CMAKE_C_FLAGS_DEBUG:STRING=-g
+CMAKE_C_FLAGS_DEBUG:STRING=
 
 //Flags used by the C compiler during MINSIZEREL builds.
-CMAKE_C_FLAGS_MINSIZEREL:STRING=-Os -DNDEBUG
+CMAKE_C_FLAGS_MINSIZEREL:STRING=
 
 //Flags used by the C compiler during RELEASE builds.
-CMAKE_C_FLAGS_RELEASE:STRING=-O3 -DNDEBUG
+CMAKE_C_FLAGS_RELEASE:STRING=
 
 //Flags used by the C compiler during RELWITHDEBINFO builds.
-CMAKE_C_FLAGS_RELWITHDEBINFO:STRING=-O2 -g -DNDEBUG
+CMAKE_C_FLAGS_RELWITHDEBINFO:STRING=
 
 //Path to a program.
 CMAKE_DLLTOOL:FILEPATH=/run/media/daunita/d1027e9e-f09a-4156-b547-27ac5ba4a095/llvm/bin/llvm-dlltool
@@ -201,13 +201,13 @@ CMAKE_MODULE_LINKER_FLAGS_RELEASE:STRING=
 CMAKE_MODULE_LINKER_FLAGS_RELWITHDEBINFO:STRING=
 
 //Path to a program.
-CMAKE_NM:FILEPATH=/run/media/daunita/d1027e9e-f09a-4156-b547-27ac5ba4a095/llvm/bin/llvm-nm
+CMAKE_NM:FILEPATH=/usr/bin/nm
 
 //Path to a program.
-CMAKE_OBJCOPY:FILEPATH=/run/media/daunita/d1027e9e-f09a-4156-b547-27ac5ba4a095/llvm/bin/llvm-objcopy
+CMAKE_OBJCOPY:FILEPATH=/usr/bin/objcopy
 
 //Path to a program.
-CMAKE_OBJDUMP:FILEPATH=/run/media/daunita/d1027e9e-f09a-4156-b547-27ac5ba4a095/llvm/bin/llvm-objdump
+CMAKE_OBJDUMP:FILEPATH=/usr/bin/objdump
 
 //Value Computed by CMake
 CMAKE_PROJECT_DESCRIPTION:STATIC=
@@ -234,10 +234,10 @@ CMAKE_PROJECT_VERSION_PATCH:STATIC=2
 CMAKE_PROJECT_VERSION_TWEAK:STATIC=
 
 //Path to a program.
-CMAKE_RANLIB:FILEPATH=/run/media/daunita/d1027e9e-f09a-4156-b547-27ac5ba4a095/llvm/bin/llvm-ranlib
+CMAKE_RANLIB:FILEPATH=/usr/bin/ranlib
 
 //Path to a program.
-CMAKE_READELF:FILEPATH=/run/media/daunita/d1027e9e-f09a-4156-b547-27ac5ba4a095/llvm/bin/llvm-readelf
+CMAKE_READELF:FILEPATH=/usr/bin/readelf
 
 //Flags used by the linker during the creation of shared libraries
 // during all build types.
@@ -287,7 +287,7 @@ CMAKE_STATIC_LINKER_FLAGS_RELEASE:STRING=
 CMAKE_STATIC_LINKER_FLAGS_RELWITHDEBINFO:STRING=
 
 //Path to a program.
-CMAKE_STRIP:FILEPATH=/run/media/daunita/d1027e9e-f09a-4156-b547-27ac5ba4a095/llvm/bin/llvm-strip
+CMAKE_STRIP:FILEPATH=/usr/bin/strip
 
 //Path to a program.
 CMAKE_TAPI:FILEPATH=CMAKE_TAPI-NOTFOUND
@@ -1241,15 +1241,6 @@ pkgcfg_lib_PKG_FONTCONFIG_fontconfig:FILEPATH=/usr/lib/libfontconfig.so
 //Path to a library.
 pkgcfg_lib_PKG_FONTCONFIG_freetype:FILEPATH=/usr/lib/libfreetype.so
 
-//Value Computed by CMake
-vulkanbro_BINARY_DIR:STATIC=/home/daunita/CLionProjects/vulkanbro/cmake-build-debug
-
-//Value Computed by CMake
-vulkanbro_IS_TOP_LEVEL:STATIC=ON
-
-//Value Computed by CMake
-vulkanbro_SOURCE_DIR:STATIC=/home/daunita/CLionProjects/vulkanbro
-
 
 ########################
 # INTERNAL cache entries
@@ -1316,7 +1307,7 @@ CMAKE_C_FLAGS_RELWITHDEBINFO-ADVANCED:INTERNAL=1
 //ADVANCED property for variable: CMAKE_DLLTOOL
 CMAKE_DLLTOOL-ADVANCED:INTERNAL=1
 //Executable file format
-CMAKE_EXECUTABLE_FORMAT:INTERNAL=ELF
+CMAKE_EXECUTABLE_FORMAT:INTERNAL=Unknown
 //ADVANCED property for variable: CMAKE_EXE_LINKER_FLAGS
 CMAKE_EXE_LINKER_FLAGS-ADVANCED:INTERNAL=1
 //ADVANCED property for variable: CMAKE_EXE_LINKER_FLAGS_DEBUG

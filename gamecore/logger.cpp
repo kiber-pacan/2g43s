@@ -1,9 +1,6 @@
 #ifndef LOGGER_H
 #define LOGGER_H
 
-#include <iostream>
-#include <vector>
-
 /*
 foreground background
 black   30 40
@@ -20,8 +17,10 @@ white   37 47
 class logger {
 public:
     const char* name;
+    //For ASCI start of print
     bool st = false;
 
+    //Color for severity of log
     enum Severity {
         INFO = 97,
         WARNING = 93,
@@ -43,11 +42,12 @@ public:
     }
 
 private:
-    //Stub method for compiler
+    //Stub method for recursion
     static void log(const std::string& str) {
         std::cout << "";
     }
 
+    //Method just for printing messages
     template<typename T>
     void log(const char* str, T value, auto... args) {
         /*
@@ -71,7 +71,7 @@ private:
         this->name = name;
     }
 
-    //Start of print
+    //Using ASCI color
     void start(int color) {
         if (!st) {
             st = true;

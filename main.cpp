@@ -10,8 +10,10 @@ struct AppContext {
     SDL_Window* window{};
     SDL_Renderer* renderer{};
     SDL_bool app_quit = SDL_FALSE;
-    engine vulkan_engine{};
 };
+
+engine vulkan_engine{};
+logger* LOGGER = logger::of("INFO");
 
 int SDL_Fail(){
     SDL_LogError(SDL_LOG_CATEGORY_CUSTOM, "Error %s", SDL_GetError());
@@ -35,7 +37,6 @@ int SDL_AppInit(void** appstate, int argc, char* argv[]) {
         return SDL_Fail();
     }
 
-    logger* LOGGER = logger::of("INFO");
 
     // print some information about the window
     SDL_ShowWindow(window);
@@ -60,8 +61,8 @@ int SDL_AppInit(void** appstate, int argc, char* argv[]) {
     auto* app = (AppContext*)appstate;
 
     //Set up Vulkan engine
-    app->vulkan_engine.init();
-    LOGGER->printLog(logger::INFO,"Session ID: $", app->vulkan_engine.sid);
+    vulkan_engine.init();
+    LOGGER->printLog(logger::INFO,"Session ID: $", vulkan_engine.sid);
 
     LOGGER->printLog(logger::INFO,"Application started successfully!", nullptr);
 
@@ -107,5 +108,5 @@ void SDL_AppQuit(void* appstate) {
     }
 
     SDL_Quit();
-    SDL_Log("Application quit successfully!");
+    LOGGER->printLog(logger::INFO,"Application quit successfully!", nullptr);
 }

@@ -1,5 +1,0 @@
-ninja_dyndep_version = 1.0
-build CMakeFiles/2g43s.dir/main.cpp.o: dyndep
-
-build CMakeFiles/2g43s.dir/gamecore/logger.cpp.o: dyndep
-

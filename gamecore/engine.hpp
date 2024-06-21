@@ -1,10 +1,12 @@
 #ifndef ENGINE_H
 #define ENGINE_H
 
+#include <iostream>
 #include <vulkan/vulkan.h>
 #include <SDL3/SDL_vulkan.h>
-#include <iostream>
+
 #include "tools.hpp"
+#include "logger.cpp"
 
 //Parameters
 inline int HEIGHT = 360;
@@ -35,9 +37,12 @@ private:
     //Variables
     VkInstance instance;
     VkDebugUtilsMessengerEXT debugMessenger;
+    logger* LOGGER;
 
+    //Init engine and its counterparts
     void initVulkan() {
         sid = tools::randomNum<uint64_t>(1000000000,9999999999);
+        LOGGER = logger::of("VULKAN");
         std::cout << "test print from vulkan engine" <<std::endl;
         createInstance();
         setupDebugMessenger();
@@ -76,7 +81,7 @@ private:
         }
     }
 
-    //
+    //Main engine loop
     void mainLoop() {
 
     }
@@ -118,6 +123,7 @@ private:
         return VK_FALSE;
     }
 
+    //Setup debug messenger
     void setupDebugMessenger() {
         if (!enableValidationLayers) return;
 
@@ -129,6 +135,7 @@ private:
         }
     }
 
+    //Creating debug messenger for printing messages
     VkResult CreateDebugUtilsMessengerEXT(VkInstance instance, const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkDebugUtilsMessengerEXT* pDebugMessenger) {
         auto func = (PFN_vkCreateDebugUtilsMessengerEXT) vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT");
         if (func != nullptr) {
@@ -138,7 +145,7 @@ private:
         }
     }
 
-
+    //Get required validation extensions
     std::vector<const char*> getRequiredExtensions() {
         uint32_t ExtensionCount = 0;
         auto glfwExtensions = SDL_Vulkan_GetInstanceExtensions(&ExtensionCount);
@@ -152,6 +159,7 @@ private:
         return extensions;
     }
 
+    //Checking if validation layers is supported by system
     bool checkValidationLayerSupport() {
         uint32_t layerCount;
         vkEnumerateInstanceLayerProperties(&layerCount, nullptr);

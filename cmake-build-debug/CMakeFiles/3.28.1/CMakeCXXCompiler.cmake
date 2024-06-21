@@ -22,9 +22,9 @@ set(CMAKE_CXX_SIMULATE_VERSION "")
 
 
 
-set(CMAKE_AR "/run/media/daunita/d1027e9e-f09a-4156-b547-27ac5ba4a095/llvm/bin/llvm-ar")
+set(CMAKE_AR "/usr/bin/ar")
 set(CMAKE_CXX_COMPILER_AR "/run/media/daunita/d1027e9e-f09a-4156-b547-27ac5ba4a095/llvm/bin/llvm-ar")
-set(CMAKE_RANLIB "/run/media/daunita/d1027e9e-f09a-4156-b547-27ac5ba4a095/llvm/bin/llvm-ranlib")
+set(CMAKE_RANLIB "/usr/bin/ranlib")
 set(CMAKE_CXX_COMPILER_RANLIB "/run/media/daunita/d1027e9e-f09a-4156-b547-27ac5ba4a095/llvm/bin/llvm-ranlib")
 set(CMAKE_LINKER "/usr/bin/ld")
 set(CMAKE_MT "")
