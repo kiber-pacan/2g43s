@@ -42,8 +42,8 @@ private:
     //Init engine and its counterparts
     void initVulkan() {
         sid = tools::randomNum<uint64_t>(1000000000,9999999999);
-        LOGGER = logger::of("VULKAN");
-        std::cout << "test print from vulkan engine" <<std::endl;
+        LOGGER = logger::of("ENGINE");
+        LOGGER->log("76ff00", "Vulkan engine started successfully!", nullptr);
         createInstance();
         setupDebugMessenger();
     }

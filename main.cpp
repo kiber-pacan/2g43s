@@ -44,12 +44,12 @@ int SDL_AppInit(void** appstate, int argc, char* argv[]) {
         int width, height, bbwidth, bbheight;
         SDL_GetWindowSize(window, &width, &height);
         SDL_GetWindowSizeInPixels(window, &bbwidth, &bbheight);
-        LOGGER->printLog(logger::INFO,"Window size: $x$", width, height);
-        LOGGER->printLog(logger::INFO,"Backbuffer size: $x$", bbwidth, bbheight);
+        LOGGER->log(logger::severity::LOG,"Window size: $x$", width, height);
+        LOGGER->log(logger::severity::LOG,"Backbuffer size: $x$", bbwidth, bbheight);
         if (width != bbwidth){
-            LOGGER->printLog(logger::INFO,"This is a highdpi environment.", nullptr);
+            LOGGER->log(logger::severity::LOG,"This is a highdpi environment.", nullptr);
         }
-        LOGGER->printLog(logger::INFO,"Random number: $ (between 1 and 100)", tools::randomNum<uint32_t>(1,100));
+        LOGGER->log(logger::severity::LOG,"Random number: $ (between 1 and 100)", tools::randomNum<uint32_t>(1,100));
     }
 
     // set up the application data
@@ -62,13 +62,13 @@ int SDL_AppInit(void** appstate, int argc, char* argv[]) {
 
     //Set up Vulkan engine
     vulkan_engine.init();
-    LOGGER->printLog(logger::INFO,"Session ID: $", vulkan_engine.sid);
+    LOGGER->log(logger::severity::LOG,"Session ID: $", vulkan_engine.sid);
 
-    LOGGER->printLog(logger::INFO,"Application started successfully!", nullptr);
+    LOGGER->log(logger::severity::LOG,"Application started successfully!", nullptr);
 
-    LOGGER->printLog(logger::INFO,"Hello $", "world");
-    LOGGER->printLog(logger::WARNING,"Hello $", "world");
-    LOGGER->printLog(logger::ERROR,"Hello $", "world");
+    LOGGER->log(logger::severity::LOG,"Hello $", "world");
+    LOGGER->log(logger::severity::WARNING,"Hello $", "world");
+    LOGGER->log(logger::severity::ERROR,"Hello $", "world");
 
     return 0;
 }
@@ -108,5 +108,5 @@ void SDL_AppQuit(void* appstate) {
     }
 
     SDL_Quit();
-    LOGGER->printLog(logger::INFO,"Application quit successfully!", nullptr);
+    LOGGER->log(logger::severity::LOG,"Application quit successfully!", nullptr);
 }
