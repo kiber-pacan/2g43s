@@ -1,6 +1,11 @@
 #ifndef LOGGER_H
 #define LOGGER_H
 
+#include <string>
+#include <iostream>
+#include <vector>
+#include <glm/glm.hpp>
+
 /*
 foreground background
 black   30 40
@@ -21,10 +26,11 @@ public:
     bool st = false;
 
     //Color for severity of log
-    enum Severity {
-        INFO = 97,
-        WARNING = 93,
-        ERROR = 91
+    struct severity {
+        static constexpr auto LOG = "ffffff";
+        static constexpr auto WARNING = "eed202";
+        static constexpr auto ERROR = "ff1100";
+        static constexpr auto SUCCESS = "76ff00";
     };
 
     //I just want to create object what way because it is prettier for me
@@ -34,22 +40,22 @@ public:
 
     //Main method for logging
     template<typename T>
-    void printLog(int color, const char* str, T value, auto... args) {
-        start(color);
-        log(str, value, args...);
+    void log(const char* hex, const char* str, T value, auto... args) {
+        start(hex);
+        tempLog(str, value, args...);
         st = false;
         std::cout << "" << std::endl ;
     }
 
 private:
     //Stub method for recursion
-    static void log(const std::string& str) {
+    static void tempLog(const std::string& str) {
         std::cout << "";
     }
 
     //Method just for printing messages
     template<typename T>
-    void log(const char* str, T value, auto... args) {
+    void tempLog(const char* str, T value, auto... args) {
         /*
          *Basically erasing and printing char by char,
          *also replacing $ with value and then doing recursion with value as args[0]
@@ -59,7 +65,7 @@ private:
             if (*str == '$')
             {
                 std::cout << value;
-                log(str + 1, args...);
+                tempLog(str + 1, args...);
                 return;
             }
             std::cout << *str;
@@ -71,17 +77,24 @@ private:
         this->name = name;
     }
 
-    //Using ASCI color
-    void start(int color) {
+    //Start of log (Color and name)
+    void start(const char* hex) {
         if (!st) {
+
+            const std::string r{hex[0], hex[1]};
+            const std::string g{hex[2], hex[3]};
+            const std::string b{hex[4], hex[5]};
             st = true;
             std::cout
-            << "\e[0;"
-            << color
-            << "m"
-            << name
-            <<": ";
+            << "\033[38;2;"
+            << std::stoi(r, nullptr, 16) << ";"
+            << std::stoi(g, nullptr, 16) << ";"
+            << std::stoi(b, nullptr, 16) << "m"
+            << name << ": ";
         }
+    }
+    void end() {
+
     }
 };
 
