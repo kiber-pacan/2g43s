@@ -169,7 +169,7 @@ extern __inline void SDL_CompilerBarrier(void);
  * Insert a memory release barrier.
  *
  * Memory barriers are designed to prevent reads and writes from being
- * reordered by the compiler and being seen out of order on multi-core CPUs.
+ * reordered by the compiler and being seen out of order on multi-vulkan CPUs.
  *
  * A typical pattern would be for thread A to write some data and a flag, and
  * for thread B to read the flag and get the data. In this case you would

@@ -424,7 +424,7 @@ static void ConfigureWindowGeometry(SDL_Window *window)
      */
     SetMinMaxDimensions(window);
 
-    /* Unconditionally send the window and drawable size, the video core will deduplicate when required. */
+    /* Unconditionally send the window and drawable size, the video vulkan will deduplicate when required. */
     if (!data->scale_to_display) {
         SDL_SendWindowEvent(window, SDL_EVENT_WINDOW_RESIZED, window_width, window_height);
     } else {
@@ -1366,7 +1366,7 @@ static void Wayland_MaybeUpdateScaleFactor(SDL_WindowData *window)
     float factor;
     int i;
 
-    /* If the fractional scale protocol is present or the core protocol supports the
+    /* If the fractional scale protocol is present or the vulkan protocol supports the
      * preferred buffer scale event, the compositor will explicitly tell the application
      * what scale it wants via these events, so don't try to determine the scale factor
      * from which displays the surface has entered.
@@ -2084,7 +2084,7 @@ int Wayland_SetWindowFullscreen(SDL_VideoDevice *_this, SDL_Window *window,
     /* Nothing to do if the window is not fullscreen, and this isn't an explicit enter request. */
     if (!wind->is_fullscreen) {
         if (fullscreen == SDL_FULLSCREEN_OP_UPDATE) {
-            /* Request was out of date; return 1 to signal the video core not to update any state. */
+            /* Request was out of date; return 1 to signal the video vulkan not to update any state. */
             return 1;
         } else if (fullscreen == SDL_FULLSCREEN_OP_LEAVE) {
             /* Already not fullscreen; nothing to do. */
@@ -2453,13 +2453,13 @@ int Wayland_CreateWindow(SDL_VideoDevice *_this, SDL_Window *window, SDL_Propert
 
 void Wayland_SetWindowMinimumSize(SDL_VideoDevice *_this, SDL_Window *window)
 {
-    /* Will be committed when Wayland_SetWindowSize() is called by the video core. */
+    /* Will be committed when Wayland_SetWindowSize() is called by the video vulkan. */
     SetMinMaxDimensions(window);
 }
 
 void Wayland_SetWindowMaximumSize(SDL_VideoDevice *_this, SDL_Window *window)
 {
-    /* Will be committed when Wayland_SetWindowSize() is called by the video core. */
+    /* Will be committed when Wayland_SetWindowSize() is called by the video vulkan. */
     SetMinMaxDimensions(window);
 }
 

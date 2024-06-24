@@ -1650,7 +1650,7 @@ static int X11_SetWindowFullscreenViaWM(SDL_VideoDevice *_this, SDL_Window *wind
 
         if (!(window->flags & SDL_WINDOW_FULLSCREEN)) {
             if (fullscreen == SDL_FULLSCREEN_OP_UPDATE) {
-                /* Request was out of date; set -1 to signal the video core to undo a mode switch. */
+                /* Request was out of date; set -1 to signal the video vulkan to undo a mode switch. */
                 return -1;
             } else if (fullscreen == SDL_FULLSCREEN_OP_LEAVE) {
                 /* Nothing to do. */

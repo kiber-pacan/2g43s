@@ -69,7 +69,7 @@
 
 #define WAYLANDVID_DRIVER_NAME "wayland"
 
-/* Clamp certain core protocol versions on older versions of libwayland. */
+/* Clamp certain vulkan protocol versions on older versions of libwayland. */
 #if SDL_WAYLAND_CHECK_VERSION(1, 22, 0)
 #define SDL_WL_COMPOSITOR_VERSION 6
 #else

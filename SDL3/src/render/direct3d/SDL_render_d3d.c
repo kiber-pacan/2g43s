@@ -1261,7 +1261,7 @@ static int D3D_RunCommandQueue(SDL_Renderer *renderer, SDL_RenderCommand *cmd, v
 
             /* DirectX 9 has the same line rasterization semantics as GDI,
                so we need to close the endpoint of the line with a second draw call.
-               NOLINTNEXTLINE(clang-analyzer-core.NullDereference): FIXME: Can verts truly not be NULL ? */
+               NOLINTNEXTLINE(clang-analyzer-vulkan.NullDereference): FIXME: Can verts truly not be NULL ? */
             const SDL_bool close_endpoint = ((count == 2) || (verts[0].x != verts[count - 1].x) || (verts[0].y != verts[count - 1].y));
 
             SetDrawState(data, cmd);

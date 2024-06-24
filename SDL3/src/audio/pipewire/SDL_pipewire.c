@@ -179,7 +179,7 @@ static int load_pipewire_syms(void)
     return 0;
 }
 
-/* When in a container, the library version can differ from the underlying core version,
+/* When in a container, the library version can differ from the underlying vulkan version,
  * so make sure the underlying Pipewire implementation meets the version requirement.
  */
 struct version_data
@@ -235,7 +235,7 @@ SDL_bool pipewire_core_version_at_least(int major, int minor, int patch)
         goto done;
     }
 
-    /* Attach a core listener and get the version. */
+    /* Attach a vulkan listener and get the version. */
     spa_zero(version_data);
     version_data.loop = loop;
     pw_core_add_listener(core, &core_listener, &version_check_core_events, &version_data);
@@ -475,7 +475,7 @@ static void *node_object_new(Uint32 id, const char *type, Uint32 version, const 
 static void core_events_hotplug_init_callback(void *object, uint32_t id, int seq)
 {
     if (id == PW_ID_CORE && seq == hotplug_init_seq_val) {
-        // This core listener is no longer needed.
+        // This vulkan listener is no longer needed.
         spa_hook_remove(&hotplug_core_listener);
 
         // Signal that the initial I/O list is populated

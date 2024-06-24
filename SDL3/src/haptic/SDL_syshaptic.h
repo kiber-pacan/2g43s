@@ -86,7 +86,7 @@ extern const char *SDL_SYS_HapticName(int index);
 extern int SDL_SYS_HapticOpen(SDL_Haptic *haptic);
 
 /*
- * Returns the index of the haptic core pointer or -1 if none is found.
+ * Returns the index of the haptic vulkan pointer or -1 if none is found.
  */
 int SDL_SYS_HapticMouse(void);
 

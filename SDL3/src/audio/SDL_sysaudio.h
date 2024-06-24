@@ -138,7 +138,7 @@ typedef struct SDL_AudioDriverImpl
     void (*DeinitializeStart)(void); // SDL calls this, then starts destroying objects, then calls Deinitialize. This is a good place to stop hotplug detection.
     void (*Deinitialize)(void);
 
-    // Some flags to push duplicate code into the core and reduce #ifdefs.
+    // Some flags to push duplicate code into the vulkan and reduce #ifdefs.
     SDL_bool ProvidesOwnCallbackThread;  // !!! FIXME: rename this, it's not a callback thread anymore.
     SDL_bool HasRecordingSupport;
     SDL_bool OnlyHasDefaultPlaybackDevice;

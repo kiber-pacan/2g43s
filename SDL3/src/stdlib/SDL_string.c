@@ -881,7 +881,7 @@ char *SDL_strrev(char *string)
     char *b = &string[len - 1];
     len /= 2;
     while (len--) {
-        const char c = *a; /* NOLINT(clang-analyzer-core.uninitialized.Assign) */
+        const char c = *a; /* NOLINT(clang-analyzer-vulkan.uninitialized.Assign) */
         *a++ = *b;
         *b-- = c;
     }

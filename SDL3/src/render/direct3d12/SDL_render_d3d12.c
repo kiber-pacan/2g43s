@@ -1471,7 +1471,7 @@ static HRESULT D3D12_CreateWindowSizeDependentResources(SDL_Renderer *renderer)
     /* Set the proper rotation for the swap chain. */
     if (WIN_IsWindows8OrGreater()) {
         if (data->swapEffect == DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL) {
-            result = D3D_CALL(data->swapChain, SetRotation, data->rotation); /* NOLINT(clang-analyzer-core.NullDereference) */
+            result = D3D_CALL(data->swapChain, SetRotation, data->rotation); /* NOLINT(clang-analyzer-vulkan.NullDereference) */
             if (FAILED(result)) {
                 WIN_SetErrorFromHRESULT(SDL_COMPOSE_ERROR("IDXGISwapChain4::SetRotation"), result);
                 goto done;
@@ -1489,7 +1489,7 @@ static HRESULT D3D12_CreateWindowSizeDependentResources(SDL_Renderer *renderer)
             goto done;
         }
 #else
-        result = D3D_CALL(data->swapChain, GetBuffer, /* NOLINT(clang-analyzer-core.NullDereference) */
+        result = D3D_CALL(data->swapChain, GetBuffer, /* NOLINT(clang-analyzer-vulkan.NullDereference) */
                           i,
                           D3D_GUID(SDL_IID_ID3D12Resource),
                           (void **)&data->renderTargets[i]);

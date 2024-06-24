@@ -74,8 +74,8 @@
 #endif
 
 /* Keyboard and mouse names to match XWayland */
-#define WAYLAND_DEFAULT_KEYBOARD_NAME "Virtual core keyboard"
-#define WAYLAND_DEFAULT_POINTER_NAME "Virtual core pointer"
+#define WAYLAND_DEFAULT_KEYBOARD_NAME "Virtual vulkan keyboard"
+#define WAYLAND_DEFAULT_POINTER_NAME "Virtual vulkan pointer"
 
 struct SDL_WaylandTouchPoint
 {

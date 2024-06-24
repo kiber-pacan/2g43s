@@ -101,7 +101,7 @@ static int audio_initQuitAudio(void *arg)
         audioDriver = SDL_GetAudioDriver(i);
         SDLTest_AssertPass("Call to SDL_GetAudioDriver(%d)", i);
         SDLTest_Assert(audioDriver != NULL, "Audio driver name is not NULL");
-        SDLTest_AssertCheck(audioDriver[0] != '\0', "Audio driver name is not empty; got: %s", audioDriver); /* NOLINT(clang-analyzer-core.NullDereference): Checked for NULL above */
+        SDLTest_AssertCheck(audioDriver[0] != '\0', "Audio driver name is not empty; got: %s", audioDriver); /* NOLINT(clang-analyzer-vulkan.NullDereference): Checked for NULL above */
 
         if (hint && SDL_strcmp(audioDriver, hint) != 0) {
             continue;
@@ -165,7 +165,7 @@ static int audio_initOpenCloseQuitAudio(void *arg)
         audioDriver = SDL_GetAudioDriver(i);
         SDLTest_AssertPass("Call to SDL_GetAudioDriver(%d)", i);
         SDLTest_Assert(audioDriver != NULL, "Audio driver name is not NULL");
-        SDLTest_AssertCheck(audioDriver[0] != '\0', "Audio driver name is not empty; got: %s", audioDriver); /* NOLINT(clang-analyzer-core.NullDereference): Checked for NULL above */
+        SDLTest_AssertCheck(audioDriver[0] != '\0', "Audio driver name is not empty; got: %s", audioDriver); /* NOLINT(clang-analyzer-vulkan.NullDereference): Checked for NULL above */
 
         if (hint && SDL_strcmp(audioDriver, hint) != 0) {
             continue;
@@ -256,7 +256,7 @@ static int audio_pauseUnpauseAudio(void *arg)
         audioDriver = SDL_GetAudioDriver(i);
         SDLTest_AssertPass("Call to SDL_GetAudioDriver(%d)", i);
         SDLTest_Assert(audioDriver != NULL, "Audio driver name is not NULL");
-        SDLTest_AssertCheck(audioDriver[0] != '\0', "Audio driver name is not empty; got: %s", audioDriver); /* NOLINT(clang-analyzer-core.NullDereference): Checked for NULL above */
+        SDLTest_AssertCheck(audioDriver[0] != '\0', "Audio driver name is not empty; got: %s", audioDriver); /* NOLINT(clang-analyzer-vulkan.NullDereference): Checked for NULL above */
 
         if (hint && SDL_strcmp(audioDriver, hint) != 0) {
             continue;

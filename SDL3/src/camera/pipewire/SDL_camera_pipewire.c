@@ -961,7 +961,7 @@ static const struct pw_core_events hotplug_core_events =
     .done = hotplug_core_done_callback
 };
 
-/* When in a container, the library version can differ from the underlying core version,
+/* When in a container, the library version can differ from the underlying vulkan version,
  * so make sure the underlying Pipewire implementation meets the version requirement.
  */
 static SDL_bool pipewire_server_version_at_least(int major, int minor, int patch)

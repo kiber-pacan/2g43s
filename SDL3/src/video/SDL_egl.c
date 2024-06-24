@@ -255,7 +255,7 @@ SDL_FunctionPointer SDL_EGL_GetProcAddressInternal(SDL_VideoDevice *_this, const
         const Uint32 eglver = (((Uint32)_this->egl_data->egl_version_major) << 16) | ((Uint32)_this->egl_data->egl_version_minor);
         const SDL_bool is_egl_15_or_later = eglver >= ((((Uint32)1) << 16) | 5);
 
-        /* EGL 1.5 can use eglGetProcAddress() for any symbol. 1.4 and earlier can't use it for core entry points. */
+        /* EGL 1.5 can use eglGetProcAddress() for any symbol. 1.4 and earlier can't use it for vulkan entry points. */
         if (!retval && is_egl_15_or_later && _this->egl_data->eglGetProcAddress) {
             retval = _this->egl_data->eglGetProcAddress(proc);
         }

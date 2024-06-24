@@ -53,7 +53,7 @@ int SDL_SYS_CreateThread(SDL_Thread *thread,
 
     svcGetThreadPriority(&priority, CUR_THREAD_HANDLE);
 
-    /* prefer putting audio thread on system core */
+    /* prefer putting audio thread on system vulkan */
     if (thread->name && (SDL_strncmp(thread->name, "SDLAudioP", 9) == 0) && R_SUCCEEDED(APT_SetAppCpuTimeLimit(30))) {
         cpu = 1;
     }

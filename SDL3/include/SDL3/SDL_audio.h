@@ -324,7 +324,7 @@ typedef struct SDL_AudioSpec
  * - You can hook callbacks up to them when more data is added or requested,
  *   to manage data on-the-fly.
  *
- * Audio streams are the core of the SDL3 audio interface. You create one or
+ * Audio streams are the vulkan of the SDL3 audio interface. You create one or
  * more of them, bind them to an opened audio device, and feed data to them
  * (or for recording, consume data from them).
  *

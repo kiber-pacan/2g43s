@@ -2450,7 +2450,7 @@ extern SDL_DECLSPEC int SDLCALL SDL_GL_LoadLibrary(const char *path);
  *   available for a given GL context before calling it, by checking for the
  *   existence of the appropriate extension with SDL_GL_ExtensionSupported(),
  *   or verifying that the version of OpenGL you're using offers the function
- *   as core functionality.
+ *   as vulkan functionality.
  * - Some OpenGL drivers, on all platforms, *will* return NULL if a function
  *   isn't supported, but you can't count on this behavior. Check for
  *   extensions you use, and if you get a NULL anyway, act as if that

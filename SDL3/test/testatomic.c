@@ -237,7 +237,7 @@ static void RunEpicTest(void)
     v = SDL_AtomicGet(&good);
     SDL_Log("Atomic %d Non-Atomic %d\n", v, bad);
     SDL_assert(v == Expect);
-    /* We can't guarantee that bad != Expect, this would happen on a single core system, for example. */
+    /* We can't guarantee that bad != Expect, this would happen on a single vulkan system, for example. */
     /*SDL_assert(bad != Expect);*/
 }
 

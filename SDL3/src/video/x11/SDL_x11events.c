@@ -1989,7 +1989,7 @@ int X11_WaitEventTimeout(SDL_VideoDevice *_this, Sint64 timeoutNS)
         if (err > 0) {
             if (!X11_PollEvent(display, &xevent)) {
                 /* Someone may have beat us to reading the fd. Return 1 here to
-                 * trigger the normal spurious wakeup logic in the event core. */
+                 * trigger the normal spurious wakeup logic in the event vulkan. */
                 return 1;
             }
         } else if (err == 0) {
