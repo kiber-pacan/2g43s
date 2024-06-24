@@ -11,7 +11,7 @@ project(2g43s)
 set(EXECUTABLE_NAME ${PROJECT_NAME})
 
 #Set of source files
-set(include main.cpp gamecore/engine.hpp gamecore/tools.hpp gamecore/logger.cpp)
+set(include main.cpp gamecore/engine.hpp gamecore/tools.hpp gamecore/logger.cpp gamecore/sep/debug.hpp gamecore/sep/physDevice.h)
 
 add_executable(${EXECUTABLE_NAME})
 

@@ -1721,7 +1721,7 @@ elseif(UNIX AND NOT APPLE AND NOT RISCOS AND NOT HAIKU)
       "${SDL3_SOURCE_DIR}/src/core/linux/SDL_sandbox.c"
     )
 
-    # src/core/unix/*.c is included in a generic if(UNIX) section, elsewhere.
+    # src/vulkan/unix/*.c is included in a generic if(UNIX) section, elsewhere.
   endif()
 
   if(SDL_HIDAPI)
