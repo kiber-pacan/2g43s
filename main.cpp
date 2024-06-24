@@ -64,11 +64,13 @@ int SDL_AppInit(void** appstate, int argc, char* argv[]) {
     vulkan_engine.init();
     LOGGER->log(logger::severity::LOG,"Session ID: $", vulkan_engine.sid);
 
-    LOGGER->log(logger::severity::LOG,"Application started successfully!", nullptr);
+    LOGGER->log(logger::severity::SUCCESS,"Application started successfully!", nullptr);
 
+    /*
     LOGGER->log(logger::severity::LOG,"Hello $", "world");
     LOGGER->log(logger::severity::WARNING,"Hello $", "world");
     LOGGER->log(logger::severity::ERROR,"Hello $", "world");
+    */
 
     return 0;
 }
@@ -108,5 +110,5 @@ void SDL_AppQuit(void* appstate) {
     }
 
     SDL_Quit();
-    LOGGER->log(logger::severity::LOG,"Application quit successfully!", nullptr);
+    LOGGER->log(logger::severity::SUCCESS,"Application quit successfully!", nullptr);
 }

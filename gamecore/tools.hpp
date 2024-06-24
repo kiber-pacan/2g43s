@@ -3,6 +3,7 @@
 
 #include <random>
 #include <chrono>
+#include <iostream>
 
 //Some tools
 class tools {
