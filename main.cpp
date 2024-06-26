@@ -2,9 +2,9 @@
 #include <SDL3/SDL_main.h>
 #include <cmath>
 #include <vulkan/vulkan.h>
-#include "gamecore/engine.hpp"
-#include "gamecore/logger.cpp"
-#include "gamecore/tools.hpp"
+#include "core/engine.hpp"
+#include "core/logger.cpp"
+#include "core/tools.hpp"
 
 struct AppContext {
     SDL_Window* window{};
@@ -13,7 +13,7 @@ struct AppContext {
 };
 
 engine vulkan_engine{};
-logger* LOGGER = logger::of("INFO");
+logger* LOGGER = logger::of("MAIN");
 
 int SDL_Fail(){
     SDL_LogError(SDL_LOG_CATEGORY_CUSTOM, "Error %s", SDL_GetError());
