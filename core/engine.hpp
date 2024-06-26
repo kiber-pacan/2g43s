@@ -7,7 +7,8 @@
 #include "tools.hpp"
 #include "logger.cpp"
 #include "sep/debug.hpp"
-#include "sep/physDevice.h"
+#include "sep/logDevice.hpp"
+#include "sep/physDevice.hpp"
 
 //Parameters
 inline int HEIGHT = 360;
@@ -26,13 +27,16 @@ public:
     uint64_t sid;
 private:
     //Variables
-    VkInstance instance;
-    VkDebugUtilsMessengerEXT debugMessenger;
+    VkInstance instance = VK_NULL_HANDLE;
+    VkDebugUtilsMessengerEXT debugMessenger = VK_NULL_HANDLE;
 
-    logger* LOGGER;
-    //Rendering device
+    logger* LOGGER = nullptr;
+
+    //GPU
     VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
 
+    VkDevice device = VK_NULL_HANDLE;
+    VkQueue graphicsQueue;
 
     //Init engine and its counterparts
     void initVulkan() {
@@ -42,6 +46,8 @@ private:
         createInstance();
         setupDebugMessenger();
         physDevice::pickPhysicalDevice(instance,physicalDevice);
+        logDevice::createLogicalDevice(physicalDevice, device, graphicsQueue);
+
     }
 
     //Creating Vulkan instance
@@ -96,6 +102,8 @@ private:
 
     //Clean trash before closing app
     void cleanup() {
+        vkDestroyDevice(device, nullptr);
+
         if (enableValidationLayers) {
             debug::DestroyDebugUtilsMessengerEXT(instance, debugMessenger, nullptr);
         }
