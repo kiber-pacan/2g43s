@@ -3,16 +3,16 @@
 #include <cmath>
 #include <vulkan/vulkan.h>
 #include "core/engine.hpp"
-#include "core/logger.cpp"
+#include "core/logger.hpp"
 #include "core/tools.hpp"
 
 struct AppContext {
     SDL_Window* window{};
-    SDL_Renderer* renderer{};
+    engine vulkan_engine;
     SDL_bool app_quit = SDL_FALSE;
 };
 
-engine vulkan_engine{};
+
 logger* LOGGER = logger::of("MAIN");
 
 int SDL_Fail(){
@@ -27,16 +27,10 @@ int SDL_AppInit(void** appstate, int argc, char* argv[]) {
     }
 
     // create a window
-    SDL_Window* window = SDL_CreateWindow("Window", WIDTH, HEIGHT, SDL_WINDOW_RESIZABLE);
+    SDL_Window* window = SDL_CreateWindow("Window", WIDTH, HEIGHT, SDL_WINDOW_RESIZABLE | SDL_WINDOW_VULKAN);
     if (!window){
         return SDL_Fail();
     }
-
-    SDL_Renderer* renderer = SDL_CreateRenderer(window, nullptr);
-    if (!renderer){
-        return SDL_Fail();
-    }
-
 
     // print some information about the window
     SDL_ShowWindow(window);
@@ -52,18 +46,19 @@ int SDL_AppInit(void** appstate, int argc, char* argv[]) {
         LOGGER->log(logger::severity::LOG,"Random number: $ (between 1 and 100)", tools::randomNum<uint32_t>(1,100));
     }
 
+    //Set up Vulkan engine
+    engine vulkan_engine;
+    vulkan_engine.init(window);
+
     // set up the application data
     *appstate = new AppContext{
-       window,
-       renderer,
-    };
+        window,
+        vulkan_engine
+     };
 
     auto* app = (AppContext*)appstate;
 
-    //Set up Vulkan engine
-    vulkan_engine.init();
     LOGGER->log(logger::severity::LOG,"Session ID: $", vulkan_engine.sid);
-
     LOGGER->log(logger::severity::SUCCESS,"Application started successfully!", nullptr);
 
     /*
@@ -86,29 +81,21 @@ int SDL_AppEvent(void *appstate, const SDL_Event* event) {
 }
 
 int SDL_AppIterate(void *appstate) {
+    /*
     auto* app = (AppContext*)appstate;
 
-    // draw a color
-    auto time = SDL_GetTicks() / 1000.f;
-    auto red = (std::sin(time) + 1) / 2.0 * 255;
-    auto green = (std::sin(time / 2) + 1) / 2.0 * 255;
-    auto blue = (std::sin(time) * 2 + 1) / 2.0 * 255;
-
-    SDL_SetRenderDrawColor(app->renderer, red, green, blue, SDL_ALPHA_OPAQUE);
-    SDL_RenderClear(app->renderer);
-    SDL_RenderPresent(app->renderer);
-
     return app->app_quit;
+    */
 }
 
 void SDL_AppQuit(void* appstate) {
     auto* app = (AppContext*)appstate;
     if (app) {
-        SDL_DestroyRenderer(app->renderer);
         SDL_DestroyWindow(app->window);
         delete app;
     }
 
+    app->vulkan_engine.cleanup();
     SDL_Quit();
     LOGGER->log(logger::severity::SUCCESS,"Application quit successfully!", nullptr);
 }
