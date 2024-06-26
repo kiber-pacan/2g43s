@@ -80,19 +80,7 @@ struct debug {
         return true;
     }
 
-    //Get required validation extensions
-    static std::vector<const char*> getRequiredExtensions() {
-        uint32_t ExtensionCount = 0;
-        auto SDLextensions = SDL_Vulkan_GetInstanceExtensions(&ExtensionCount);
 
-        std::vector<const char*> extensions(SDLextensions, SDLextensions + ExtensionCount);
-
-        if (enableValidationLayers) {
-            extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
-        }
-
-        return extensions;
-    }
 };
 
 #endif //DEBUG_H
