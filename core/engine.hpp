@@ -1,14 +1,15 @@
 #ifndef ENGINE_H
 #define ENGINE_H
 
-#include <vulkan/vulkan.h>
+
 #include <SDL3/SDL_vulkan.h>
 
 #include "tools.hpp"
-#include "logger.cpp"
+#include "logger.hpp"
 #include "sep/debug.hpp"
 #include "sep/logDevice.hpp"
 #include "sep/physDevice.hpp"
+#include "sep/surface.hpp"
 
 //Parameters
 inline int HEIGHT = 360;
@@ -17,37 +18,55 @@ inline int WIDTH = 640;
 class engine {
 public:
     //Method for estanblishing and running engine
-    void init() {
-        initVulkan();
-        mainLoop();
-        cleanup();
+    void init(SDL_Window* window) {
+        initVulkan(window);
+    }
+
+    //Clean trash before closing app
+    void cleanup() {
+        vkDestroyDevice(device, nullptr);
+        SDL_Vulkan_DestroySurface(instance,surface,nullptr);
+
+        if (enableValidationLayers) {
+            debug::DestroyDebugUtilsMessengerEXT(instance, debugMessenger, nullptr);
+        }
+
+        vkDestroyInstance(instance, nullptr);
     }
 
     //Session ID
     uint64_t sid;
 private:
     //Variables
-    VkInstance instance = VK_NULL_HANDLE;
-    VkDebugUtilsMessengerEXT debugMessenger = VK_NULL_HANDLE;
+    VkInstance instance;
+    VkDebugUtilsMessengerEXT debugMessenger;
+
+    SDL_Window* window;
 
     logger* LOGGER = nullptr;
 
     //GPU
-    VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
+    VkPhysicalDevice physicalDevice;
 
-    VkDevice device = VK_NULL_HANDLE;
+    VkDevice device;
     VkQueue graphicsQueue;
 
+    //Window surface
+    VkSurfaceKHR surface;
+
     //Init engine and its counterparts
-    void initVulkan() {
+    void initVulkan(SDL_Window* window) {
+        this->window = window;
         sid = tools::randomNum<uint64_t>(1000000000,9999999999);
         LOGGER = logger::of("ENGINE");
-        LOGGER->log("76ff00", "Vulkan engine started successfully!", nullptr);
         createInstance();
         setupDebugMessenger();
         physDevice::pickPhysicalDevice(instance,physicalDevice);
         logDevice::createLogicalDevice(physicalDevice, device, graphicsQueue);
+        surface::createSurface(surface, window, instance);
 
+
+        LOGGER->log(logger::severity::SUCCESS, "Vulkan engine started successfully!", nullptr);
     }
 
     //Creating Vulkan instance
@@ -63,7 +82,7 @@ private:
         appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
         appInfo.pEngineName = "No Engine";
         appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
-        appInfo.apiVersion = VK_API_VERSION_1_0;
+        appInfo.apiVersion = VK_API_VERSION_1_3;
 
         //Instance info
         VkInstanceCreateInfo createInfo{};
@@ -71,10 +90,9 @@ private:
         createInfo.pApplicationInfo = &appInfo;
 
         //Vulkan extensions
-        auto extensions = debug::getRequiredExtensions();
+        auto extensions = getRequiredExtensions();
         createInfo.enabledExtensionCount = static_cast<uint32_t>(extensions.size());
         createInfo.ppEnabledExtensionNames = extensions.data();
-
 
         //Validation layers initialization
         VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo{};
@@ -100,15 +118,19 @@ private:
 
     }
 
-    //Clean trash before closing app
-    void cleanup() {
-        vkDestroyDevice(device, nullptr);
+    //Get required extensions
+    static std::vector<const char*> getRequiredExtensions() {
+        uint32_t extensionCount = 0;
+        auto SDLextensions = SDL_Vulkan_GetInstanceExtensions(&extensionCount);
+
+        std::vector<const char*> extensions(SDLextensions, SDLextensions + extensionCount);
 
         if (enableValidationLayers) {
-            debug::DestroyDebugUtilsMessengerEXT(instance, debugMessenger, nullptr);
+            extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
         }
+        extensions.push_back(VK_KHR_SURFACE_EXTENSION_NAME);
 
-        vkDestroyInstance(instance, nullptr);
+        return extensions;
     }
 
     //Setup debug messenger
