@@ -6,6 +6,10 @@
 #include <vector>
 #include <vulkan/vulkan.h>
 
+const std::vector<const char*> deviceExtensions = {
+    VK_KHR_SWAPCHAIN_EXTENSION_NAME
+};
+
 struct physDevice {
     //Main method for picking Graphics device
     static void pickPhysicalDevice(VkInstance& instance, VkPhysicalDevice& physicalDevice) {
@@ -59,6 +63,7 @@ struct physDevice {
 
         return score;
     }
+
 };
 
 #endif //PHYSICALDEVICE_H

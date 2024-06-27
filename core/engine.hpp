@@ -11,6 +11,8 @@
 #include "sep/physDevice.hpp"
 #include "sep/surface.hpp"
 
+
+
 //Parameters
 inline int HEIGHT = 360;
 inline int WIDTH = 640;
@@ -37,22 +39,26 @@ public:
     //Session ID
     uint64_t sid;
 private:
-    //Variables
+    //Instance
     VkInstance instance;
+
+    //Debug
     VkDebugUtilsMessengerEXT debugMessenger;
 
-    SDL_Window* window;
-
+    //Logger
     logger* LOGGER = nullptr;
 
-    //GPU
+    //Devices
     VkPhysicalDevice physicalDevice;
-
     VkDevice device;
-    VkQueue graphicsQueue;
 
-    //Window surface
+    //Window
     VkSurfaceKHR surface;
+    SDL_Window* window;
+
+    //Queues
+    VkQueue presentQueue;
+    VkQueue graphicsQueue;
 
     //Init engine and its counterparts
     void initVulkan(SDL_Window* window) {
@@ -62,7 +68,7 @@ private:
         createInstance();
         setupDebugMessenger();
         physDevice::pickPhysicalDevice(instance,physicalDevice);
-        logDevice::createLogicalDevice(physicalDevice, device, graphicsQueue);
+        logDevice::createLogicalDevice(physicalDevice, device, graphicsQueue, surface);
         surface::createSurface(surface, window, instance);
 
 
