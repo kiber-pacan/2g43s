@@ -27,7 +27,8 @@ public:
     //Clean trash before closing app
     void cleanup() {
         vkDestroyDevice(device, nullptr);
-        SDL_Vulkan_DestroySurface(instance,surface,nullptr);
+        SDL_Vulkan_DestroySurface(instance, surface, nullptr); //Maybe it is useless...
+        vkDestroySurfaceKHR(instance, surface, nullptr);
 
         if (enableValidationLayers) {
             debug::DestroyDebugUtilsMessengerEXT(instance, debugMessenger, nullptr);
@@ -37,39 +38,39 @@ public:
     }
 
     //Session ID
-    uint64_t sid;
+    uint64_t sid{};
 private:
     //Instance
-    VkInstance instance;
+    VkInstance instance{};
 
     //Debug
-    VkDebugUtilsMessengerEXT debugMessenger;
+    VkDebugUtilsMessengerEXT debugMessenger{};
 
     //Logger
-    logger* LOGGER = nullptr;
+    logger* LOGGER{};
 
     //Devices
-    VkPhysicalDevice physicalDevice;
-    VkDevice device;
+    VkPhysicalDevice physicalDevice{};
+    VkDevice device{};
 
     //Window
-    VkSurfaceKHR surface;
-    SDL_Window* window;
+    VkSurfaceKHR surface{};
+    SDL_Window* window{};
 
     //Queues
-    VkQueue presentQueue;
-    VkQueue graphicsQueue;
+    VkQueue presentQueue{};
+    VkQueue graphicsQueue{};
 
-    //Init engine and its counterparts
+    //Initializaiton of engine and its counterparts
     void initVulkan(SDL_Window* window) {
         this->window = window;
         sid = tools::randomNum<uint64_t>(1000000000,9999999999);
         LOGGER = logger::of("ENGINE");
         createInstance();
         setupDebugMessenger();
+        surface::createSurface(surface, window, instance);
         physDevice::pickPhysicalDevice(instance,physicalDevice);
         logDevice::createLogicalDevice(physicalDevice, device, graphicsQueue, surface);
-        surface::createSurface(surface, window, instance);
 
 
         LOGGER->log(logger::severity::SUCCESS, "Vulkan engine started successfully!", nullptr);
