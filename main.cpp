@@ -81,11 +81,9 @@ int SDL_AppEvent(void *appstate, const SDL_Event* event) {
 }
 
 int SDL_AppIterate(void *appstate) {
-    /*
     auto* app = (AppContext*)appstate;
 
     return app->app_quit;
-    */
 }
 
 void SDL_AppQuit(void* appstate) {
