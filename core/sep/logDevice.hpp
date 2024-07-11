@@ -8,7 +8,7 @@
 #include "queue.hpp"
 
 struct logDevice {
-    //Main method for creating logical device
+    // Main method for creating logical device
     static void createLogicalDevice(VkPhysicalDevice& physicalDevice, VkDevice& device, VkQueue& graphicsQueue, VkSurfaceKHR& surface) {
         QueueFamilyIndices indices = queue::findQueueFamilies(physicalDevice, surface);
 
