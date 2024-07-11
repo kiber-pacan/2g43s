@@ -17,7 +17,7 @@ bool constexpr enableValidationLayers = true;
 #endif
 
 struct debug {
-    //Destroying debug messenger (for cleanup)
+    // Destroying debug messenger (for cleanup)
     static void DestroyDebugUtilsMessengerEXT(VkInstance instance, VkDebugUtilsMessengerEXT debugMessenger, const VkAllocationCallbacks* pAllocator) {
         auto func = (PFN_vkDestroyDebugUtilsMessengerEXT) vkGetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT");
         if (func != nullptr) {
@@ -25,7 +25,7 @@ struct debug {
         }
     }
 
-    //Populate createinfo for debug messenger creation (separate method just for better readablity)
+    // Populate createinfo for debug messenger creation (separate method just for better readablity)
     static void populateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT& createInfo) {
         createInfo = {};
         createInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
@@ -45,7 +45,7 @@ struct debug {
         return VK_FALSE;
     }
 
-    //Creating debug messenger for printing messages
+    // Creating debug messenger for printing messages
     static VkResult CreateDebugUtilsMessengerEXT(VkInstance instance, const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkDebugUtilsMessengerEXT* pDebugMessenger) {
         auto func = (PFN_vkCreateDebugUtilsMessengerEXT) vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT");
         if (func != nullptr) {
@@ -54,7 +54,8 @@ struct debug {
             return VK_ERROR_EXTENSION_NOT_PRESENT;
         }
     }
-    //Checking if validation layers is supported by system
+
+    // Checking if validation layers is supported by system
     static bool checkValidationLayerSupport() {
         uint32_t layerCount;
         vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
@@ -79,8 +80,6 @@ struct debug {
 
         return true;
     }
-
-
 };
 
 #endif //DEBUG_H

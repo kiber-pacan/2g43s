@@ -2,12 +2,9 @@
 #define QUEUE_H
 
 #include <vulkan/vulkan.h>
-#include <SDL3/SDL_vulkan.h>
 #include <optional>
-#include <iostream>
 
-
-
+//Queue families
 struct QueueFamilyIndices {
     std::optional<uint32_t> graphicsFamily;
     std::optional<uint32_t> presentFamily;
@@ -17,35 +14,37 @@ struct QueueFamilyIndices {
     }
 };
 
+
+
 struct queue {
     static QueueFamilyIndices findQueueFamilies(VkPhysicalDevice &device, VkSurfaceKHR &surface) {
         QueueFamilyIndices indices;
 
-        //Get queue count
+        // Get queue count
         uint32_t queueFamilyCount = 0;
         vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, nullptr);
 
-        //Get queue families
+        // Get queue families
         std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
         vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, queueFamilies.data());
 
         int i = 0;
         for (const auto& queueFamily : queueFamilies) {
-            //Comparing bits and then setting index of graphicsFamily
+            // Comparing bits and then setting index of graphicsFamily
             if (queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT) {
                 indices.graphicsFamily = i;
             }
 
             VkBool32 presentSupport = false;
-            //Checking present support by queueFamily
+            // Checking present support by queueFamily
             vkGetPhysicalDeviceSurfaceSupportKHR(device, i, surface, &presentSupport);
 
-            //Setting index
+            // Setting index
             if (presentSupport) {
                 indices.presentFamily = i;
             }
 
-            //If graphics and present family != null break for loop
+            // If graphics and present family != null break for loop
             if (indices.isComplete()) {
                 break;
             }
@@ -56,4 +55,4 @@ struct queue {
     }
 };
 
-#endif //QUEUE_H
+#endif // QUEUE_H

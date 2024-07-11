@@ -64,25 +64,29 @@ private:
     //Initializaiton of engine and its counterparts
     void initVulkan(SDL_Window* window) {
         this->window = window;
+
+        // Engine related stuff
         sid = tools::randomNum<uint64_t>(1000000000,9999999999);
         LOGGER = logger::of("ENGINE");
+
+        // Vulkan related stuff
         createInstance();
         setupDebugMessenger();
         surface::createSurface(surface, window, instance);
-        physDevice::pickPhysicalDevice(instance,physicalDevice);
+        physDevice::pickPhysicalDevice(instance, physicalDevice, surface);
         logDevice::createLogicalDevice(physicalDevice, device, graphicsQueue, surface);
 
-
+        // Success!?
         LOGGER->log(logger::severity::SUCCESS, "Vulkan engine started successfully!", nullptr);
     }
 
-    //Creating Vulkan instance
+    // Creating Vulkan instance
     void createInstance() {
-        //Check if validation layers available when requested
+        // Check if validation layers available when requested
         if (enableValidationLayers && !debug::checkValidationLayerSupport()) {
             throw std::runtime_error("validation layers requested, but not available!");
         }
-        //App info
+        // App info
         VkApplicationInfo appInfo{};
         appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
         appInfo.pApplicationName = "Hello Triangle";
@@ -91,17 +95,17 @@ private:
         appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
         appInfo.apiVersion = VK_API_VERSION_1_3;
 
-        //Instance info
+        // Instance info
         VkInstanceCreateInfo createInfo{};
         createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
         createInfo.pApplicationInfo = &appInfo;
 
-        //Vulkan extensions
+        // Vulkan extensions
         auto extensions = getRequiredExtensions();
         createInfo.enabledExtensionCount = static_cast<uint32_t>(extensions.size());
         createInfo.ppEnabledExtensionNames = extensions.data();
 
-        //Validation layers initialization
+        // Validation layers initialization
         VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo{};
         if (enableValidationLayers) {
             createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
@@ -114,24 +118,25 @@ private:
             createInfo.pNext = nullptr;
         }
 
-        //Trying to create vulkan instance
+        // Trying to create vulkan instance
         if (vkCreateInstance(&createInfo, nullptr, &instance) != VK_SUCCESS) {
             throw std::runtime_error("failed to create instance!");
         }
     }
 
-    //Main engine loop
+    // Main engine loop
     void mainLoop() {
 
     }
 
-    //Get required extensions
+    // Get SDL extensions
     static std::vector<const char*> getRequiredExtensions() {
         uint32_t extensionCount = 0;
         auto SDLextensions = SDL_Vulkan_GetInstanceExtensions(&extensionCount);
 
         std::vector<const char*> extensions(SDLextensions, SDLextensions + extensionCount);
 
+        // If validation layers enabled when add them to extensions vector
         if (enableValidationLayers) {
             extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
         }
@@ -140,7 +145,7 @@ private:
         return extensions;
     }
 
-    //Setup debug messenger
+    // Setup debug messenger
     void setupDebugMessenger() {
         if (!enableValidationLayers) return;
 
