@@ -21,6 +21,7 @@ set(include
         core/sep/queue.hpp
         core/sep/logDevice.hpp
         core/sep/surface.hpp
+        core/sep/swapchain.hpp
 )
 
 add_executable(${EXECUTABLE_NAME})
