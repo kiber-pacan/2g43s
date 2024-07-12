@@ -21,11 +21,12 @@ class engine {
 public:
     //Method for estanblishing and running engine
     void init(SDL_Window* window) {
-        initVulkan(window);
+        initialize(window);
     }
 
     //Clean trash before closing app
     void cleanup() {
+        vkDestroySwapchainKHR(device, swapchain, nullptr);
         vkDestroyDevice(device, nullptr);
         SDL_Vulkan_DestroySurface(instance, surface, nullptr); //Maybe it is useless...
         vkDestroySurfaceKHR(instance, surface, nullptr);
@@ -55,6 +56,10 @@ private:
 
     //Window
     VkSurfaceKHR surface{};
+    VkSwapchainKHR swapchain{};
+    std::vector<VkImage> swapchainImages;
+    VkFormat swapchainImageFormat{};
+    VkExtent2D swapChainExtent{};
     SDL_Window* window{};
 
     //Queues
@@ -62,22 +67,29 @@ private:
     VkQueue graphicsQueue{};
 
     //Initializaiton of engine and its counterparts
-    void initVulkan(SDL_Window* window) {
+    void initialize(SDL_Window* window) {
         this->window = window;
 
         // Engine related stuff
         sid = tools::randomNum<uint64_t>(1000000000,9999999999);
         LOGGER = logger::of("ENGINE");
 
-        // Vulkan related stuff
+        initializeVulkan();
+
+        // Success!?
+        LOGGER->log(logger::severity::SUCCESS, "Vulkan engine started successfully!", nullptr);
+    }
+
+    // Vulkan related stuff
+    void initializeVulkan() {
         createInstance();
         setupDebugMessenger();
         surface::createSurface(surface, window, instance);
         physDevice::pickPhysicalDevice(instance, physicalDevice, surface);
         logDevice::createLogicalDevice(physicalDevice, device, graphicsQueue, surface);
-
-        // Success!?
-        LOGGER->log(logger::severity::SUCCESS, "Vulkan engine started successfully!", nullptr);
+        std::pair<VkFormat, VkExtent2D> pair = swapchain::createSwapChain(physicalDevice, device, surface, window, swapchain, swapchainImages);
+        swapchainImageFormat = pair.first;
+        swapChainExtent = pair.second;
     }
 
     // Creating Vulkan instance
