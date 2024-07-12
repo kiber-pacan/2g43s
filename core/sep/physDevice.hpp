@@ -13,6 +13,7 @@ const std::vector<const char*> deviceExtensions = {
     VK_KHR_SWAPCHAIN_EXTENSION_NAME
 };
 
+
 struct physDevice {
     // Main method for picking Graphics device
     static void pickPhysicalDevice(VkInstance& instance, VkPhysicalDevice& physicalDevice, VkSurfaceKHR& surface) {
@@ -41,34 +42,7 @@ struct physDevice {
         }
     }
 
-    static SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice& device, VkSurfaceKHR& surface) {
-        SwapChainSupportDetails details;
 
-        // Capabilities
-        vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, surface, &details.capabilities);
-
-        // Formats
-        uint32_t formatCount;
-        vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &formatCount, nullptr);
-
-        // Just some little precaution
-        if (formatCount != 0) {
-            details.formats.resize(formatCount);
-            vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &formatCount, details.formats.data());
-        }
-
-        // Present modes
-        uint32_t presentModeCount;
-        vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &presentModeCount, nullptr);
-
-        // Another little precaution
-        if (presentModeCount != 0) {
-            details.presentModes.resize(presentModeCount);
-            vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &presentModeCount, details.presentModes.data());
-        }
-
-        return details;
-    }
 
     // Rating devices (for multi gpu setups)
     static int rateDeviceSuitability(VkPhysicalDevice device, VkSurfaceKHR surface) {
@@ -96,7 +70,7 @@ struct physDevice {
         bool extensionsSupport = checkDeviceExtensionSupport(device);
         bool swapChainAdequate = false;
         if (extensionsSupport) {
-            SwapChainSupportDetails swapChainSupport = querySwapChainSupport(device, surface);
+            SwapChainSupportDetails swapChainSupport = swapchain::querySwapChainSupport(device, surface);
             swapChainAdequate = !swapChainSupport.formats.empty() && !swapChainSupport.presentModes.empty();
         }
 
