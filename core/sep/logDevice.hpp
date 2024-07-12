@@ -6,6 +6,10 @@
 
 #include "debug.hpp"
 #include "queue.hpp"
+#include "physDevice.hpp"
+
+
+
 
 struct logDevice {
     // Main method for creating logical device
@@ -34,8 +38,10 @@ struct logDevice {
         createInfo.queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.size());
 
         createInfo.pEnabledFeatures = &deviceFeatures;
+        //createInfo.enabledExtensionCount = 0;
 
-        createInfo.enabledExtensionCount = 0;
+        createInfo.enabledExtensionCount = static_cast<uint32_t>(deviceExtensions.size());
+        createInfo.ppEnabledExtensionNames = deviceExtensions.data();
 
         if (enableValidationLayers) {
             createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());

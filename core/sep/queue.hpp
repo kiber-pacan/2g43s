@@ -14,8 +14,6 @@ struct QueueFamilyIndices {
     }
 };
 
-
-
 struct queue {
     static QueueFamilyIndices findQueueFamilies(VkPhysicalDevice &device, VkSurfaceKHR &surface) {
         QueueFamilyIndices indices;
