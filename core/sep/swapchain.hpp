@@ -88,14 +88,13 @@ struct swapchain {
     }
 
     std::pair<VkFormat, VkExtent2D> static createSwapChain(VkPhysicalDevice& physicalDevice, VkDevice& device, VkSurfaceKHR& surface, SDL_Window* window, VkSwapchainKHR& swapchain, std::vector<VkImage>& swapchainImages) {
-        SwapChainSupportDetails swapChainSupport = querySwapChainSupport(physicalDevice, surface);
+SwapChainSupportDetails swapChainSupport = querySwapChainSupport(physicalDevice, surface);
 
         VkSurfaceFormatKHR surfaceFormat = chooseSwapSurfaceFormat(swapChainSupport.formats);
         VkPresentModeKHR presentMode = chooseSwapPresentMode(swapChainSupport.presentModes);
         VkExtent2D extent = chooseSwapExtent(swapChainSupport.capabilities, window);
 
         uint32_t imageCount = swapChainSupport.capabilities.minImageCount + 1;
-
         if (swapChainSupport.capabilities.maxImageCount > 0 && imageCount > swapChainSupport.capabilities.maxImageCount) {
             imageCount = swapChainSupport.capabilities.maxImageCount;
         }
@@ -120,20 +119,19 @@ struct swapchain {
             createInfo.pQueueFamilyIndices = queueFamilyIndices;
         } else {
             createInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
-            createInfo.queueFamilyIndexCount = 0; // Optional
-            createInfo.pQueueFamilyIndices = nullptr; // Optional
         }
 
         createInfo.preTransform = swapChainSupport.capabilities.currentTransform;
-
         createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
         createInfo.presentMode = presentMode;
         createInfo.clipped = VK_TRUE;
+
         createInfo.oldSwapchain = VK_NULL_HANDLE;
 
         if (vkCreateSwapchainKHR(device, &createInfo, nullptr, &swapchain) != VK_SUCCESS) {
             throw std::runtime_error("failed to create swap chain!");
         }
+
         vkGetSwapchainImagesKHR(device, swapchain, &imageCount, nullptr);
         swapchainImages.resize(imageCount);
         vkGetSwapchainImagesKHR(device, swapchain, &imageCount, swapchainImages.data());
