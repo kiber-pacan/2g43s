@@ -22,6 +22,7 @@ set(include
         core/sep/logDevice.hpp
         core/sep/surface.hpp
         core/sep/swapchain.hpp
+        core/graphics.hpp
 )
 
 add_executable(${EXECUTABLE_NAME})
@@ -30,7 +31,7 @@ add_executable(${EXECUTABLE_NAME})
 target_sources(${EXECUTABLE_NAME} PRIVATE ${include})
 
 #Adding SDL3 directory to project
-add_subdirectory(SDL3 EXCLUDE_FROM_ALL)
+find_package(SDL3 REQUIRED CONFIG REQUIRED COMPONENTS SDL3-shared)
 
 #Finding Vulkan API and adding it to project
 find_package(Vulkan REQUIRED)
