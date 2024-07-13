@@ -34,8 +34,8 @@ jobs:
       uses: threeal/cmake-action@main
       with:
         generator: Ninja
-        c-compiler: clang-19
-        cxx-compiler: clang++-19
+        c-compiler: clang
+        cxx-compiler: clang++
 
 
     - name: Test
