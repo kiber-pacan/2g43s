@@ -10,63 +10,94 @@
 #include "sep/logDevice.hpp"
 #include "sep/physDevice.hpp"
 #include "sep/surface.hpp"
+#include "graphics.hpp"
 
 
 
-//Parameters
+// Parameters
 inline int HEIGHT = 360;
 inline int WIDTH = 640;
 
 class engine {
 public:
-    //Method for estanblishing and running engine
+    // Method for estanblishing and running engine
     void init(SDL_Window* window) {
         initialize(window);
     }
 
-    //Clean trash before closing app
+    // Clean trash before closing app
     void cleanup() {
+        for (auto framebuffer : swapChainFramebuffers) {
+            vkDestroyFramebuffer(device, framebuffer, nullptr);
+        }
+
+        vkDestroyPipeline(device, graphicsPipeline, nullptr);
+        vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
+        vkDestroyRenderPass(device, renderPass, nullptr);
+
+
+        for (auto imageView : swapchainImageViews) {
+            if (imageView != VK_NULL_HANDLE) {
+                // Just for avoiding annoying validation errors
+                vkDestroyImageView(device, imageView, nullptr);
+            }
+        }
+
         vkDestroySwapchainKHR(device, swapchain, nullptr);
         vkDestroyDevice(device, nullptr);
-        SDL_Vulkan_DestroySurface(instance, surface, nullptr); //Maybe it is useless...
-        vkDestroySurfaceKHR(instance, surface, nullptr);
 
         if (enableValidationLayers) {
             debug::DestroyDebugUtilsMessengerEXT(instance, debugMessenger, nullptr);
         }
 
+        SDL_Vulkan_DestroySurface(instance, surface, nullptr); //Maybe it is useless...
+        vkDestroySurfaceKHR(instance, surface, nullptr);
+
         vkDestroyInstance(instance, nullptr);
     }
 
-    //Session ID
+    // Session ID
     uint64_t sid{};
 private:
-    //Instance
+    // Instance
     VkInstance instance{};
 
-    //Debug
+    // Debug
     VkDebugUtilsMessengerEXT debugMessenger{};
 
-    //Logger
+    // Logger
     logger* LOGGER{};
 
-    //Devices
+    // Devices
     VkPhysicalDevice physicalDevice{};
     VkDevice device{};
 
-    //Window
+    // Window
     VkSurfaceKHR surface{};
-    VkSwapchainKHR swapchain{};
-    std::vector<VkImage> swapchainImages;
-    VkFormat swapchainImageFormat{};
-    VkExtent2D swapChainExtent{};
     SDL_Window* window{};
 
-    //Queues
+    // Queues
     VkQueue presentQueue{};
     VkQueue graphicsQueue{};
 
-    //Initializaiton of engine and its counterparts
+    // Swap chain
+    VkSwapchainKHR swapchain{};
+
+    VkFormat swapchainImageFormat{};
+    VkExtent2D swapchainExtent{};
+
+    std::vector<VkImage> swapchainImages{};
+    std::vector<VkImageView> swapchainImageViews{};
+    std::vector<VkFramebuffer> swapChainFramebuffers{};
+
+
+    // Graphics
+    VkPipeline graphicsPipeline{};
+    VkRenderPass renderPass{};
+    VkPipelineLayout pipelineLayout{};
+
+
+    // Initializaiton of engine and its counterparts
     void initialize(SDL_Window* window) {
         this->window = window;
 
@@ -89,7 +120,40 @@ private:
         logDevice::createLogicalDevice(physicalDevice, device, graphicsQueue, surface);
         std::pair<VkFormat, VkExtent2D> pair = swapchain::createSwapChain(physicalDevice, device, surface, window, swapchain, swapchainImages);
         swapchainImageFormat = pair.first;
-        swapChainExtent = pair.second;
+        swapchainExtent = pair.second;
+        createImageViews();
+        graphics::createRenderPass(swapchainImageFormat, device, renderPass);
+        graphics::createGraphicsPipeline(device, pipelineLayout, renderPass, graphicsPipeline);
+    }
+
+
+    void createImageViews() {
+        swapchainImageViews.resize(swapchainImages.size());
+
+        // Loop thru all swap chain images
+        for (size_t i = 0; i < swapchainImages.size(); i++) {
+            VkImageViewCreateInfo createInfo{};
+            createInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+            createInfo.image = swapchainImages[i];
+
+            createInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+            createInfo.format = swapchainImageFormat;
+
+            createInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+            createInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+            createInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+            createInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+
+            createInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+            createInfo.subresourceRange.baseMipLevel = 0;
+            createInfo.subresourceRange.levelCount = 1;
+            createInfo.subresourceRange.baseArrayLayer = 0;
+            createInfo.subresourceRange.layerCount = 1;
+
+            if (vkCreateImageView(device, &createInfo, nullptr, &swapchainImageViews[i]) != VK_SUCCESS) {
+                throw std::runtime_error("failed to create image views!");
+            }
+        }
     }
 
     // Creating Vulkan instance
