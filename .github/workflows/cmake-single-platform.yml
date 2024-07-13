@@ -22,9 +22,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        compiler:
-          - llvm-19.0.0git
-          # you can specify the version after `-` like `llvm-13.0.0`.
+        os-version: [ ubuntu-latest ]
+        compiler: [ clang-19, clang++-19 ]
 
     steps:
     - uses: actions/checkout@v4
