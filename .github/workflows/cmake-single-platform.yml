@@ -28,9 +28,9 @@ jobs:
     - uses: actions/checkout@v4
 
     - name: Install Clang
-      uses: egor-tensin/setup-clang@v1
+      uses: KyleMayes/install-llvm-action@v2.0.3
       with:
-        version:
+        version: git
 
     - name: Setup Ninja
       uses: seanmiddleditch/gha-setup-ninja@v4
