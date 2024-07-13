@@ -27,8 +27,6 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
-      env:
-        CXX: clang++-19
 
     - name: Configure CMake
       with:
