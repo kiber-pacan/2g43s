@@ -23,12 +23,12 @@ jobs:
       fail-fast: false
       matrix:
         os-version: [ ubuntu-latest ]
-        compiler: [ clang-19, clang++-19 ]
+        compiler: [ clang-19]
 
     steps:
     - uses: actions/checkout@v4
       env:
-        CC: ${{ matrix.compiler }}
+        CXX: clang++-19
 
     - name: Configure CMake
       # Configure CMake in a 'build' subdirectory. `CMAKE_BUILD_TYPE` is only required if you are using a single-configuration generator such as make.
