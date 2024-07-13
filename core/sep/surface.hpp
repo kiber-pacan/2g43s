@@ -9,10 +9,10 @@
 struct surface {
     static void createSurface(VkSurfaceKHR& surface, SDL_Window* window, VkInstance& instance) {
         logger* LOGGER = logger::of("SURFACE");
-        if (SDL_Vulkan_CreateSurface(window, instance, nullptr, &surface) == SDL_FALSE) {
-            LOGGER->log(logger::severity::ERROR, "Failed to create Vulkan surface", nullptr);
-        } else {
+        if (SDL_Vulkan_CreateSurface(window, instance, nullptr, &surface) == 0) {
             LOGGER->log(logger::severity::SUCCESS, "Successfuly created Vulkan surface with SDL3", nullptr);
+        } else {
+            LOGGER->log(logger::severity::ERROR, "Failed to create Vulkan surface", nullptr);
         }
     }
 };
