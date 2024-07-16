@@ -31,7 +31,7 @@ add_executable(${EXECUTABLE_NAME})
 target_sources(${EXECUTABLE_NAME} PRIVATE ${include})
 
 #Adding SDL3 directory to project
-find_package(SDL2 REQUIRED CONFIG REQUIRED COMPONENTS SDL2-shared)
+find_package(SDL2 REQUIRED CONFIG)
 
 #Finding Vulkan API and adding it to project
 find_package(Vulkan REQUIRED)
