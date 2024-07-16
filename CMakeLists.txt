@@ -41,5 +41,5 @@ if(Vulkan_FOUND)
 endif()
 
 #Linking libraries to project
-target_link_libraries(${EXECUTABLE_NAME} PUBLIC SDL3::SDL3 ${Vulkan_LIBRARIES})
+target_link_libraries(${EXECUTABLE_NAME} PUBLIC SDL2::SDL2 ${Vulkan_LIBRARIES})
 target_compile_definitions(${EXECUTABLE_NAME} PUBLIC SDL_MAIN_USE_CALLBACKS)
