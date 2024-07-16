@@ -50,7 +50,7 @@ jobs:
     - name: Setup SDL
       # You may pin to the exact commit or the version.
       # uses: libsdl-org/setup-sdl@2343b6c61d6def3048fbd8e8f2e2363f609464c3
-      uses: libsdl-org/setup-sdl@v1
+      uses: libsdl-org/setup-sdl@main
       with:
         cmake-generator: Ninja
         version: 3-head
