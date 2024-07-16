@@ -53,8 +53,8 @@ jobs:
       uses: libsdl-org/setup-sdl@v1
       with:
           install-linux-dependencies: true
-          version: 3-head
-          version-sdl-image: 3-head
+          version: 9960738916
+          #version-sdl-image: 9960738916
           
 
     - name: Set reusable strings
