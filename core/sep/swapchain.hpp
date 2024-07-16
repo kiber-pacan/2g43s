@@ -79,9 +79,9 @@ struct swapchain {
                 static_cast<uint32_t>(width),
                 static_cast<uint32_t>(height)
             };
-
-            actualExtent.width = std::clamp(actualExtent.width, capabilities.minImageExtent.width, capabilities.maxImageExtent.width);
-            actualExtent.height = std::clamp(actualExtent.height, capabilities.minImageExtent.height, capabilities.maxImageExtent.height);
+            //max, std::max(min, v)
+            actualExtent.width = std::min(capabilities.maxImageExtent.width, std::max(capabilities.minImageExtent.width, actualExtent.width));
+            actualExtent.height = std::min(capabilities.maxImageExtent.height, std::max(capabilities.minImageExtent.height, actualExtent.height));
 
             return actualExtent;
         }
