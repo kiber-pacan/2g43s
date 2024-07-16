@@ -5,7 +5,7 @@
 #include <vulkan/vulkan.h>
 
 struct graphics {
-
+    // For reading shader files
     static std::vector<char> readFile(const std::string& filename) {
         std::ifstream file(filename, std::ios::ate | std::ios::binary);
 
@@ -188,6 +188,7 @@ struct graphics {
     static void createFramebuffers(std::vector<VkFramebuffer>& swapChainFramebuffers, std::vector<VkImageView>& swapchainImageViews, VkRenderPass& renderPass, VkExtent2D& swapchainExtent, VkDevice& device) {
         swapChainFramebuffers.resize(swapchainImageViews.size());
 
+        // Create framebuffer for each swapchain image view
         for (size_t i = 0; i < swapchainImageViews.size(); i++) {
             VkImageView attachments[] = {
                 swapchainImageViews[i]
