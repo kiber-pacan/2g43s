@@ -52,38 +52,9 @@ jobs:
       # uses: libsdl-org/setup-sdl@2343b6c61d6def3048fbd8e8f2e2363f609464c3
       uses: libsdl-org/setup-sdl@v1
       with:
-        # Required version of SDL (2.x.y, 2-any, 2-latest, 2-head, 3-head), or git hash
-        version: 3-latest
-        
-        # Allow pre-releases
-        #pre-release: # default is true
-        
-        # CMake build type (Release/Debug/RelWithDebInfo/MinSizeRel)
-        #build-type: # default is Debug
-        
-        # Build and install SDL_test library
-        #sdl-test: # optional, default is false
-        
-        # Path of a CMake toolchain file
-        #cmake-toolchain-file: # optional
-        
-        # CMake generator name (see https://cmake.org/cmake/help/latest/manual/cmake-generators.7.html)
-        #cmake-generator: # optional
-        
-        # Install Linux dependencies
-        install-linux-dependencies: true
-        
-        # Run commands as `$shell $file` (with $file containing the build commands)
-        #shell: # optional
-        
-        # Unique string to include in the GitHub SDL cache hash
-        #discriminator: # optional
-        
-        # Add path of the SDL (shared) library to PATH/LD_LIBRARY_PATH/DYLD_LIBRARY_PATH
-        #add-to-environment: # optional, default is false
-        
-        # A GitHub API token.
-        #token: # optional, default is ${{ github.token }}
+          install-linux-dependencies: true
+          version: 2-latest
+          version-sdl-image: 2-latest
           
 
     - name: Set reusable strings
