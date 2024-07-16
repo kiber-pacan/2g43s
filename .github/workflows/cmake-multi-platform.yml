@@ -53,7 +53,7 @@ jobs:
       uses: libsdl-org/setup-sdl@v1
       with:
           install-linux-dependencies: true
-          version: 3-head
+          version: 70727d36b28d90127049a9c23e10d395a0f39876
           #version-sdl-image: 9960738916
       
     - name: Setup Vulkan API
