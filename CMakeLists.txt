@@ -1,8 +1,8 @@
 #Set cmake version
 cmake_minimum_required(VERSION 3.28)
 
-#Setting c++ 26 standard
-set(CMAKE_CXX_STANDARD 26)
+#Setting c++ 23 standard
+set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED on)
 set(CMAKE_CXX_EXTENSIONS off)
 
