@@ -47,6 +47,16 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
+    - name: Setup SDL
+      # You may pin to the exact commit or the version.
+      # uses: libsdl-org/setup-sdl@2343b6c61d6def3048fbd8e8f2e2363f609464c3
+      uses: libsdl-org/setup-sdl@v1
+      with:
+          install-linux-dependencies: true
+          version: sdl2-latest
+          #version-sdl-image: 9960738916
+          
+
     - name: Set reusable strings
       # Turn repeated input strings (such as the build output directory) into step outputs. These step outputs can be used throughout the workflow file.
       id: strings
