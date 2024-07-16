@@ -52,9 +52,10 @@ jobs:
       # uses: libsdl-org/setup-sdl@2343b6c61d6def3048fbd8e8f2e2363f609464c3
       uses: libsdl-org/setup-sdl@v1
       with:
-          install-linux-dependencies: true
-          version: 3-head
-          #version-sdl-image: 9960738916
+        cmake-generator: Ninja
+        version: 3-head
+        sdl-test: true
+        shell: ${{ matrix.platform.shell }}
       
     - name: Setup Vulkan API
       # You may pin to the exact commit or the version.
