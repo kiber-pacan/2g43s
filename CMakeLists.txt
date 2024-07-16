@@ -31,7 +31,7 @@ add_executable(${EXECUTABLE_NAME})
 target_sources(${EXECUTABLE_NAME} PRIVATE ${include})
 
 #Adding SDL3 directory to project
-find_package(SDL2 REQUIRED CONFIG)
+find_package(SDL3 REQUIRED CONFIG)
 
 #Finding Vulkan API and adding it to project
 find_package(Vulkan REQUIRED)
@@ -41,5 +41,5 @@ if(Vulkan_FOUND)
 endif()
 
 #Linking libraries to project
-target_link_libraries(${EXECUTABLE_NAME} PUBLIC SDL2::SDL2 ${Vulkan_LIBRARIES})
+target_link_libraries(${EXECUTABLE_NAME} PUBLIC SDL3::SDL3 ${Vulkan_LIBRARIES})
 target_compile_definitions(${EXECUTABLE_NAME} PUBLIC SDL_MAIN_USE_CALLBACKS)
