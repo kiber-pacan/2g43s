@@ -54,7 +54,6 @@ jobs:
       with:
         version: 3-head
         sdl-test: true
-        shell: ${{ matrix.platform.shell }}
       
     - name: Setup Vulkan API
       # You may pin to the exact commit or the version.
