@@ -3,15 +3,13 @@
 
 #include <string>
 #include <iostream>
-#include <vector>
-#include <glm/glm.hpp>
 
 // Just look at names of class and file...
 class logger {
 public:
     const char* name;
     // For ASCI start of print
-    bool st = false;
+    bool started = false;
 
     // Color for severity of log
     struct severity {
@@ -31,7 +29,7 @@ public:
     void log(const char* hex, const char* str, T value, auto... args) {
         start(hex);
         tempLog(str, value, args...);
-        st = false;
+        started = false;
         std::cout << "" << std::endl ;
     }
 
@@ -67,12 +65,13 @@ private:
 
     // Start of log (Color and name)
     void start(const char* hex) {
-        if (!st) {
+        if (!started) {
 
+            // Raw hex colors
             const std::string r{hex[0], hex[1]};
             const std::string g{hex[2], hex[3]};
             const std::string b{hex[4], hex[5]};
-            st = true;
+            started = true;
             std::cout
             << "\033[38;2;"
             << std::stoi(r, nullptr, 16) << ";"
