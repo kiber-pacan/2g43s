@@ -8,8 +8,6 @@
 class logger {
 public:
     const char* name;
-    // For ASCI start of print
-    bool started = false;
 
     // Color for severity of log
     struct severity {
@@ -27,10 +25,14 @@ public:
     // Main method for logging
     template<typename T>
     void log(const char* hex, const char* str, T value, auto... args) {
+        // Coloring
         start(hex);
+
+        // Printing
         tempLog(str, value, args...);
-        started = false;
-        std::cout << "" << std::endl ;
+
+        // Reset coloring
+        std::cout << "\033[0m" << std::endl;
     }
 
 private:
@@ -46,10 +48,8 @@ private:
          *Basically erasing and printing char by char,
          *also replacing $ with value and then doing recursion with value as args[0]
         */
-        for (; *str != '\0'; str++)
-        {
-            if (*str == '$')
-            {
+        for (; *str != '\0'; str++) {
+            if (*str == '$') {
                 std::cout << value;
                 tempLog(str + 1, args...);
                 return;
@@ -65,23 +65,16 @@ private:
 
     // Start of log (Color and name)
     void start(const char* hex) {
-        if (!started) {
-
-            // Raw hex colors
-            const std::string r{hex[0], hex[1]};
-            const std::string g{hex[2], hex[3]};
-            const std::string b{hex[4], hex[5]};
-            started = true;
-            std::cout
-            << "\033[38;2;"
-            << std::stoi(r, nullptr, 16) << ";"
-            << std::stoi(g, nullptr, 16) << ";"
-            << std::stoi(b, nullptr, 16) << "m"
-            << name << ": ";
-        }
-    }
-    void end() {
-
+        // Raw hex colors
+        const std::string r{hex[0], hex[1]};
+        const std::string g{hex[2], hex[3]};
+        const std::string b{hex[4], hex[5]};
+        std::cout
+        << "\033[38;2;"
+        << std::stoi(r, nullptr, 16) << ";"
+        << std::stoi(g, nullptr, 16) << ";"
+        << std::stoi(b, nullptr, 16) << "m"
+        << name << ": ";
     }
 };
 
