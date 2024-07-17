@@ -89,4 +89,4 @@ jobs:
         name: ${{ matrix.os }}
         path: |
           ${{ steps.strings.outputs.build-output-dir }}/2g43s
-          ${{ steps.strings.outputs.build-output-dir }}/2g43s.exe
+          ${{ steps.strings.outputs.build-output-dir }}/Debug/2g43s.exe
