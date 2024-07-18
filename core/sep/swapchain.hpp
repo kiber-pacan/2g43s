@@ -88,7 +88,7 @@ struct swapchain {
     }
 
     std::pair<VkFormat, VkExtent2D> static createSwapChain(VkPhysicalDevice& physicalDevice, VkDevice& device, VkSurfaceKHR& surface, SDL_Window* window, VkSwapchainKHR& swapchain, std::vector<VkImage>& swapchainImages) {
-SwapChainSupportDetails swapChainSupport = querySwapChainSupport(physicalDevice, surface);
+        SwapChainSupportDetails swapChainSupport = querySwapChainSupport(physicalDevice, surface);
 
         VkSurfaceFormatKHR surfaceFormat = chooseSwapSurfaceFormat(swapChainSupport.formats);
         VkPresentModeKHR presentMode = chooseSwapPresentMode(swapChainSupport.presentModes);

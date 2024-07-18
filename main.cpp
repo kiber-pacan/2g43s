@@ -82,6 +82,10 @@ int SDL_AppEvent(void *appstate, const SDL_Event* event) {
 
 int SDL_AppIterate(void *appstate) {
     auto* app = (AppContext*)appstate;
+    engine& vulkan_engine = app->vulkan_engine;
+
+    vulkan_engine.drawFrame();
+    vkDeviceWaitIdle(vulkan_engine.device);
 
     return app->app_quit;
 }

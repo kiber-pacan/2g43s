@@ -13,7 +13,7 @@
 
 struct logDevice {
     // Main method for creating logical device
-    static void createLogicalDevice(VkPhysicalDevice& physicalDevice, VkDevice& device, VkQueue& graphicsQueue, VkSurfaceKHR& surface) {
+    static void createLogicalDevice(VkPhysicalDevice& physicalDevice, VkDevice& device, VkQueue& graphicsQueue, VkQueue& presentQueue, VkSurfaceKHR& surface) {
         QueueFamilyIndices indices = queue::findQueueFamilies(physicalDevice, surface);
 
         std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
@@ -55,6 +55,7 @@ struct logDevice {
         }
 
         vkGetDeviceQueue(device, indices.presentFamily.value(), 0, &graphicsQueue);
+        vkGetDeviceQueue(device, indices.presentFamily.value(), 0, &presentQueue);
     }
 };
 
