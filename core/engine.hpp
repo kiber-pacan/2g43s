@@ -27,6 +27,12 @@ public:
 
     // Clean trash before closing app
     void cleanup() {
+        vkDestroySemaphore(device, renderFinishedSemaphore, nullptr);
+        vkDestroySemaphore(device, imageAvailableSemaphore, nullptr);
+        vkDestroyFence(device, inFlightFence, nullptr);
+
+        vkDestroyCommandPool(device, commandPool, nullptr);
+
         for (auto framebuffer : swapChainFramebuffers) {
             vkDestroyFramebuffer(device, framebuffer, nullptr);
         }
@@ -35,12 +41,8 @@ public:
         vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
         vkDestroyRenderPass(device, renderPass, nullptr);
 
-
         for (auto imageView : swapchainImageViews) {
-            if (imageView != VK_NULL_HANDLE) {
-                // Just for avoiding annoying validation errors
-                vkDestroyImageView(device, imageView, nullptr);
-            }
+            vkDestroyImageView(device, imageView, nullptr);
         }
 
         vkDestroySwapchainKHR(device, swapchain, nullptr);
@@ -50,14 +52,62 @@ public:
             debug::DestroyDebugUtilsMessengerEXT(instance, debugMessenger, nullptr);
         }
 
-        SDL_Vulkan_DestroySurface(instance, surface, nullptr); //Maybe it is useless...
         vkDestroySurfaceKHR(instance, surface, nullptr);
-
         vkDestroyInstance(instance, nullptr);
+    }
+
+    // Draw
+    void drawFrame() {
+        vkWaitForFences(device, 1, &inFlightFence, VK_TRUE, UINT64_MAX);
+        vkResetFences(device, 1, &inFlightFence);
+
+        uint32_t imageIndex;
+        vkAcquireNextImageKHR(device, swapchain, UINT64_MAX, imageAvailableSemaphore, VK_NULL_HANDLE, &imageIndex);
+
+        vkResetCommandBuffer(commandBuffer, /*VkCommandBufferResetFlagBits*/ 0);
+        graphics::recordCommandBuffer(commandBuffer, imageIndex, renderPass, swapChainFramebuffers, swapchainExtent, graphicsPipeline);
+
+        VkSubmitInfo submitInfo{};
+        submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+
+        VkSemaphore waitSemaphores[] = {imageAvailableSemaphore};
+        VkPipelineStageFlags waitStages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
+        submitInfo.waitSemaphoreCount = 1;
+        submitInfo.pWaitSemaphores = waitSemaphores;
+        submitInfo.pWaitDstStageMask = waitStages;
+
+        submitInfo.commandBufferCount = 1;
+        submitInfo.pCommandBuffers = &commandBuffer;
+
+        VkSemaphore signalSemaphores[] = {renderFinishedSemaphore};
+        submitInfo.signalSemaphoreCount = 1;
+        submitInfo.pSignalSemaphores = signalSemaphores;
+
+        if (vkQueueSubmit(graphicsQueue, 1, &submitInfo, inFlightFence) != VK_SUCCESS) {
+            throw std::runtime_error("failed to submit draw command buffer!");
+        }
+
+        VkPresentInfoKHR presentInfo{};
+        presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+
+        presentInfo.waitSemaphoreCount = 1;
+        presentInfo.pWaitSemaphores = signalSemaphores;
+
+        VkSwapchainKHR swapChains[] = {swapchain};
+        presentInfo.swapchainCount = 1;
+        presentInfo.pSwapchains = swapChains;
+
+        presentInfo.pImageIndices = &imageIndex;
+
+        vkQueuePresentKHR(presentQueue, &presentInfo);
     }
 
     // Session ID
     uint64_t sid{};
+
+    // Devices
+    VkPhysicalDevice physicalDevice{};
+    VkDevice device{};
 private:
     // Instance
     VkInstance instance{};
@@ -67,10 +117,6 @@ private:
 
     // Logger
     logger* LOGGER{};
-
-    // Devices
-    VkPhysicalDevice physicalDevice{};
-    VkDevice device{};
 
     // Window
     VkSurfaceKHR surface{};
@@ -95,7 +141,13 @@ private:
     VkPipeline graphicsPipeline{};
     VkRenderPass renderPass{};
     VkPipelineLayout pipelineLayout{};
+    VkCommandPool commandPool{};
+    VkCommandBuffer commandBuffer{};
 
+    // Fences
+    VkSemaphore imageAvailableSemaphore{};
+    VkSemaphore renderFinishedSemaphore{};
+    VkFence inFlightFence{};
 
     // Initializaiton of engine and its counterparts
     void initialize(SDL_Window* window) {
@@ -113,17 +165,28 @@ private:
 
     // Vulkan related stuff
     void initializeVulkan() {
+        // Basic things
         createInstance();
         setupDebugMessenger();
+
+        // SDL3 surface
         surface::createSurface(surface, window, instance);
+
+        // Devices
         physDevice::pickPhysicalDevice(instance, physicalDevice, surface);
-        logDevice::createLogicalDevice(physicalDevice, device, graphicsQueue, surface);
+        logDevice::createLogicalDevice(physicalDevice, device, graphicsQueue, presentQueue, surface);
+
+        // Swapchain
         std::pair<VkFormat, VkExtent2D> pair = swapchain::createSwapChain(physicalDevice, device, surface, window, swapchain, swapchainImages);
         swapchainImageFormat = pair.first;
         swapchainExtent = pair.second;
         createImageViews();
-        graphics::createRenderPass(swapchainImageFormat, device, renderPass);
-        graphics::createGraphicsPipeline(device, pipelineLayout, renderPass, graphicsPipeline);
+
+        // Graphics
+        graphics::init(device, physicalDevice, commandPool, pipelineLayout, surface, renderPass, graphicsPipeline, swapchainImageFormat,
+            commandBuffer, swapChainFramebuffers, swapchainExtent, swapchainImageViews);
+
+        createSyncObjects();
     }
 
 
@@ -230,6 +293,21 @@ private:
 
         if (debug::CreateDebugUtilsMessengerEXT(instance, &createInfo, nullptr, &debugMessenger) != VK_SUCCESS) {
             throw std::runtime_error("failed to set up debug messenger!");
+        }
+    }
+
+    void createSyncObjects() {
+        VkSemaphoreCreateInfo semaphoreInfo{};
+        semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+
+        VkFenceCreateInfo fenceInfo{};
+        fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+        fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+
+        if (vkCreateSemaphore(device, &semaphoreInfo, nullptr, &imageAvailableSemaphore) != VK_SUCCESS ||
+                vkCreateSemaphore(device, &semaphoreInfo, nullptr, &renderFinishedSemaphore) != VK_SUCCESS ||
+                vkCreateFence(device, &fenceInfo, nullptr, &inFlightFence) != VK_SUCCESS) {
+            throw std::runtime_error("failed to create semaphores!");
         }
     }
 };
