@@ -27,9 +27,11 @@ public:
 
     // Clean trash before closing app
     void cleanup() {
-        vkDestroySemaphore(device, renderFinishedSemaphore, nullptr);
-        vkDestroySemaphore(device, imageAvailableSemaphore, nullptr);
-        vkDestroyFence(device, inFlightFence, nullptr);
+        for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+            vkDestroySemaphore(device, renderFinishedSemaphores[i], nullptr);
+            vkDestroySemaphore(device, imageAvailableSemaphores[i], nullptr);
+            vkDestroyFence(device, inFlightFences[i], nullptr);
+        }
 
         vkDestroyCommandPool(device, commandPool, nullptr);
 
@@ -58,32 +60,32 @@ public:
 
     // Draw
     void drawFrame() {
-        vkWaitForFences(device, 1, &inFlightFence, VK_TRUE, UINT64_MAX);
-        vkResetFences(device, 1, &inFlightFence);
+        vkWaitForFences(device, 1, &inFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
+        vkResetFences(device, 1, &inFlightFences[currentFrame]);
 
         uint32_t imageIndex;
-        vkAcquireNextImageKHR(device, swapchain, UINT64_MAX, imageAvailableSemaphore, VK_NULL_HANDLE, &imageIndex);
+        vkAcquireNextImageKHR(device, swapchain, UINT64_MAX, imageAvailableSemaphores[currentFrame], VK_NULL_HANDLE, &imageIndex);
 
-        vkResetCommandBuffer(commandBuffer, /*VkCommandBufferResetFlagBits*/ 0);
-        graphics::recordCommandBuffer(commandBuffer, imageIndex, renderPass, swapChainFramebuffers, swapchainExtent, graphicsPipeline);
+        vkResetCommandBuffer(commandBuffers[currentFrame], /*VkCommandBufferResetFlagBits*/ 0);
+        graphics::recordCommandBuffer(commandBuffers[currentFrame], imageIndex, renderPass, swapChainFramebuffers, swapchainExtent, graphicsPipeline);
 
         VkSubmitInfo submitInfo{};
         submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 
-        VkSemaphore waitSemaphores[] = {imageAvailableSemaphore};
+        VkSemaphore waitSemaphores[] = {imageAvailableSemaphores[currentFrame]};
         VkPipelineStageFlags waitStages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
         submitInfo.waitSemaphoreCount = 1;
         submitInfo.pWaitSemaphores = waitSemaphores;
         submitInfo.pWaitDstStageMask = waitStages;
 
         submitInfo.commandBufferCount = 1;
-        submitInfo.pCommandBuffers = &commandBuffer;
+        submitInfo.pCommandBuffers = &commandBuffers[currentFrame];
 
-        VkSemaphore signalSemaphores[] = {renderFinishedSemaphore};
+        VkSemaphore signalSemaphores[] = {renderFinishedSemaphores[currentFrame]};
         submitInfo.signalSemaphoreCount = 1;
         submitInfo.pSignalSemaphores = signalSemaphores;
 
-        if (vkQueueSubmit(graphicsQueue, 1, &submitInfo, inFlightFence) != VK_SUCCESS) {
+        if (vkQueueSubmit(graphicsQueue, 1, &submitInfo, inFlightFences[currentFrame]) != VK_SUCCESS) {
             throw std::runtime_error("failed to submit draw command buffer!");
         }
 
@@ -100,7 +102,10 @@ public:
         presentInfo.pImageIndices = &imageIndex;
 
         vkQueuePresentKHR(presentQueue, &presentInfo);
+
+        currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
     }
+
 
     // Session ID
     uint64_t sid{};
@@ -142,12 +147,16 @@ private:
     VkRenderPass renderPass{};
     VkPipelineLayout pipelineLayout{};
     VkCommandPool commandPool{};
-    VkCommandBuffer commandBuffer{};
+    std::vector<VkCommandBuffer> commandBuffers{};
 
     // Fences
-    VkSemaphore imageAvailableSemaphore{};
-    VkSemaphore renderFinishedSemaphore{};
-    VkFence inFlightFence{};
+    std::vector<VkSemaphore> imageAvailableSemaphores{};
+    std::vector<VkSemaphore> renderFinishedSemaphores{};
+    std::vector<VkFence> inFlightFences{};
+
+    // Frames
+    const int MAX_FRAMES_IN_FLIGHT = 2;
+    uint32_t currentFrame = 0;
 
     // Initializaiton of engine and its counterparts
     void initialize(SDL_Window* window) {
@@ -180,44 +189,19 @@ private:
         std::pair<VkFormat, VkExtent2D> pair = swapchain::createSwapChain(physicalDevice, device, surface, window, swapchain, swapchainImages);
         swapchainImageFormat = pair.first;
         swapchainExtent = pair.second;
-        createImageViews();
+        swapchain::createImageViews(device, swapchainImageViews, swapchainImages, swapchainImageFormat);
 
         // Graphics
-        graphics::init(device, physicalDevice, commandPool, pipelineLayout, surface, renderPass, graphicsPipeline, swapchainImageFormat,
-            commandBuffer, swapChainFramebuffers, swapchainExtent, swapchainImageViews);
-
-        createSyncObjects();
+        graphics::createRenderPass(device, swapchainImageFormat, renderPass);
+        graphics::createGraphicsPipeline(device, pipelineLayout, renderPass, graphicsPipeline);
+        graphics::createFramebuffers(device, swapChainFramebuffers, swapchainImageViews, renderPass, swapchainExtent);
+        graphics::createCommandPool(device, physicalDevice, commandPool, surface);
+        graphics::createCommandBuffer(commandPool, device, commandBuffers, MAX_FRAMES_IN_FLIGHT);
+        graphics::createSyncObjects(device, imageAvailableSemaphores, renderFinishedSemaphores, inFlightFences, MAX_FRAMES_IN_FLIGHT);
     }
 
 
-    void createImageViews() {
-        swapchainImageViews.resize(swapchainImages.size());
 
-        // Loop thru all swap chain images
-        for (size_t i = 0; i < swapchainImages.size(); i++) {
-            VkImageViewCreateInfo createInfo{};
-            createInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-            createInfo.image = swapchainImages[i];
-
-            createInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-            createInfo.format = swapchainImageFormat;
-
-            createInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
-            createInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
-            createInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
-            createInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
-
-            createInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-            createInfo.subresourceRange.baseMipLevel = 0;
-            createInfo.subresourceRange.levelCount = 1;
-            createInfo.subresourceRange.baseArrayLayer = 0;
-            createInfo.subresourceRange.layerCount = 1;
-
-            if (vkCreateImageView(device, &createInfo, nullptr, &swapchainImageViews[i]) != VK_SUCCESS) {
-                throw std::runtime_error("failed to create image views!");
-            }
-        }
-    }
 
     // Creating Vulkan instance
     void createInstance() {
@@ -263,11 +247,6 @@ private:
         }
     }
 
-    // Main engine loop
-    void mainLoop() {
-
-    }
-
     // Get SDL extensions
     static std::vector<const char*> getRequiredExtensions() {
         uint32_t extensionCount = 0;
@@ -296,20 +275,7 @@ private:
         }
     }
 
-    void createSyncObjects() {
-        VkSemaphoreCreateInfo semaphoreInfo{};
-        semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
 
-        VkFenceCreateInfo fenceInfo{};
-        fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-        fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
-
-        if (vkCreateSemaphore(device, &semaphoreInfo, nullptr, &imageAvailableSemaphore) != VK_SUCCESS ||
-                vkCreateSemaphore(device, &semaphoreInfo, nullptr, &renderFinishedSemaphore) != VK_SUCCESS ||
-                vkCreateFence(device, &fenceInfo, nullptr, &inFlightFence) != VK_SUCCESS) {
-            throw std::runtime_error("failed to create semaphores!");
-        }
-    }
 };
 
 #endif //ENGINE_H
