@@ -34,6 +34,8 @@ target_sources(${EXECUTABLE_NAME} PRIVATE ${include})
 #Adding SDL3 directory to project
 find_package(SDL3 REQUIRED CONFIG)
 
+include_directories(/core/shaders)
+
 #Finding Vulkan API and adding it to project
 find_package(Vulkan REQUIRED)
 if(Vulkan_FOUND)
