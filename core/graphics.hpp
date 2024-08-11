@@ -2,7 +2,11 @@
 #define GRAPHICS_H
 
 #include <fstream>
+#include <bits/fs_fwd.h>
 #include <vulkan/vulkan.h>
+#include <filesystem>
+
+namespace fs = std::filesystem;
 
 struct graphics {
     // For reading shader files
@@ -39,8 +43,8 @@ struct graphics {
 
     // Main method for creating graphics pipeline
     static void createGraphicsPipeline(VkDevice& device, VkPipelineLayout& pipelinelayout, VkRenderPass& renderpass, VkPipeline& graphicsPipeline) {
-        auto vertShaderCode = readFile("/home/daunita/CLionProjects/vulkanbro/core/shaders/vert.spv");
-        auto fragShaderCode = readFile("/home/daunita/CLionProjects/vulkanbro/core/shaders/frag.spv");
+        auto vertShaderCode = readFile("/home/down/CLionProjects/2g43s/core/shaders/vert.spv");
+        auto fragShaderCode = readFile("/home/down/CLionProjects/2g43s/core/shaders/frag.spv");
 
         VkShaderModule vertShaderModule = createShaderModule(vertShaderCode, device);
         VkShaderModule fragShaderModule = createShaderModule(fragShaderCode, device);
@@ -150,7 +154,7 @@ struct graphics {
         vkDestroyShaderModule(device, vertShaderModule, nullptr);
     }
 
-    static void createRenderPass(VkFormat& swapchainImageFormat, VkDevice& device, VkRenderPass& renderPass) {
+    static void createRenderPass(VkDevice& device, VkFormat& swapchainImageFormat, VkRenderPass& renderPass) {
         VkAttachmentDescription colorAttachment{};
         colorAttachment.format = swapchainImageFormat;
         colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -186,7 +190,7 @@ struct graphics {
         }
     }
 
-    static void createFramebuffers(std::vector<VkFramebuffer>& swapChainFramebuffers, std::vector<VkImageView>& swapchainImageViews, VkRenderPass& renderPass, VkExtent2D& swapchainExtent, VkDevice& device) {
+    static void createFramebuffers(VkDevice& device, std::vector<VkFramebuffer>& swapChainFramebuffers, std::vector<VkImageView>& swapchainImageViews, VkRenderPass& renderPass, VkExtent2D& swapchainExtent) {
         swapChainFramebuffers.resize(swapchainImageViews.size());
 
         for (size_t i = 0; i < swapchainImageViews.size(); i++) {
@@ -222,14 +226,16 @@ struct graphics {
         }
     }
 
-    static void createCommandBuffer(VkCommandPool& commandPool, VkDevice& device, VkCommandBuffer& commandBuffer) {
+    static void createCommandBuffer(VkCommandPool& commandPool, VkDevice& device, std::vector<VkCommandBuffer>& commandBuffers, int MAX_FRAMES_IN_FLIGHT) {
+        commandBuffers.resize(MAX_FRAMES_IN_FLIGHT);
+
         VkCommandBufferAllocateInfo allocInfo{};
         allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
         allocInfo.commandPool = commandPool;
         allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-        allocInfo.commandBufferCount = 1;
+        allocInfo.commandBufferCount = (uint32_t) commandBuffers.size();
 
-        if (vkAllocateCommandBuffers(device, &allocInfo, &commandBuffer) != VK_SUCCESS) {
+        if (vkAllocateCommandBuffers(device, &allocInfo, commandBuffers.data()) != VK_SUCCESS) {
             throw std::runtime_error("failed to allocate command buffers!");
         }
     }
@@ -237,8 +243,6 @@ struct graphics {
     static void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex, VkRenderPass& renderPass, std::vector<VkFramebuffer>& swapChainFramebuffers, VkExtent2D& swapchainExtent, VkPipeline& graphicsPipeline) {
         VkCommandBufferBeginInfo beginInfo{};
         beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-        beginInfo.flags = 0; // Optional
-        beginInfo.pInheritanceInfo = nullptr; // Optional
 
         if (vkBeginCommandBuffer(commandBuffer, &beginInfo) != VK_SUCCESS) {
             throw std::runtime_error("failed to begin recording command buffer!");
@@ -248,7 +252,6 @@ struct graphics {
         renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
         renderPassInfo.renderPass = renderPass;
         renderPassInfo.framebuffer = swapChainFramebuffers[imageIndex];
-
         renderPassInfo.renderArea.offset = {0, 0};
         renderPassInfo.renderArea.extent = swapchainExtent;
 
@@ -283,17 +286,26 @@ struct graphics {
         }
     }
 
-    // Probably super stupid braindead thing
-    static void init(VkDevice& device, VkPhysicalDevice& physicalDevice, VkCommandPool& commandPool, VkPipelineLayout& pipelinelayout,
-        VkSurfaceKHR& surface, VkRenderPass& renderPass, VkPipeline& graphicsPipeline, VkFormat& swapchainImageFormat,
-        VkCommandBuffer& commandBuffer, std::vector<VkFramebuffer>& swapChainFramebuffers, VkExtent2D& swapchainExtent,
-        std::vector<VkImageView> swapchainImageViews)
-    {
-        createRenderPass(swapchainImageFormat, device, renderPass);
-        createGraphicsPipeline(device, pipelinelayout, renderPass, graphicsPipeline);
-        createFramebuffers(swapChainFramebuffers, swapchainImageViews, renderPass, swapchainExtent, device);
-        createCommandPool(device, physicalDevice, commandPool, surface);
-        createCommandBuffer(commandPool, device, commandBuffer);
+    void static createSyncObjects(VkDevice& device, std::vector<VkSemaphore>& imageAvailableSemaphores, std::vector<VkSemaphore>& renderFinishedSemaphores, std::vector<VkFence>& inFlightFences, int MAX_FRAMES_IN_FLIGHT) {
+        imageAvailableSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
+        renderFinishedSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
+        inFlightFences.resize(MAX_FRAMES_IN_FLIGHT);
+
+        VkSemaphoreCreateInfo semaphoreInfo{};
+        semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+
+        VkFenceCreateInfo fenceInfo{};
+        fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+        fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+
+        for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+            if (vkCreateSemaphore(device, &semaphoreInfo, nullptr, &imageAvailableSemaphores[i]) != VK_SUCCESS ||
+                vkCreateSemaphore(device, &semaphoreInfo, nullptr, &renderFinishedSemaphores[i]) != VK_SUCCESS ||
+                vkCreateFence(device, &fenceInfo, nullptr, &inFlightFences[i]) != VK_SUCCESS) {
+
+                throw std::runtime_error("failed to create synchronization objects for a frame!");
+                }
+        }
     }
 };
 
