@@ -127,6 +127,7 @@ struct graphics {
         pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
         pipelineInfo.stageCount = 2;
         pipelineInfo.pStages = shaderStages;
+        pipelineInfo.pTessellationState = nullptr;
 
         if (vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &pipelinelayout) != VK_SUCCESS) {
             throw std::runtime_error("failed to create pipeline layout!");
@@ -213,7 +214,7 @@ struct graphics {
         }
     }
 
-    static void createCommandPool(VkDevice& device, VkPhysicalDevice& physicalDevice, VkCommandPool& commandPool, VkSurfaceKHR surface) {
+    static void createCommandPool(VkDevice& device, VkPhysicalDevice& physicalDevice, VkCommandPool& commandPool, VkSurfaceKHR& surface) {
         QueueFamilyIndices queueFamilyIndices = queue::findQueueFamilies(physicalDevice, surface);
 
         VkCommandPoolCreateInfo poolInfo{};
@@ -240,7 +241,7 @@ struct graphics {
         }
     }
 
-    static void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex, VkRenderPass& renderPass, std::vector<VkFramebuffer>& swapChainFramebuffers, VkExtent2D& swapchainExtent, VkPipeline& graphicsPipeline) {
+    static void recordCommandBuffer(VkCommandBuffer& commandBuffer, uint32_t imageIndex, VkRenderPass& renderPass, std::vector<VkFramebuffer>& swapChainFramebuffers, VkExtent2D& swapchainExtent, VkPipeline& graphicsPipeline) {
         VkCommandBufferBeginInfo beginInfo{};
         beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 
@@ -302,7 +303,6 @@ struct graphics {
             if (vkCreateSemaphore(device, &semaphoreInfo, nullptr, &imageAvailableSemaphores[i]) != VK_SUCCESS ||
                 vkCreateSemaphore(device, &semaphoreInfo, nullptr, &renderFinishedSemaphores[i]) != VK_SUCCESS ||
                 vkCreateFence(device, &fenceInfo, nullptr, &inFlightFences[i]) != VK_SUCCESS) {
-
                 throw std::runtime_error("failed to create synchronization objects for a frame!");
                 }
         }
