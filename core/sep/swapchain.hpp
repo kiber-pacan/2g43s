@@ -88,7 +88,7 @@ struct swapchain {
     }
 
     std::pair<VkFormat, VkExtent2D> static createSwapChain(VkPhysicalDevice& physicalDevice, VkDevice& device, VkSurfaceKHR& surface, SDL_Window* window, VkSwapchainKHR& swapchain, std::vector<VkImage>& swapchainImages) {
-       SwapChainSupportDetails swapChainSupport = querySwapChainSupport(physicalDevice, surface);
+        SwapChainSupportDetails swapChainSupport = querySwapChainSupport(physicalDevice, surface);
 
         VkSurfaceFormatKHR surfaceFormat = chooseSwapSurfaceFormat(swapChainSupport.formats);
         VkPresentModeKHR presentMode = chooseSwapPresentMode(swapChainSupport.presentModes);
@@ -125,8 +125,6 @@ struct swapchain {
         createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
         createInfo.presentMode = presentMode;
         createInfo.clipped = VK_TRUE;
-
-        createInfo.oldSwapchain = VK_NULL_HANDLE;
 
         if (vkCreateSwapchainKHR(device, &createInfo, nullptr, &swapchain) != VK_SUCCESS) {
             throw std::runtime_error("failed to create swap chain!");
