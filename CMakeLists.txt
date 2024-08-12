@@ -14,16 +14,18 @@ set(EXECUTABLE_NAME ${PROJECT_NAME})
 #Set of source files
 set(include
         main.cpp
+
         core/engine.hpp
         core/tools.hpp
         core/logger.hpp
+        core/graphics.hpp
+
         core/sep/debug.hpp
         core/sep/physDevice.hpp
         core/sep/queue.hpp
         core/sep/logDevice.hpp
         core/sep/surface.hpp
         core/sep/swapchain.hpp
-        core/graphics.hpp
 )
 
 add_executable(${EXECUTABLE_NAME})
@@ -34,7 +36,7 @@ target_sources(${EXECUTABLE_NAME} PRIVATE ${include})
 #Adding SDL3 directory to project
 find_package(SDL3 REQUIRED CONFIG)
 
-include_directories(/core/shaders)
+#include_directories(/core/shaders)
 
 #Finding Vulkan API and adding it to project
 find_package(Vulkan REQUIRED)
