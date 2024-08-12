@@ -32,6 +32,7 @@ int SDL_AppInit(void** appstate, int argc, char* argv[]) {
         return SDL_Fail();
     }
 
+
     // print some information about the window
     SDL_ShowWindow(window);
     {
@@ -76,6 +77,12 @@ int SDL_AppEvent(void *appstate, const SDL_Event* event) {
     if (event->type == SDL_EVENT_QUIT) {
         app->app_quit = SDL_TRUE;
     }
+    if (event->type == SDL_EVENT_WINDOW_RESIZED) {
+        //int height = 0;
+        //int width = 0;
+        //SDL_GetWindowSizeInPixels(app->window, &height, &width);
+        //app->vulkan_engine.framebufferResized = true;
+    }
 
     return 0;
 }
@@ -83,6 +90,7 @@ int SDL_AppEvent(void *appstate, const SDL_Event* event) {
 int SDL_AppIterate(void *appstate) {
     auto* app = (AppContext*)appstate;
     engine& vulkan_engine = app->vulkan_engine;
+
 
     vulkan_engine.drawFrame();
     vkDeviceWaitIdle(vulkan_engine.device);
@@ -92,12 +100,13 @@ int SDL_AppIterate(void *appstate) {
 
 void SDL_AppQuit(void* appstate) {
     auto* app = (AppContext*)appstate;
+
     if (app) {
+        app->vulkan_engine.cleanup();
         SDL_DestroyWindow(app->window);
         delete app;
     }
 
-    app->vulkan_engine.cleanup();
     SDL_Quit();
     LOGGER->log(logger::severity::SUCCESS,"Application quit successfully!", nullptr);
 }
