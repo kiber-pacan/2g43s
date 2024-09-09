@@ -7,9 +7,10 @@
 #include <SDL3/SDL_vulkan.h>
 
 struct surface {
+    // Creating surface with SDL3
     static void createSurface(VkSurfaceKHR& surface, SDL_Window* window, VkInstance& instance) {
         logger* LOGGER = logger::of("SURFACE");
-        if (SDL_Vulkan_CreateSurface(window, instance, nullptr, &surface) == 0) {
+        if (SDL_Vulkan_CreateSurface(window, instance, nullptr, &surface) == SDL_TRUE) {
             LOGGER->log(logger::severity::SUCCESS, "Successfuly created Vulkan surface with SDL3", nullptr);
         } else {
             LOGGER->log(logger::severity::ERROR, "Failed to create Vulkan surface", nullptr);
