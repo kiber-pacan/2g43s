@@ -26,15 +26,17 @@ set(include
         core/sep/logDevice.hpp
         core/sep/surface.hpp
         core/sep/swapchain.hpp
+        core/sep/key.hpp
 )
 
-add_executable(${EXECUTABLE_NAME})
+add_executable(${EXECUTABLE_NAME}
 
 #Adding sources to project
 target_sources(${EXECUTABLE_NAME} PRIVATE ${include})
 
 #Adding SDL3 directory to project
 find_package(SDL3 REQUIRED CONFIG)
+find_package(glm REQUIRED CONFIG)
 
 #include_directories(/core/shaders)
 
@@ -46,5 +48,5 @@ if(Vulkan_FOUND)
 endif()
 
 #Linking libraries to project
-target_link_libraries(${EXECUTABLE_NAME} PUBLIC SDL3::SDL3 ${Vulkan_LIBRARIES})
+target_link_libraries(${EXECUTABLE_NAME} PUBLIC SDL3::SDL3 ${Vulkan_LIBRARIES} glm::glm)
 target_compile_definitions(${EXECUTABLE_NAME} PUBLIC SDL_MAIN_USE_CALLBACKS)
