@@ -16,7 +16,7 @@ const std::vector<const char*> deviceExtensions = {
 
 struct physDevice {
     // Main method for picking Graphics device
-    static void pickPhysicalDevice(VkInstance& instance, VkPhysicalDevice& physicalDevice, VkSurfaceKHR& surface) {
+    static void pickPhysicalDevice(VkPhysicalDevice& physicalDevice, VkInstance& instance, VkSurfaceKHR& surface) {
         uint32_t deviceCount = 0;
         vkEnumeratePhysicalDevices(instance, &deviceCount, nullptr);
 
@@ -41,8 +41,6 @@ struct physDevice {
             throw std::runtime_error("failed to find a suitable GPU!");
         }
     }
-
-
 
     // Rating devices (for multi gpu setups)
     static int rateDeviceSuitability(VkPhysicalDevice device, VkSurfaceKHR surface) {
@@ -70,7 +68,7 @@ struct physDevice {
         bool extensionsSupport = checkDeviceExtensionSupport(device);
         bool swapChainAdequate = false;
         if (extensionsSupport) {
-            SwapChainSupportDetails swapChainSupport = swapchain::querySwapChainSupport(device, surface);
+            SwapchainSupportDetails swapChainSupport = swapchain::querySwapchainSupport(device, surface);
             swapChainAdequate = !swapChainSupport.formats.empty() && !swapChainSupport.presentModes.empty();
         }
 
@@ -96,7 +94,6 @@ struct physDevice {
 
         return requiredExtensions.empty();
     }
-
 };
 
 #endif //PHYSICALDEVICE_H
