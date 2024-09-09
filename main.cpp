@@ -6,23 +6,27 @@
 #include "core/logger.hpp"
 #include "core/tools.hpp"
 
+#define GLM_FORCE_RADIANS
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+
 struct AppContext {
-    SDL_Window* window{};
-    engine vulkan_engine;
-    SDL_bool app_quit = SDL_FALSE;
+    SDL_Window* win{};
+    engine eng;
+    SDL_bool quit = SDL_FALSE;
 };
 
 
 logger* LOGGER = logger::of("MAIN");
 
-int SDL_Fail(){
+SDL_AppResult SDL_Fail() {
     SDL_LogError(SDL_LOG_CATEGORY_CUSTOM, "Error %s", SDL_GetError());
-    return -1;
+    return SDL_APP_FAILURE;
 }
 
-int SDL_AppInit(void** appstate, int argc, char* argv[]) {
+SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
     // init the library, here we make a window so we only need the Video capabilities.
-    if (SDL_Init(SDL_INIT_VIDEO)){
+    if (!SDL_Init(SDL_INIT_VIDEO)){
         return SDL_Fail();
     }
 
@@ -55,55 +59,73 @@ int SDL_AppInit(void** appstate, int argc, char* argv[]) {
     *appstate = new AppContext{
         window,
         vulkan_engine
-     };
-
-    auto* app = (AppContext*)appstate;
+    };
 
     LOGGER->log(logger::severity::LOG,"Session ID: $", vulkan_engine.sid);
     LOGGER->log(logger::severity::SUCCESS,"Application started successfully!", nullptr);
 
-    /*
-    LOGGER->log(logger::severity::LOG,"Hello $", "world");
-    LOGGER->log(logger::severity::WARNING,"Hello $", "world");
-    LOGGER->log(logger::severity::ERROR,"Hello $", "world");
-    */
-
-    return 0;
+    return SDL_APP_CONTINUE;
 }
 
-int SDL_AppEvent(void *appstate, const SDL_Event* event) {
-    auto* app = (AppContext*)appstate;
+bool w = false;
+bool a = false;
+bool s = false;
+bool d = false;
 
-    if (event->type == SDL_EVENT_QUIT) {
-        app->app_quit = SDL_TRUE;
-    }
-    if (event->type == SDL_EVENT_WINDOW_RESIZED) {
-        //int height = 0;
-        //int width = 0;
-        //SDL_GetWindowSizeInPixels(app->window, &height, &width);
-        //app->vulkan_engine.framebufferResized = true;
+
+SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *e) {
+    auto* app = static_cast<AppContext *>(appstate);
+
+    if (e->type == SDL_EVENT_QUIT) {
+        app->quit = SDL_TRUE;
+        return SDL_APP_SUCCESS;
     }
 
-    return 0;
+    if (e->type == SDL_EVENT_KEY_UP && e->key.scancode == SDL_SCANCODE_W) {
+        w = false;
+    } else if (e->type == SDL_EVENT_KEY_DOWN && e->key.scancode == SDL_SCANCODE_W) {
+        w = true;
+    }
+    if (e->type == SDL_EVENT_KEY_UP && e->key.scancode == SDL_SCANCODE_S) {
+        s = false;
+    } else if (e->type == SDL_EVENT_KEY_DOWN && e->key.scancode == SDL_SCANCODE_S) {
+        s = true;
+    }
+    if (e->type == SDL_EVENT_KEY_UP && e->key.scancode == SDL_SCANCODE_A) {
+        a = false;
+    } else if (e->type == SDL_EVENT_KEY_DOWN && e->key.scancode == SDL_SCANCODE_A) {
+        a = true;
+    }
+    if (e->type == SDL_EVENT_KEY_UP && e->key.scancode == SDL_SCANCODE_D) {
+        d = false;
+    } else if (e->type == SDL_EVENT_KEY_DOWN && e->key.scancode == SDL_SCANCODE_D) {
+        d = true;
+    }
+
+    return SDL_APP_CONTINUE;
 }
 
-int SDL_AppIterate(void *appstate) {
-    auto* app = (AppContext*)appstate;
-    engine& vulkan_engine = app->vulkan_engine;
+SDL_AppResult SDL_AppIterate(void *appstate) {
+    auto* app = static_cast<AppContext *>(appstate);
+    engine& vulkan_engine = app->eng;
+
+    if (w) app->eng.pos.x += 0.1;
+    if (s) app->eng.pos.x -= 0.1;
+    if (d) app->eng.pos.z += 0.1;
+    if (a) app->eng.pos.z -= 0.1;
 
 
     vulkan_engine.drawFrame();
     vkDeviceWaitIdle(vulkan_engine.device);
 
-    return app->app_quit;
+    return SDL_APP_CONTINUE;
 }
 
 void SDL_AppQuit(void* appstate) {
-    auto* app = (AppContext*)appstate;
-
-    if (app) {
-        app->vulkan_engine.cleanup();
-        SDL_DestroyWindow(app->window);
+    // Cleanup
+    if (auto* app = static_cast<AppContext *>(appstate)) {
+        app->eng.cleanup();
+        SDL_DestroyWindow(app->win);
         delete app;
     }
 
