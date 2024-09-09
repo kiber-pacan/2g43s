@@ -10,9 +10,9 @@
 #include "sep/logDevice.hpp"
 #include "sep/physDevice.hpp"
 #include "sep/surface.hpp"
+#include "sep/swapchain.hpp"
 #include "graphics.hpp"
-
-
+#include "glm/glm.hpp"
 
 // Parameters
 inline int HEIGHT = 360;
@@ -20,37 +20,9 @@ inline int WIDTH = 640;
 
 class engine {
 public:
-    // Method for estanblishing and running engine
+    // Method for initializing and running engine
     void init(SDL_Window* window) {
         initialize(window);
-    }
-
-    // Clean trash before closing app
-    void cleanup() {
-        cleanupSwapChain();
-        for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-            vkDestroySemaphore(device, renderFinishedSemaphores[i], nullptr);
-            vkDestroySemaphore(device, imageAvailableSemaphores[i], nullptr);
-            vkDestroyFence(device, inFlightFences[i], nullptr);
-        }
-
-        vkDestroyPipeline(device, graphicsPipeline, nullptr);
-        vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
-
-        vkDestroyRenderPass(device, renderPass, nullptr);
-
-        vkDestroyCommandPool(device, commandPool, nullptr);
-
-
-
-        vkDestroyDevice(device, nullptr);
-
-        if (enableValidationLayers) {
-            debug::DestroyDebugUtilsMessengerEXT(instance, debugMessenger, nullptr);
-        }
-
-        vkDestroySurfaceKHR(instance, surface, nullptr);
-        vkDestroyInstance(instance, nullptr);
     }
 
     // Draw
@@ -61,16 +33,18 @@ public:
         VkResult result = vkAcquireNextImageKHR(device, swapchain, UINT64_MAX, imageAvailableSemaphores[currentFrame], VK_NULL_HANDLE, &imageIndex);
 
         if (result == VK_ERROR_OUT_OF_DATE_KHR) {
-            recreateSwapChain();
+            recreateSwapchain();
             return;
         } else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
             throw std::runtime_error("failed to acquire swap chain image!");
         }
 
+        graphics::updateUniformBuffer(currentFrame, swapchainExtent, uniformBuffersMapped, ubo, pos);
+
         vkResetFences(device, 1, &inFlightFences[currentFrame]);
 
         vkResetCommandBuffer(commandBuffers[currentFrame], /*VkCommandBufferResetFlagBits*/ 0);
-        graphics::recordCommandBuffer(commandBuffers[currentFrame], imageIndex, renderPass, swapChainFramebuffers, swapchainExtent, graphicsPipeline);
+        graphics::recordCommandBuffer(commandBuffers[currentFrame], imageIndex, renderPass, swapChainFramebuffers, swapchainExtent, graphicsPipeline, indices, vertexBuffer, indexBuffer, pipelineLayout, descriptorSets, currentFrame);
 
         VkSubmitInfo submitInfo{};
         submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -98,9 +72,9 @@ public:
         presentInfo.waitSemaphoreCount = 1;
         presentInfo.pWaitSemaphores = signalSemaphores;
 
-        VkSwapchainKHR swapChains[] = {swapchain};
+        VkSwapchainKHR swapchains[] = { swapchain };
         presentInfo.swapchainCount = 1;
-        presentInfo.pSwapchains = swapChains;
+        presentInfo.pSwapchains = swapchains;
 
         presentInfo.pImageIndices = &imageIndex;
 
@@ -108,7 +82,7 @@ public:
 
         if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || framebufferResized) {
             framebufferResized = false;
-            recreateSwapChain();
+            recreateSwapchain();
         } else if (result != VK_SUCCESS) {
             throw std::runtime_error("failed to present swap chain image!");
         }
@@ -116,6 +90,47 @@ public:
         currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
     }
 
+    // Clean trash before closing app
+    void cleanup() {
+        cleanupSwapchain();
+
+        for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+            vkDestroyBuffer(device, uniformBuffers[i], nullptr);
+            vkFreeMemory(device, uniformBuffersMemory[i], nullptr);
+        }
+
+        vkDestroyDescriptorPool(device, descriptorPool, nullptr);
+
+        vkDestroyDescriptorSetLayout(device, descriptorSetLayout, nullptr);
+
+        vkDestroyBuffer(device, vertexBuffer, nullptr);
+        vkFreeMemory(device, vertexBufferMemory, nullptr);
+
+        vkDestroyBuffer(device, indexBuffer, nullptr);
+        vkFreeMemory(device, indexBufferMemory, nullptr);
+
+        for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+            vkDestroySemaphore(device, renderFinishedSemaphores[i], nullptr);
+            vkDestroySemaphore(device, imageAvailableSemaphores[i], nullptr);
+            vkDestroyFence(device, inFlightFences[i], nullptr);
+        }
+
+        vkDestroyPipeline(device, graphicsPipeline, nullptr);
+        vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
+
+        vkDestroyRenderPass(device, renderPass, nullptr);
+
+        vkDestroyCommandPool(device, commandPool, nullptr);
+
+        vkDestroyDevice(device, nullptr);
+
+        if (enableValidationLayers) {
+            debug::DestroyDebugUtilsMessengerEXT(instance, debugMessenger, nullptr);
+        }
+
+        vkDestroySurfaceKHR(instance, surface, nullptr);
+        vkDestroyInstance(instance, nullptr);
+    }
 
     // Session ID
     uint64_t sid{};
@@ -125,6 +140,10 @@ public:
     VkDevice device{};
 
     bool framebufferResized = false;
+    graphics::UniformBufferObject ubo{};
+
+    glm::vec3 pos = glm::vec3(0, 0, 0);
+
 private:
     // Instance
     VkInstance instance{};
@@ -143,7 +162,7 @@ private:
     VkQueue presentQueue{};
     VkQueue graphicsQueue{};
 
-    // Swap chain
+    // Swapchain
     VkSwapchainKHR swapchain{};
 
     VkFormat swapchainImageFormat{};
@@ -153,23 +172,47 @@ private:
     std::vector<VkImageView> swapchainImageViews{};
     std::vector<VkFramebuffer> swapChainFramebuffers{};
 
-
     // Graphics
     VkPipeline graphicsPipeline{};
     VkRenderPass renderPass{};
+    VkDescriptorSetLayout descriptorSetLayout{};
     VkPipelineLayout pipelineLayout{};
+    VkDescriptorPool descriptorPool{};
+    std::vector<VkDescriptorSet> descriptorSets{};
+
     VkCommandPool commandPool{};
     std::vector<VkCommandBuffer> commandBuffers{};
+
+    VkBuffer vertexBuffer{};
+    VkDeviceMemory vertexBufferMemory{};
+
+    VkBuffer indexBuffer{};
+    VkDeviceMemory indexBufferMemory{};
+
+    std::vector<VkBuffer> uniformBuffers;
+    std::vector<VkDeviceMemory> uniformBuffersMemory;
+    std::vector<void*> uniformBuffersMapped;
 
     // Fences
     std::vector<VkSemaphore> imageAvailableSemaphores{};
     std::vector<VkSemaphore> renderFinishedSemaphores{};
     std::vector<VkFence> inFlightFences{};
 
-
     // Frames
     const int MAX_FRAMES_IN_FLIGHT = 2;
     uint32_t currentFrame = 0;
+
+    // Shader stuff
+    std::vector<graphics::Vertex> vertices = {
+        {{0.0, -0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}},
+        {{0.0, -0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}},
+        {{0.0, 0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}},
+        {{0.0, 0.5f, -0.5f}, {1.0f, 1.0f, 1.0f}}
+    };
+
+    std::vector<uint16_t> indices = {
+        0, 1, 2, 2, 3, 0
+    };
 
     // Initializaiton of engine and its counterparts
     void initialize(SDL_Window* window) {
@@ -187,6 +230,9 @@ private:
 
     // Vulkan related stuff
     void initializeVulkan() {
+        ubo.model = glm::mat4(1.0f);
+        ubo.view = glm::lookAt(glm::vec3(2.0f, 0.0f, 0.0f),pos, glm::vec3(0.0f, 1.0f, 0.0f));
+
         // Basic things
         createInstance();
         setupDebugMessenger();
@@ -195,47 +241,53 @@ private:
         surface::createSurface(surface, window, instance);
 
         // Devices
-        physDevice::pickPhysicalDevice(instance, physicalDevice, surface);
-        logDevice::createLogicalDevice(physicalDevice, device, graphicsQueue, presentQueue, surface);
+        physDevice::pickPhysicalDevice(physicalDevice, instance, surface);
+        logDevice::createLogicalDevice(device, physicalDevice, graphicsQueue, presentQueue, surface);
 
         // Swapchain
-        std::pair<VkFormat, VkExtent2D> pair = swapchain::createSwapChain(physicalDevice, device, surface, window, swapchain, swapchainImages);
-        swapchainImageFormat = pair.first;
-        swapchainExtent = pair.second;
+        swapchain::createSwapchain(device, physicalDevice, surface, window, swapchain, swapchainImages, swapchainImageFormat, swapchainExtent);
         swapchain::createImageViews(device, swapchainImageViews, swapchainImages, swapchainImageFormat);
 
         // Graphics
         graphics::createRenderPass(device, swapchainImageFormat, renderPass);
-        graphics::createGraphicsPipeline(device, pipelineLayout, renderPass, graphicsPipeline);
+        graphics::createDescriptorSetLayout(device, descriptorSetLayout);
+        graphics::createGraphicsPipeline(device, pipelineLayout, renderPass, graphicsPipeline, descriptorSetLayout, pipelineLayout, renderPass);
         graphics::createFramebuffers(device, swapChainFramebuffers, swapchainImageViews, renderPass, swapchainExtent);
         graphics::createCommandPool(device, physicalDevice, commandPool, surface);
-        graphics::createCommandBuffer(commandPool, device, commandBuffers, MAX_FRAMES_IN_FLIGHT);
+        graphics::createVertexBuffer(device, physicalDevice, commandPool, graphicsQueue, vertexBuffer, vertexBufferMemory, vertices);
+        graphics::createIndexBuffer(device, physicalDevice, commandPool, graphicsQueue, indexBuffer, indexBufferMemory, indices);
+        graphics::createUniformBuffers(device, physicalDevice, uniformBuffers, uniformBuffersMemory, uniformBuffersMapped, MAX_FRAMES_IN_FLIGHT);
+        graphics::createDescriptorPool(device, MAX_FRAMES_IN_FLIGHT, descriptorPool);
+        graphics::createDescriptorSets(device, MAX_FRAMES_IN_FLIGHT, descriptorSetLayout, descriptorPool, descriptorSets, uniformBuffers);
+        graphics::createCommandBuffer(device, commandPool, commandBuffers, MAX_FRAMES_IN_FLIGHT);
         graphics::createSyncObjects(device, imageAvailableSemaphores, renderFinishedSemaphores, inFlightFences, MAX_FRAMES_IN_FLIGHT);
     }
 
-    void cleanupSwapChain() {
-        for (size_t i = 0; i < swapChainFramebuffers.size(); i++) {
-            vkDestroyFramebuffer(device, swapChainFramebuffers[i], nullptr);
+
+    void cleanupSwapchain() {
+        for (auto & swapChainFramebuffer : swapChainFramebuffers) {
+            vkDestroyFramebuffer(device, swapChainFramebuffer, nullptr);
         }
 
-        for (size_t i = 0; i < swapchainImageViews.size(); i++) {
-            vkDestroyImageView(device, swapchainImageViews[i], nullptr);
+        for (auto & swapchainImageView : swapchainImageViews) {
+            vkDestroyImageView(device, swapchainImageView, nullptr);
         }
 
         vkDestroySwapchainKHR(device, swapchain, nullptr);
     }
 
-    void recreateSwapChain() {
+    void recreateSwapchain() {
         vkDeviceWaitIdle(device);
 
-        cleanupSwapChain();
+        cleanupSwapchain();
 
-        std::pair<VkFormat, VkExtent2D> pair = swapchain::createSwapChain(physicalDevice, device, surface, window, swapchain, swapchainImages);
-        swapchainImageFormat = pair.first;
-        swapchainExtent = pair.second;
+        // Swapchain
+        swapchain::createSwapchain(device, physicalDevice, surface, window, swapchain, swapchainImages, swapchainImageFormat, swapchainExtent);
         swapchain::createImageViews(device, swapchainImageViews, swapchainImages, swapchainImageFormat);
+
         graphics::createFramebuffers(device, swapChainFramebuffers, swapchainImageViews, renderPass, swapchainExtent);
     }
+
 
     // Creating Vulkan instance
     void createInstance() {
@@ -282,23 +334,6 @@ private:
     }
 
 
-
-    // Get SDL extensions
-    static std::vector<const char*> getRequiredExtensions() {
-        uint32_t extensionCount = 0;
-        auto SDLextensions = SDL_Vulkan_GetInstanceExtensions(&extensionCount);
-
-        std::vector<const char*> extensions(SDLextensions, SDLextensions + extensionCount);
-
-        // If validation layers enabled when add them to extensions vector
-        if (enableValidationLayers) {
-            extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
-        }
-        //extensions.push_back(VK_KHR_SURFACE_EXTENSION_NAME);
-
-        return extensions;
-    }
-
     // Setup debug messenger
     void setupDebugMessenger() {
         if (!enableValidationLayers) return;
@@ -311,7 +346,21 @@ private:
         }
     }
 
+    // Get SDL extensions
+    static std::vector<const char*> getRequiredExtensions() {
+        uint32_t extensionCount = 0;
+        auto SDLextensions = SDL_Vulkan_GetInstanceExtensions(&extensionCount);
 
+        std::vector extensions(SDLextensions, SDLextensions + extensionCount);
+
+        // If validation layers enabled when add them to extensions vector
+        if (enableValidationLayers) {
+            extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+        }
+        //extensions.push_back(VK_KHR_SURFACE_EXTENSION_NAME);
+
+        return extensions;
+    }
 };
 
 #endif //ENGINE_H

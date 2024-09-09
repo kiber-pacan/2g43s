@@ -4,8 +4,8 @@
 #include <set>
 #include <vulkan/vulkan.h>
 
-#include "debug.hpp"
 #include "queue.hpp"
+#include "debug.hpp"
 #include "physDevice.hpp"
 
 
@@ -13,7 +13,7 @@
 
 struct logDevice {
     // Main method for creating logical device
-    static void createLogicalDevice(VkPhysicalDevice& physicalDevice, VkDevice& device, VkQueue& graphicsQueue, VkQueue& presentQueue, VkSurfaceKHR& surface) {
+    static void createLogicalDevice(VkDevice& device, VkPhysicalDevice& physicalDevice, VkQueue& graphicsQueue, VkQueue& presentQueue, VkSurfaceKHR& surface) {
         QueueFamilyIndices indices = queue::findQueueFamilies(physicalDevice, surface);
 
         std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
