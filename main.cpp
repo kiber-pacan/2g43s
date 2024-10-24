@@ -1,5 +1,5 @@
-#include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
+#include <SDL3/SDL.h>
 #include <cmath>
 #include <vulkan/vulkan.h>
 #include "core/engine.hpp"
@@ -8,14 +8,19 @@
 
 #define GLM_FORCE_RADIANS
 #include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.hpp>
+
+#include "core/sep/control/keyListener.hpp"
+#include "core/sep/camera/camListener.hpp"
+
 
 struct AppContext {
     SDL_Window* win{};
     engine eng;
-    SDL_bool quit = SDL_FALSE;
-};
+    bool quit = true;
 
+    keyListener* kL;
+    camListener* cL;
+};
 
 logger* LOGGER = logger::of("MAIN");
 
@@ -58,65 +63,53 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
     // set up the application data
     *appstate = new AppContext{
         window,
-        vulkan_engine
+        vulkan_engine,
+        false,
+        new keyListener(),
+        new camListener()
     };
 
     LOGGER->log(logger::severity::LOG,"Session ID: $", vulkan_engine.sid);
     LOGGER->log(logger::severity::SUCCESS,"Application started successfully!", nullptr);
 
+    SDL_SetWindowRelativeMouseMode(window, true);
+
     return SDL_APP_CONTINUE;
 }
-
-bool w = false;
-bool a = false;
-bool s = false;
-bool d = false;
-
 
 SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *e) {
     auto* app = static_cast<AppContext *>(appstate);
 
     if (e->type == SDL_EVENT_QUIT) {
-        app->quit = SDL_TRUE;
+        app->quit = true;
         return SDL_APP_SUCCESS;
     }
 
-    if (e->type == SDL_EVENT_KEY_UP && e->key.scancode == SDL_SCANCODE_W) {
-        w = false;
-    } else if (e->type == SDL_EVENT_KEY_DOWN && e->key.scancode == SDL_SCANCODE_W) {
-        w = true;
+    if(app->quit) {
+        return SDL_APP_SUCCESS;
     }
-    if (e->type == SDL_EVENT_KEY_UP && e->key.scancode == SDL_SCANCODE_S) {
-        s = false;
-    } else if (e->type == SDL_EVENT_KEY_DOWN && e->key.scancode == SDL_SCANCODE_S) {
-        s = true;
+
+    float x, y;
+
+    if (e->type == SDL_EVENT_MOUSE_MOTION && SDL_GetMouseFocus() == app->win) {
+        SDL_GetRelativeMouseState(&x,&y);
+        app->cL->moveCamera(x, y, app->eng.camera);
     }
-    if (e->type == SDL_EVENT_KEY_UP && e->key.scancode == SDL_SCANCODE_A) {
-        a = false;
-    } else if (e->type == SDL_EVENT_KEY_DOWN && e->key.scancode == SDL_SCANCODE_A) {
-        a = true;
-    }
-    if (e->type == SDL_EVENT_KEY_UP && e->key.scancode == SDL_SCANCODE_D) {
-        d = false;
-    } else if (e->type == SDL_EVENT_KEY_DOWN && e->key.scancode == SDL_SCANCODE_D) {
-        d = true;
-    }
+
+    app->kL->listen(e);
 
     return SDL_APP_CONTINUE;
 }
 
 SDL_AppResult SDL_AppIterate(void *appstate) {
     auto* app = static_cast<AppContext *>(appstate);
-    engine& vulkan_engine = app->eng;
+    engine& eng = app->eng;
 
-    if (w) app->eng.pos.x += 0.1;
-    if (s) app->eng.pos.x -= 0.1;
-    if (d) app->eng.pos.z += 0.1;
-    if (a) app->eng.pos.z -= 0.1;
+    app->eng.deltaT->calculateDelta();
+    app->kL->iterateCamMovement(app->quit, app->eng);
 
-
-    vulkan_engine.drawFrame();
-    vkDeviceWaitIdle(vulkan_engine.device);
+    eng.drawFrame();
+    vkDeviceWaitIdle(eng.device);
 
     return SDL_APP_CONTINUE;
 }

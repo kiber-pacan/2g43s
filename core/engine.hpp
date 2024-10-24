@@ -1,22 +1,23 @@
 #ifndef ENGINE_H
 #define ENGINE_H
 
-
 #include <SDL3/SDL_vulkan.h>
 
 #include "tools.hpp"
 #include "logger.hpp"
-#include "sep/debug.hpp"
-#include "sep/logDevice.hpp"
-#include "sep/physDevice.hpp"
-#include "sep/surface.hpp"
-#include "sep/swapchain.hpp"
-#include "graphics.hpp"
+#include "sep/util/debug.hpp"
+#include "sep/device/logDevice.hpp"
+#include "sep/device/physDevice.hpp"
+#include "sep/window/surface.hpp"
+#include "sep/window/swapchain.hpp"
+#include "sep/graphics/graphics.hpp"
 #include "glm/glm.hpp"
+#include "sep/camera/cam.h"
+#include "sep/graphics/delta.hpp"
 
 // Parameters
-inline int HEIGHT = 360;
-inline int WIDTH = 640;
+inline int HEIGHT = 720;
+inline int WIDTH = 1280;
 
 class engine {
 public:
@@ -39,7 +40,7 @@ public:
             throw std::runtime_error("failed to acquire swap chain image!");
         }
 
-        graphics::updateUniformBuffer(currentFrame, swapchainExtent, uniformBuffersMapped, ubo, pos);
+        updateUniformBuffer(currentFrame, swapchainExtent, uniformBuffersMapped, ubo, camera.pos, camera);
 
         vkResetFences(device, 1, &inFlightFences[currentFrame]);
 
@@ -90,9 +91,21 @@ public:
         currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
     }
 
+
+    static void updateUniformBuffer(uint32_t currentImage, VkExtent2D& swapchainExtent, std::vector<void*>& uniformBuffersMapped, graphics::UniformBufferObject& ubo, glm::vec3 pos, cam& cam) {
+        ubo.model = glm::translate(glm::mat4(1.0f), pos);
+        ubo.view = glm::lookAt(glm::vec3(0), cam.look, glm::vec3(0.0f, 1.0f, 0.0f));
+        ubo.proj = glm::perspective(cam.fov,  (float) swapchainExtent.width / (float) swapchainExtent.height, 0.01f, 64.0f);
+        ubo.proj[1][1] *= -1;
+        memcpy(uniformBuffersMapped[currentImage], &ubo, sizeof(ubo));
+    }
+
     // Clean trash before closing app
     void cleanup() {
         cleanupSwapchain();
+
+        vkDestroyImage(device, textureImage, nullptr);
+        vkFreeMemory(device, textureImageMemory, nullptr);
 
         for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
             vkDestroyBuffer(device, uniformBuffers[i], nullptr);
@@ -142,7 +155,10 @@ public:
     bool framebufferResized = false;
     graphics::UniformBufferObject ubo{};
 
-    glm::vec3 pos = glm::vec3(0, 0, 0);
+    // Controls
+    cam camera{};
+
+    delta *deltaT{};
 
 private:
     // Instance
@@ -174,13 +190,23 @@ private:
 
     // Graphics
     VkPipeline graphicsPipeline{};
-    VkRenderPass renderPass{};
-    VkDescriptorSetLayout descriptorSetLayout{};
     VkPipelineLayout pipelineLayout{};
-    VkDescriptorPool descriptorPool{};
+
+    VkDescriptorSetLayout descriptorSetLayout{};
     std::vector<VkDescriptorSet> descriptorSets{};
 
+    VkDescriptorPool descriptorPool{};
     VkCommandPool commandPool{};
+
+    VkRenderPass renderPass{};
+
+    // Depth
+    VkImage depthImage{};
+    VkDeviceMemory depthImageMemory{};
+    VkImageView depthImageView{};
+
+    // Buffers
+
     std::vector<VkCommandBuffer> commandBuffers{};
 
     VkBuffer vertexBuffer{};
@@ -193,6 +219,12 @@ private:
     std::vector<VkDeviceMemory> uniformBuffersMemory;
     std::vector<void*> uniformBuffersMapped;
 
+    VkBuffer stagingBuffer{};
+    VkDeviceMemory stagingBufferMemory{};
+
+    VkImage textureImage{};
+    VkDeviceMemory textureImageMemory{};
+
     // Fences
     std::vector<VkSemaphore> imageAvailableSemaphores{};
     std::vector<VkSemaphore> renderFinishedSemaphores{};
@@ -204,14 +236,34 @@ private:
 
     // Shader stuff
     std::vector<graphics::Vertex> vertices = {
-        {{0.0, -0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}},
-        {{0.0, -0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}},
-        {{0.0, 0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}},
-        {{0.0, 0.5f, -0.5f}, {1.0f, 1.0f, 1.0f}}
+        { {-8.f, -8.f, -8.f}, {1.0f, 0.0f, 0.0f} },
+        { {-8.f, -8.f, 8.f}, {0.0f, 1.0f, 0.0f} },
+        { {-8.f, 8.f, 8.f}, {0.0f, 0.0f, 1.0f} },
+        { {-8.f, 8.f, -8.f}, {1.0f, 1.0f, 1.0f} },
+        { {8.f, -8.f, -8.f}, {1.0f, 0.0f, 0.0f} },
+        { {8.f, -8.f, 8.f}, {0.0f, 1.0f, 0.0f} },
+        { {8.f, 8.f, 8.f}, {0.0f, 0.0f, 1.0f} },
+        { {8.f, 8.f, -8.f}, {1.0f, 1.0f, 1.0f} }
     };
 
     std::vector<uint16_t> indices = {
-        0, 1, 2, 2, 3, 0
+        0, 1, 2, 2, 3, 0,
+        0, 3, 2, 2, 1, 0,
+
+        4, 5, 6, 6, 7, 4,
+        4, 7, 6, 6, 5, 4,
+
+        1, 5, 2, 5, 6, 2,
+        2, 6, 5, 2, 5, 1,
+
+        3, 7, 6, 6, 2, 3,
+        3, 2, 6, 6, 7, 3,
+
+        0, 3, 4, 3, 7, 4,
+        4, 7, 3, 4, 3, 0,
+
+        0, 1, 5, 0, 5, 4,
+        4, 5, 0, 5, 1, 0
     };
 
     // Initializaiton of engine and its counterparts
@@ -231,7 +283,7 @@ private:
     // Vulkan related stuff
     void initializeVulkan() {
         ubo.model = glm::mat4(1.0f);
-        ubo.view = glm::lookAt(glm::vec3(2.0f, 0.0f, 0.0f),pos, glm::vec3(0.0f, 1.0f, 0.0f));
+        deltaT = new delta();
 
         // Basic things
         createInstance();
@@ -254,6 +306,7 @@ private:
         graphics::createGraphicsPipeline(device, pipelineLayout, renderPass, graphicsPipeline, descriptorSetLayout, pipelineLayout, renderPass);
         graphics::createFramebuffers(device, swapChainFramebuffers, swapchainImageViews, renderPass, swapchainExtent);
         graphics::createCommandPool(device, physicalDevice, commandPool, surface);
+        graphics::createTextureImage(device, commandPool, graphicsQueue, physicalDevice, stagingBuffer, stagingBufferMemory, textureImage, textureImageMemory);
         graphics::createVertexBuffer(device, physicalDevice, commandPool, graphicsQueue, vertexBuffer, vertexBufferMemory, vertices);
         graphics::createIndexBuffer(device, physicalDevice, commandPool, graphicsQueue, indexBuffer, indexBufferMemory, indices);
         graphics::createUniformBuffers(device, physicalDevice, uniformBuffers, uniformBuffersMemory, uniformBuffersMapped, MAX_FRAMES_IN_FLIGHT);
