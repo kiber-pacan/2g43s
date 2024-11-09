@@ -2,7 +2,8 @@
 #define ENTITY_H
 #include "glm/vec3.hpp"
 
-struct entity {
+struct Entity {
+    virtual ~Entity() = default;
     glm::vec3 pos{};
     glm::vec3 look{};
 
