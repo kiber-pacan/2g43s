@@ -3,27 +3,37 @@
 
 #include <SDL3/SDL_vulkan.h>
 
-#include "tools.hpp"
-#include "logger.hpp"
-#include "sep/util/debug.hpp"
-#include "sep/device/logDevice.hpp"
-#include "sep/device/physDevice.hpp"
-#include "sep/window/surface.hpp"
-#include "sep/window/swapchain.hpp"
-#include "sep/graphics/graphics.hpp"
+#include "Tools.hpp"
+#include "Logger.hpp"
+#include "sep/util/Debug.hpp"
+#include "sep/device/LogDevice.hpp"
+#include "sep/device/PhysDevice.hpp"
+#include "sep/window/Surface.hpp"
+#include "sep/window/Swapchain.hpp"
+#include "sep/graphics/Graphics.hpp"
 #include "glm/glm.hpp"
-#include "sep/camera/cam.h"
-#include "sep/graphics/delta.hpp"
+#include "sep/camera/Camera.h"
+#include "sep/graphics/Delta.hpp"
 
 // Parameters
 inline int HEIGHT = 720;
 inline int WIDTH = 1280;
 
-class engine {
+class Engine {
 public:
     // Method for initializing and running engine
+    #pragma region Public
+
     void init(SDL_Window* window) {
         initialize(window);
+    }
+
+    static void updateUniformBuffer(uint32_t currentImage, VkExtent2D& swapchainExtent, std::vector<void*>& uniformBuffersMapped, Graphics::UniformBufferObject& ubo, glm::vec3 pos, Camera& camera) {
+        ubo.model = glm::translate(glm::mat4(1.0f), pos);
+        ubo.view = glm::lookAt(camera.pos + glm::vec3(0), camera.pos + camera.look, glm::vec3(0.0f, 1.0f, 0.0f));
+        ubo.proj = glm::perspective(camera.fov,  (float) swapchainExtent.width / (float) swapchainExtent.height, 0.01f, 64.0f);
+        ubo.proj[1][1] *= -1;
+        memcpy(uniformBuffersMapped[currentImage], &ubo, sizeof(ubo));
     }
 
     // Draw
@@ -40,12 +50,12 @@ public:
             throw std::runtime_error("failed to acquire swap chain image!");
         }
 
-        updateUniformBuffer(currentFrame, swapchainExtent, uniformBuffersMapped, ubo, camera.pos, camera);
+        updateUniformBuffer(currentFrame, swapchainExtent, uniformBuffersMapped, ubo, glm::vec3(), camera);
 
         vkResetFences(device, 1, &inFlightFences[currentFrame]);
 
         vkResetCommandBuffer(commandBuffers[currentFrame], /*VkCommandBufferResetFlagBits*/ 0);
-        graphics::recordCommandBuffer(commandBuffers[currentFrame], imageIndex, renderPass, swapChainFramebuffers, swapchainExtent, graphicsPipeline, indices, vertexBuffer, indexBuffer, pipelineLayout, descriptorSets, currentFrame);
+        Graphics::recordCommandBuffer(commandBuffers[currentFrame], imageIndex, renderPass, swapChainFramebuffers, swapchainExtent, graphicsPipeline, indices, vertexBuffer, indexBuffer, pipelineLayout, descriptorSets, currentFrame, clear_color);
 
         VkSubmitInfo submitInfo{};
         submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -92,17 +102,16 @@ public:
     }
 
 
-    static void updateUniformBuffer(uint32_t currentImage, VkExtent2D& swapchainExtent, std::vector<void*>& uniformBuffersMapped, graphics::UniformBufferObject& ubo, glm::vec3 pos, cam& cam) {
-        ubo.model = glm::translate(glm::mat4(1.0f), pos);
-        ubo.view = glm::lookAt(glm::vec3(0), cam.look, glm::vec3(0.0f, 1.0f, 0.0f));
-        ubo.proj = glm::perspective(cam.fov,  (float) swapchainExtent.width / (float) swapchainExtent.height, 0.01f, 64.0f);
-        ubo.proj[1][1] *= -1;
-        memcpy(uniformBuffersMapped[currentImage], &ubo, sizeof(ubo));
-    }
-
     // Clean trash before closing app
     void cleanup() {
+        vkDestroyImageView(device, depthImageView, nullptr);
+        vkDestroyImage(device, depthImage, nullptr);
+        vkFreeMemory(device, depthImageMemory, nullptr);
+
         cleanupSwapchain();
+
+        vkDestroySampler(device, textureSampler, nullptr);
+        vkDestroyImageView(device, textureImageView, nullptr);
 
         vkDestroyImage(device, textureImage, nullptr);
         vkFreeMemory(device, textureImageMemory, nullptr);
@@ -138,12 +147,14 @@ public:
         vkDestroyDevice(device, nullptr);
 
         if (enableValidationLayers) {
-            debug::DestroyDebugUtilsMessengerEXT(instance, debugMessenger, nullptr);
+            Debug::DestroyDebugUtilsMessengerEXT(instance, debugMessenger, nullptr);
         }
 
         vkDestroySurfaceKHR(instance, surface, nullptr);
         vkDestroyInstance(instance, nullptr);
     }
+
+    #pragma endregion
 
     // Session ID
     uint64_t sid{};
@@ -153,14 +164,17 @@ public:
     VkDevice device{};
 
     bool framebufferResized = false;
-    graphics::UniformBufferObject ubo{};
+    Graphics::UniformBufferObject ubo{};
 
     // Controls
-    cam camera{};
+    Camera camera{};
 
-    delta *deltaT{};
+    Delta *deltaT{};
+
+    Color clear_color = Color::hex(0x80c4b5);
 
 private:
+    #pragma region Variables
     // Instance
     VkInstance instance{};
 
@@ -168,7 +182,7 @@ private:
     VkDebugUtilsMessengerEXT debugMessenger{};
 
     // Logger
-    logger* LOGGER{};
+    Logger* LOGGER{};
 
     // Window
     VkSurfaceKHR surface{};
@@ -206,7 +220,6 @@ private:
     VkImageView depthImageView{};
 
     // Buffers
-
     std::vector<VkCommandBuffer> commandBuffers{};
 
     VkBuffer vertexBuffer{};
@@ -222,8 +235,13 @@ private:
     VkBuffer stagingBuffer{};
     VkDeviceMemory stagingBufferMemory{};
 
+    // Image
     VkImage textureImage{};
     VkDeviceMemory textureImageMemory{};
+    VkImageView textureImageView{};
+
+    VkSampler textureSampler{};
+
 
     // Fences
     std::vector<VkSemaphore> imageAvailableSemaphores{};
@@ -235,85 +253,77 @@ private:
     uint32_t currentFrame = 0;
 
     // Shader stuff
-    std::vector<graphics::Vertex> vertices = {
-        { {-8.f, -8.f, -8.f}, {1.0f, 0.0f, 0.0f} },
-        { {-8.f, -8.f, 8.f}, {0.0f, 1.0f, 0.0f} },
-        { {-8.f, 8.f, 8.f}, {0.0f, 0.0f, 1.0f} },
-        { {-8.f, 8.f, -8.f}, {1.0f, 1.0f, 1.0f} },
-        { {8.f, -8.f, -8.f}, {1.0f, 0.0f, 0.0f} },
-        { {8.f, -8.f, 8.f}, {0.0f, 1.0f, 0.0f} },
-        { {8.f, 8.f, 8.f}, {0.0f, 0.0f, 1.0f} },
-        { {8.f, 8.f, -8.f}, {1.0f, 1.0f, 1.0f} }
+    std::vector<Graphics::Vertex> vertices = {
+        { {8.f, -1.f, -8.f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f} }, //0
+        { {8.f, -1.f, 8.f}, {0.0f, 1.0f, 0.0f}, {0.0f, 1.0f} },  //1
+        { {8.f, 1.f, 8.f}, {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f} },   //2
+        { {8.f, 1.f, -8.f}, {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f} },  //3
+        { {-8.f, -1.f, -8.f}, {1.0f, 0.0f, 0.0f}, {1.0f, 0.0f} },//4
+        { {-8.f, -1.f, 8.f}, {0.0f, 1.0f, 0.0f}, {1.0f, 1.0f} }, //5
+        { {-8.f, 1.f, 8.f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f} },  //6
+        { {-8.f, 1.f, -8.f}, {1.0f, 1.0f, 1.0f}, {1.0f, 0.0f} }, //7
     };
 
     std::vector<uint16_t> indices = {
-        0, 1, 2, 2, 3, 0,
-        0, 3, 2, 2, 1, 0,
+        0, 1, 5, 5, 4, 0,
 
-        4, 5, 6, 6, 7, 4,
-        4, 7, 6, 6, 5, 4,
-
-        1, 5, 2, 5, 6, 2,
-        2, 6, 5, 2, 5, 1,
-
-        3, 7, 6, 6, 2, 3,
-        3, 2, 6, 6, 7, 3,
-
-        0, 3, 4, 3, 7, 4,
-        4, 7, 3, 4, 3, 0,
-
-        0, 1, 5, 0, 5, 4,
-        4, 5, 0, 5, 1, 0
+        2, 6, 7, 7, 3, 2,
     };
+
+    #pragma endregion
+
 
     // Initializaiton of engine and its counterparts
     void initialize(SDL_Window* window) {
         this->window = window;
 
         // Engine related stuff
-        sid = tools::randomNum<uint64_t>(1000000000,9999999999);
-        LOGGER = logger::of("ENGINE");
+        sid = Tools::randomNum<uint64_t>(1000000000,9999999999);
+        LOGGER = Logger::of("engine.hpp");
 
         initializeVulkan();
 
         // Success!?
-        LOGGER->log(logger::severity::SUCCESS, "Vulkan engine started successfully!", nullptr);
+        LOGGER->success("Vulkan engine started successfully!");
     }
 
     // Vulkan related stuff
     void initializeVulkan() {
         ubo.model = glm::mat4(1.0f);
-        deltaT = new delta();
+        deltaT = new Delta();
 
         // Basic things
         createInstance();
         setupDebugMessenger();
 
         // SDL3 surface
-        surface::createSurface(surface, window, instance);
+        Surface::createSurface(surface, window, instance);
 
         // Devices
-        physDevice::pickPhysicalDevice(physicalDevice, instance, surface);
-        logDevice::createLogicalDevice(device, physicalDevice, graphicsQueue, presentQueue, surface);
+        PhysDevice::pickPhysicalDevice(physicalDevice, instance, surface);
+        LogDevice::createLogicalDevice(device, physicalDevice, graphicsQueue, presentQueue, surface);
 
         // Swapchain
-        swapchain::createSwapchain(device, physicalDevice, surface, window, swapchain, swapchainImages, swapchainImageFormat, swapchainExtent);
-        swapchain::createImageViews(device, swapchainImageViews, swapchainImages, swapchainImageFormat);
+        Swapchain::createSwapchain(device, physicalDevice, surface, window, swapchain, swapchainImages, swapchainImageFormat, swapchainExtent);
+        Swapchain::createImageViews(device, swapchainImageViews, swapchainImages, swapchainImageFormat);
 
         // Graphics
-        graphics::createRenderPass(device, swapchainImageFormat, renderPass);
-        graphics::createDescriptorSetLayout(device, descriptorSetLayout);
-        graphics::createGraphicsPipeline(device, pipelineLayout, renderPass, graphicsPipeline, descriptorSetLayout, pipelineLayout, renderPass);
-        graphics::createFramebuffers(device, swapChainFramebuffers, swapchainImageViews, renderPass, swapchainExtent);
-        graphics::createCommandPool(device, physicalDevice, commandPool, surface);
-        graphics::createTextureImage(device, commandPool, graphicsQueue, physicalDevice, stagingBuffer, stagingBufferMemory, textureImage, textureImageMemory);
-        graphics::createVertexBuffer(device, physicalDevice, commandPool, graphicsQueue, vertexBuffer, vertexBufferMemory, vertices);
-        graphics::createIndexBuffer(device, physicalDevice, commandPool, graphicsQueue, indexBuffer, indexBufferMemory, indices);
-        graphics::createUniformBuffers(device, physicalDevice, uniformBuffers, uniformBuffersMemory, uniformBuffersMapped, MAX_FRAMES_IN_FLIGHT);
-        graphics::createDescriptorPool(device, MAX_FRAMES_IN_FLIGHT, descriptorPool);
-        graphics::createDescriptorSets(device, MAX_FRAMES_IN_FLIGHT, descriptorSetLayout, descriptorPool, descriptorSets, uniformBuffers);
-        graphics::createCommandBuffer(device, commandPool, commandBuffers, MAX_FRAMES_IN_FLIGHT);
-        graphics::createSyncObjects(device, imageAvailableSemaphores, renderFinishedSemaphores, inFlightFences, MAX_FRAMES_IN_FLIGHT);
+        Graphics::createRenderPass(device, physicalDevice, swapchainImageFormat, renderPass);
+        Graphics::createDescriptorSetLayout(device, descriptorSetLayout);
+        Graphics::createGraphicsPipeline(device, pipelineLayout, renderPass, graphicsPipeline, descriptorSetLayout, pipelineLayout, renderPass);
+        Graphics::createCommandPool(device, physicalDevice, commandPool, surface);
+        Graphics::createDepthResources(device, physicalDevice, commandPool, graphicsQueue, depthImage, depthImageMemory, depthImageView, swapchainExtent);
+        Graphics::createFramebuffers(device, depthImageView, swapChainFramebuffers, swapchainImageViews, renderPass, swapchainExtent);
+        Graphics::createTextureImage(device, commandPool, graphicsQueue, physicalDevice, stagingBuffer, stagingBufferMemory, textureImage, textureImageMemory);
+        Graphics::createTextureImageView(device, textureImage, textureImageView);
+        Graphics::createTextureSampler(device, physicalDevice, textureSampler);
+        Graphics::createVertexBuffer(device, physicalDevice, commandPool, graphicsQueue, vertexBuffer, vertexBufferMemory, vertices);
+        Graphics::createIndexBuffer(device, physicalDevice, commandPool, graphicsQueue, indexBuffer, indexBufferMemory, indices);
+        Graphics::createUniformBuffers(device, physicalDevice, uniformBuffers, uniformBuffersMemory, uniformBuffersMapped, MAX_FRAMES_IN_FLIGHT);
+        Graphics::createDescriptorPool(device, MAX_FRAMES_IN_FLIGHT, descriptorPool);
+        Graphics::createDescriptorSets(device, MAX_FRAMES_IN_FLIGHT, descriptorSetLayout, descriptorPool, descriptorSets, uniformBuffers, textureImageView, textureSampler);
+        Graphics::createCommandBuffer(device, commandPool, commandBuffers, MAX_FRAMES_IN_FLIGHT);
+        Graphics::createSyncObjects(device, imageAvailableSemaphores, renderFinishedSemaphores, inFlightFences, MAX_FRAMES_IN_FLIGHT);
     }
 
 
@@ -335,17 +345,18 @@ private:
         cleanupSwapchain();
 
         // Swapchain
-        swapchain::createSwapchain(device, physicalDevice, surface, window, swapchain, swapchainImages, swapchainImageFormat, swapchainExtent);
-        swapchain::createImageViews(device, swapchainImageViews, swapchainImages, swapchainImageFormat);
+        Swapchain::createSwapchain(device, physicalDevice, surface, window, swapchain, swapchainImages, swapchainImageFormat, swapchainExtent);
+        Swapchain::createImageViews(device, swapchainImageViews, swapchainImages, swapchainImageFormat);
 
-        graphics::createFramebuffers(device, swapChainFramebuffers, swapchainImageViews, renderPass, swapchainExtent);
+        Graphics::createDepthResources(device, physicalDevice, commandPool, graphicsQueue, depthImage, depthImageMemory, depthImageView, swapchainExtent);
+        Graphics::createFramebuffers(device, depthImageView, swapChainFramebuffers, swapchainImageViews, renderPass, swapchainExtent);
     }
 
 
     // Creating Vulkan instance
     void createInstance() {
         // Check if validation layers available when requested
-        if (enableValidationLayers && !debug::checkValidationLayerSupport()) {
+        if (enableValidationLayers && !Debug::checkValidationLayerSupport()) {
             throw std::runtime_error("validation layers requested, but not available!");
         }
         // App info
@@ -373,7 +384,7 @@ private:
             createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
             createInfo.ppEnabledLayerNames = validationLayers.data();
 
-            debug::populateDebugMessengerCreateInfo(debugCreateInfo);
+            Debug::populateDebugMessengerCreateInfo(debugCreateInfo);
             createInfo.pNext = &debugCreateInfo;
         } else {
             createInfo.enabledLayerCount = 0;
@@ -392,9 +403,9 @@ private:
         if (!enableValidationLayers) return;
 
         VkDebugUtilsMessengerCreateInfoEXT createInfo;
-        debug::populateDebugMessengerCreateInfo(createInfo);
+        Debug::populateDebugMessengerCreateInfo(createInfo);
 
-        if (debug::CreateDebugUtilsMessengerEXT(instance, &createInfo, nullptr, &debugMessenger) != VK_SUCCESS) {
+        if (Debug::CreateDebugUtilsMessengerEXT(instance, &createInfo, nullptr, &debugMessenger) != VK_SUCCESS) {
             throw std::runtime_error("failed to set up debug messenger!");
         }
     }
