@@ -15,32 +15,34 @@ set(EXECUTABLE_NAME ${PROJECT_NAME})
 set(include
         main.cpp
 
-        core/engine.hpp
+        core/Engine.hpp
         core/tools.hpp
         core/logger.hpp
 
-        core/sep/camera/camListener.hpp
-        core/sep/camera/cam.h
+        core/sep/camera/CamListener.hpp
+        core/sep/camera/Camera.h
 
-        core/sep/control/keyBinding.hpp
-        core/sep/control/keyListener.hpp
+        core/sep/control/KeyBinding.hpp
+        core/sep/control/KeyListener.hpp
 
-        core/sep/device/physDevice.hpp
-        core/sep/device/logDevice.hpp
+        core/sep/device/PhysDevice.hpp
+        core/sep/device/LogDevice.hpp
 
-        core/sep/graphics/graphics.hpp
-        core/sep/graphics/delta.hpp
+        core/sep/graphics/Graphics.hpp
+        core/sep/graphics/Delta.hpp
 
-        core/sep/model/instance.h
-        core/sep/model/model.h
+        core/sep/model/ModelInstance.h
+        core/sep/model/ParsedModel.h
 
-        core/sep/util/debug.hpp
-        core/sep/util/queue.hpp
+        core/sep/util/Debug.hpp
+        core/sep/util/Queue.hpp
 
-        core/sep/window/surface.hpp
-        core/sep/window/swapchain.hpp
+        core/sep/window/Surface.hpp
+        core/sep/window/Swapchain.hpp
 
-        core/sep/entity/entity.h
+        core/sep/entity/Entity.h
+
+        core/sep/util/Color.h
 )
 
 add_executable(${EXECUTABLE_NAME})
