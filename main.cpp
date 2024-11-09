@@ -2,27 +2,27 @@
 #include <SDL3/SDL.h>
 #include <cmath>
 #include <vulkan/vulkan.h>
-#include "core/engine.hpp"
-#include "core/logger.hpp"
-#include "core/tools.hpp"
+#include "core/Engine.hpp"
+#include "core/Logger.hpp"
+#include "core/Tools.hpp"
 
 #define GLM_FORCE_RADIANS
 #include <glm/glm.hpp>
 
-#include "core/sep/control/keyListener.hpp"
-#include "core/sep/camera/camListener.hpp"
+#include "core/sep/control/KeyListener.hpp"
+#include "core/sep/camera/CamListener.hpp"
 
 
 struct AppContext {
     SDL_Window* win{};
-    engine eng;
+    Engine eng;
     bool quit = true;
 
-    keyListener* kL;
-    camListener* cL;
+    KeyListener* kL;
+    CamListener* cL;
 };
 
-logger* LOGGER = logger::of("MAIN");
+Logger* LOGGER = Logger::of("main.cpp");
 
 SDL_AppResult SDL_Fail() {
     SDL_LogError(SDL_LOG_CATEGORY_CUSTOM, "Error %s", SDL_GetError());
@@ -48,16 +48,16 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
         int width, height, bbwidth, bbheight;
         SDL_GetWindowSize(window, &width, &height);
         SDL_GetWindowSizeInPixels(window, &bbwidth, &bbheight);
-        LOGGER->log(logger::severity::LOG,"Window size: $x$", width, height);
-        LOGGER->log(logger::severity::LOG,"Backbuffer size: $x$", bbwidth, bbheight);
+        LOGGER->info("Window size: ${} x ${}", width, height);
+        LOGGER->info("Backbuffer size: ${} x ${}", bbwidth, bbheight);
         if (width != bbwidth){
-            LOGGER->log(logger::severity::LOG,"This is a highdpi environment.", nullptr);
+            LOGGER->info("This is a highdpi environment.");
         }
-        LOGGER->log(logger::severity::LOG,"Random number: $ (between 1 and 100)", tools::randomNum<uint32_t>(1,100));
+        LOGGER->info("Random number: ${} (between 1 and 100)", Tools::randomNum<uint32_t>(1,100));
     }
 
     //Set up Vulkan engine
-    engine vulkan_engine;
+    Engine vulkan_engine;
     vulkan_engine.init(window);
 
     // set up the application data
@@ -65,12 +65,12 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
         window,
         vulkan_engine,
         false,
-        new keyListener(),
-        new camListener()
+        new KeyListener(),
+        new CamListener()
     };
 
-    LOGGER->log(logger::severity::LOG,"Session ID: $", vulkan_engine.sid);
-    LOGGER->log(logger::severity::SUCCESS,"Application started successfully!", nullptr);
+    LOGGER->info("Session ID: ${}", vulkan_engine.sid);
+    LOGGER->success("Application started successfully!");
 
     SDL_SetWindowRelativeMouseMode(window, true);
 
@@ -103,10 +103,17 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *e) {
 
 SDL_AppResult SDL_AppIterate(void *appstate) {
     auto* app = static_cast<AppContext *>(appstate);
-    engine& eng = app->eng;
+    Engine& eng = app->eng;
 
     app->eng.deltaT->calculateDelta();
     app->kL->iterateCamMovement(app->quit, app->eng);
+
+    /*
+    LOGGER->log(logger::severity::LOG, "Camera movement: x:$, y:$, z:$",
+        app->eng.camera.pos.x,
+        app->eng.camera.pos.y,
+        app->eng.camera.pos.z
+        );*/
 
     eng.drawFrame();
     vkDeviceWaitIdle(eng.device);
@@ -123,5 +130,5 @@ void SDL_AppQuit(void* appstate) {
     }
 
     SDL_Quit();
-    LOGGER->log(logger::severity::SUCCESS,"Application quit successfully!", nullptr);
+    LOGGER->success("Application quit successfully!");
 }
