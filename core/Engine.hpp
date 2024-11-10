@@ -14,6 +14,7 @@
 #include "glm/glm.hpp"
 #include "sep/camera/Camera.h"
 #include "sep/graphics/Delta.hpp"
+#include "sep/model/ParsedModel.h"
 
 // Parameters
 inline int HEIGHT = 720;
@@ -272,10 +273,12 @@ private:
 
     #pragma endregion
 
-
     // Initializaiton of engine and its counterparts
     void initialize(SDL_Window* window) {
+
         this->window = window;
+        std::filesystem::path path = "C:/Users/down/CLionProjects/2g43s/core/models/scene.gltf";
+        ParsedModel model = ParsedModel(path);
 
         // Engine related stuff
         sid = Tools::randomNum<uint64_t>(1000000000,9999999999);

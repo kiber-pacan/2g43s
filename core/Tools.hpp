@@ -7,7 +7,7 @@
 #include <iostream>
 
 // Some tools
-class tools {
+class Tools {
     public:
 
     // Handy dandy method for easy bounded random
@@ -30,7 +30,7 @@ class tools {
     }
 
     // For reading shader files
-    static std::vector<char> readFile(const std::string& filename) {
+    static std::vector<char> readFile(const char* filename) {
         std::ifstream file(filename, std::ios::ate | std::ios::binary);
 
         if (!file.is_open()) {

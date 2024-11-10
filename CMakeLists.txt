@@ -24,6 +24,7 @@ set(include
 
         core/sep/control/KeyBinding.hpp
         core/sep/control/KeyListener.hpp
+        core/sep/control/MouseListener.hpp
 
         core/sep/device/PhysDevice.hpp
         core/sep/device/LogDevice.hpp

@@ -10,8 +10,7 @@
 #include <glm/glm.hpp>
 
 #include "core/sep/control/KeyListener.hpp"
-#include "core/sep/camera/CamListener.hpp"
-
+#include "core/sep/control/MouseListener.hpp"
 
 struct AppContext {
     SDL_Window* win{};
@@ -19,7 +18,7 @@ struct AppContext {
     bool quit = true;
 
     KeyListener* kL;
-    CamListener* cL;
+    MouseListener* mL;
 };
 
 Logger* LOGGER = Logger::of("main.cpp");
@@ -66,7 +65,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
         vulkan_engine,
         false,
         new KeyListener(),
-        new CamListener()
+        new MouseListener()
     };
 
     LOGGER->info("Session ID: ${}", vulkan_engine.sid);
@@ -89,14 +88,8 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *e) {
         return SDL_APP_SUCCESS;
     }
 
-    float x, y;
-
-    if (e->type == SDL_EVENT_MOUSE_MOTION && SDL_GetMouseFocus() == app->win) {
-        SDL_GetRelativeMouseState(&x,&y);
-        app->cL->moveCamera(x, y, app->eng.camera);
-    }
-
-    app->kL->listen(e);
+    app->kL->listen(e, app->eng, app->quit);
+    app->mL->listen(e, app->win, app->eng.camera);
 
     return SDL_APP_CONTINUE;
 }
@@ -106,14 +99,7 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
     Engine& eng = app->eng;
 
     app->eng.deltaT->calculateDelta();
-    app->kL->iterateCamMovement(app->quit, app->eng);
-
-    /*
-    LOGGER->log(logger::severity::LOG, "Camera movement: x:$, y:$, z:$",
-        app->eng.camera.pos.x,
-        app->eng.camera.pos.y,
-        app->eng.camera.pos.z
-        );*/
+    app->kL->iterateKeys(eng, app->quit);
 
     eng.drawFrame();
     vkDeviceWaitIdle(eng.device);
