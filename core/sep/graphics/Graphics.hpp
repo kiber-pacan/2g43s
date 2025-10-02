@@ -11,7 +11,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <chrono>
 #define STB_IMAGE_IMPLEMENTATION
-#include <stb_image.h>
+#include "stb/stb_image.h"
 
 
 namespace fs = std::filesystem;
@@ -79,8 +79,8 @@ struct Graphics {
     #pragma region Main
 
         static void createGraphicsPipeline(VkDevice& device, VkPipelineLayout& pipelinelayout, VkRenderPass& renderpass, VkPipeline& graphicsPipeline, VkDescriptorSetLayout& descriptorSetLayout, VkPipelineLayout& pipelineLayout, VkRenderPass& renderPass) {
-        auto vertShaderCode = Tools::readFile("C:/Users/down/CLionProjects/2g43s/core/shaders/vert.spv");
-        auto fragShaderCode = Tools::readFile("C:/Users/down/CLionProjects/2g43s/core/shaders/frag.spv");
+        auto vertShaderCode = Tools::readFile("/mnt/sda1/CLionProjects/2g43s/core/shaders/vert.spv");
+        auto fragShaderCode = Tools::readFile("/mnt/sda1/CLionProjects/2g43s/core/shaders/frag.spv");
 
         VkShaderModule vertShaderModule = createShaderModule(vertShaderCode, device);
         VkShaderModule fragShaderModule = createShaderModule(fragShaderCode, device);
@@ -459,7 +459,7 @@ struct Graphics {
         vkFreeMemory(device, stagingBufferMemory, nullptr);
     }
 
-    static void createIndexBuffer(VkDevice& device, VkPhysicalDevice& physDevice, VkCommandPool& commandPool, VkQueue& graphicsQueue, VkBuffer &indexBuffer, VkDeviceMemory& indexBufferMemory, std::vector<uint16_t>& indices) {
+    static void createIndexBuffer(VkDevice& device, VkPhysicalDevice& physDevice, VkCommandPool& commandPool, VkQueue& graphicsQueue, VkBuffer &indexBuffer, VkDeviceMemory& indexBufferMemory, std::vector<uint32_t>& indices) {
         VkDeviceSize bufferSize = sizeof(indices[0]) * indices.size();
 
         VkBuffer stagingBuffer;
@@ -609,7 +609,7 @@ struct Graphics {
         }
     }
 
-    static void recordCommandBuffer(VkCommandBuffer& commandBuffer, uint32_t imageIndex, VkRenderPass& renderPass, std::vector<VkFramebuffer>& swapChainFramebuffers, VkExtent2D& swapchainExtent, VkPipeline& graphicsPipeline, std::vector<uint16_t>& indices, VkBuffer& vertexBuffer, VkBuffer& indexBuffer, VkPipelineLayout& pipelineLayout, std::vector<VkDescriptorSet>& descriptorSets, uint32_t& currentFrame, Color clear_color) {
+    static void recordCommandBuffer(VkCommandBuffer& commandBuffer, uint32_t imageIndex, VkRenderPass& renderPass, std::vector<VkFramebuffer>& swapChainFramebuffers, VkExtent2D& swapchainExtent, VkPipeline& graphicsPipeline, std::vector<uint32_t>& indices, VkBuffer& vertexBuffer, VkBuffer& indexBuffer, VkPipelineLayout& pipelineLayout, std::vector<VkDescriptorSet>& descriptorSets, uint32_t& currentFrame, Color clear_color) {
         VkCommandBufferBeginInfo beginInfo{};
         beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 
@@ -660,7 +660,7 @@ struct Graphics {
             VkDeviceSize offsets[] = {0};
             vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
 
-            vkCmdBindIndexBuffer(commandBuffer, indexBuffer, 0, VK_INDEX_TYPE_UINT16);
+            vkCmdBindIndexBuffer(commandBuffer, indexBuffer, 0, VK_INDEX_TYPE_UINT32);
 
             vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSets[currentFrame], 0, nullptr);
 
@@ -770,7 +770,7 @@ struct Graphics {
 
     static void createTextureImage(VkDevice& device, VkCommandPool& commandPool, VkQueue& graphicsQueue, VkPhysicalDevice& physicalDevice, VkBuffer& stagingBuffer, VkDeviceMemory& stagingBufferMemory, VkImage& textureImage, VkDeviceMemory& textureImageMemory) {
         int texWidth, texHeight, texChannels;
-        stbi_uc* pixels = stbi_load("C:/Users/down/CLionProjects/2g43s/core/textures/odd-eyed-cat.jpg", &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
+        stbi_uc* pixels = stbi_load("/mnt/sda1/CLionProjects/2g43s/core/textures/odd-eyed-cat.jpg", &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
         VkDeviceSize imageSize = texWidth * texHeight * 4;
 
         if (!pixels) {
