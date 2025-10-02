@@ -11,10 +11,7 @@ struct MouseListener {
     static void listen(SDL_Event *e, SDL_Window* win, Camera& camera) {
         float x, y;
 
-        if (e->type == SDL_EVENT_MOUSE_MOTION && SDL_GetMouseFocus() == win) {
-            SDL_GetRelativeMouseState(&x, &y);
-        }
-
+        SDL_GetRelativeMouseState(&x, &y);
         moveCamera(x, y, camera);
     }
 
@@ -22,7 +19,7 @@ struct MouseListener {
         float& pitch = camera.pitch;
         float& yaw = camera.yaw;
 
-        yaw += x * camera.sens;
+        yaw -= x * camera.sens;
         pitch -= y * camera.sens;
 
         if (pitch > 89.0f) {
@@ -35,8 +32,8 @@ struct MouseListener {
         glm::vec3 direction;
 
         direction.x = cos(glm::radians(yaw)) * cos(glm::radians(pitch));
-        direction.y = sin(glm::radians(pitch));
-        direction.z = sin(glm::radians(yaw)) * cos(glm::radians(pitch));
+        direction.y = sin(glm::radians(yaw)) * cos(glm::radians(pitch));
+        direction.z = sin(glm::radians(pitch));
 
         camera.look = glm::normalize(direction);
     }
