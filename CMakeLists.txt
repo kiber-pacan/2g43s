@@ -16,10 +16,10 @@ set(include
         main.cpp
 
         core/Engine.hpp
-        core/tools.hpp
-        core/logger.hpp
+        core/Tools.hpp
+        core/Logger.hpp
 
-        core/sep/camera/CamListener.hpp
+        #core/sep/camera/CamListener.hpp
         core/sep/camera/Camera.h
 
         core/sep/control/KeyBinding.hpp
@@ -64,7 +64,9 @@ if(${WIN32})
 else ()
     find_package(SDL3 REQUIRED CONFIG)
     find_package(glm REQUIRED CONFIG)
-    find_package(stb REQUIRED CONFIG)
+    add_subdirectory("libs/fastgltf")
+    include_directories("/libs/stb")
+    #find_package(stb REQUIRED CONFIG)
 endif ()
 
 include_directories(${Vulkan_INCLUDE_DIRS})
