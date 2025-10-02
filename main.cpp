@@ -107,7 +107,7 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
     return SDL_APP_CONTINUE;
 }
 
-void SDL_AppQuit(void* appstate) {
+void SDL_AppQuit(void *appstate, SDL_AppResult result) {
     // Cleanup
     if (auto* app = static_cast<AppContext *>(appstate)) {
         app->eng.cleanup();
