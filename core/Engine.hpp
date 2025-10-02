@@ -14,6 +14,7 @@
 #include "glm/glm.hpp"
 #include "sep/camera/Camera.h"
 #include "sep/graphics/Delta.hpp"
+#include "sep/model/ModelInstance.h"
 #include "sep/model/ParsedModel.h"
 
 // Parameters
@@ -31,8 +32,8 @@ public:
 
     static void updateUniformBuffer(uint32_t currentImage, VkExtent2D& swapchainExtent, std::vector<void*>& uniformBuffersMapped, Graphics::UniformBufferObject& ubo, glm::vec3 pos, Camera& camera) {
         ubo.model = glm::translate(glm::mat4(1.0f), pos);
-        ubo.view = glm::lookAt(camera.pos + glm::vec3(0), camera.pos + camera.look, glm::vec3(0.0f, 1.0f, 0.0f));
-        ubo.proj = glm::perspective(camera.fov,  (float) swapchainExtent.width / (float) swapchainExtent.height, 0.01f, 64.0f);
+        ubo.view = glm::lookAt(camera.pos + glm::vec3(0), camera.pos + camera.look, glm::vec3(0.0f, 0.0f, 1.0f));
+        ubo.proj = glm::perspective(camera.fov,  (float) swapchainExtent.width / (float) swapchainExtent.height, 0.1f, 2048.0f);
         ubo.proj[1][1] *= -1;
         memcpy(uniformBuffersMapped[currentImage], &ubo, sizeof(ubo));
     }
@@ -105,6 +106,7 @@ public:
 
     // Clean trash before closing app
     void cleanup() {
+        vkDeviceWaitIdle(device);
         vkDestroyImageView(device, depthImageView, nullptr);
         vkDestroyImage(device, depthImage, nullptr);
         vkFreeMemory(device, depthImageMemory, nullptr);
@@ -157,6 +159,7 @@ public:
 
     #pragma endregion
 
+    #pragma region PublicVars
     // Session ID
     uint64_t sid{};
 
@@ -173,6 +176,7 @@ public:
     Delta *deltaT{};
 
     Color clear_color = Color::hex(0x80c4b5);
+    #pragma endregion PublicVars
 
 private:
     #pragma region Variables
@@ -254,31 +258,40 @@ private:
     uint32_t currentFrame = 0;
 
     // Shader stuff
-    std::vector<Graphics::Vertex> vertices = {
-        { {8.f, -1.f, -8.f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f} }, //0
-        { {8.f, -1.f, 8.f}, {0.0f, 1.0f, 0.0f}, {0.0f, 1.0f} },  //1
-        { {8.f, 1.f, 8.f}, {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f} },   //2
-        { {8.f, 1.f, -8.f}, {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f} },  //3
-        { {-8.f, -1.f, -8.f}, {1.0f, 0.0f, 0.0f}, {1.0f, 0.0f} },//4
-        { {-8.f, -1.f, 8.f}, {0.0f, 1.0f, 0.0f}, {1.0f, 1.0f} }, //5
-        { {-8.f, 1.f, 8.f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f} },  //6
-        { {-8.f, 1.f, -8.f}, {1.0f, 1.0f, 1.0f}, {1.0f, 0.0f} }, //7
-    };
+    std::vector<Graphics::Vertex> vertices;
 
-    std::vector<uint16_t> indices = {
-        0, 1, 5, 5, 4, 0,
-
-        2, 6, 7, 7, 3, 2,
-    };
+    std::vector<uint32_t> indices;
 
     #pragma endregion
+
+    std::vector<ParsedModel> mdls_p;
+    std::vector<ModelInstance> mdls_i;
+
+    void loadModels() {
+        std::string location = "/mnt/sda1/CLionProjects/2g43s/core/models/";
+        std::vector<std::string> names;
+
+        for (const std::string& name : names) {
+            std::filesystem::path path = location + name;
+            mdls_p.emplace_back(ParsedModel(path));
+        }
+    }
 
     // Initializaiton of engine and its counterparts
     void initialize(SDL_Window* window) {
 
         this->window = window;
-        std::filesystem::path path = "C:/Users/down/CLionProjects/2g43s/core/models/scene.gltf";
+        std::filesystem::path path = "/mnt/sda1/CLionProjects/2g43s/core/models/cabinet.glb";
         ParsedModel model = ParsedModel(path);
+
+
+        for (std::vector<uint32_t> index : model.indices) {
+            indices.append_range(index);
+        }
+
+        for (std::vector<Graphics::Vertex> mesh : model.meshes) {
+            vertices.append_range(mesh);
+        }
 
         // Engine related stuff
         sid = Tools::randomNum<uint64_t>(1000000000,9999999999);

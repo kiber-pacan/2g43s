@@ -13,8 +13,8 @@ struct KeyListener {
         keys = {
             KeyBinding::of(SDL_SCANCODE_W),
             KeyBinding::of(SDL_SCANCODE_S),
-            KeyBinding::of(SDL_SCANCODE_D),
             KeyBinding::of(SDL_SCANCODE_A),
+            KeyBinding::of(SDL_SCANCODE_D),
             KeyBinding::of(SDL_SCANCODE_SPACE),
             KeyBinding::of(SDL_SCANCODE_LCTRL),
             KeyBinding::of(SDL_SCANCODE_LSHIFT),
@@ -50,13 +50,13 @@ struct KeyListener {
 
             glm::vec2 vec = glm::normalize(
                 glm::vec2(
-                    cos * eng.camera.look.x - sin * eng.camera.look.z,
-                    sin * eng.camera.look.x + cos * eng.camera.look.z
+                    cos * eng.camera.look.x - sin * eng.camera.look.y,
+                    sin * eng.camera.look.x + cos * eng.camera.look.y
                     )
                 );
 
             eng.camera.pos.x += vec.x * eng.camera.speed * eng.deltaT->d;
-            eng.camera.pos.z += vec.y * eng.camera.speed * eng.deltaT->d;
+            eng.camera.pos.y += vec.y * eng.camera.speed * eng.deltaT->d;
         }
         if (keys[3]->down) {
             auto cos = glm::cos(glm::radians(90.0f));
@@ -64,20 +64,20 @@ struct KeyListener {
 
             glm::vec2 vec = glm::normalize(
                 glm::vec2(
-                    cos * eng.camera.look.x - sin * eng.camera.look.z,
-                    sin * eng.camera.look.x + cos * eng.camera.look.z
+                    cos * eng.camera.look.x - sin * eng.camera.look.y,
+                    sin * eng.camera.look.x + cos * eng.camera.look.y
                     )
                 );
 
 
             eng.camera.pos.x -= vec.x * eng.camera.speed * eng.deltaT->d;
-            eng.camera.pos.z -= vec.y * eng.camera.speed * eng.deltaT->d;
+            eng.camera.pos.y -= vec.y * eng.camera.speed * eng.deltaT->d;
         }
         if (keys[4]->down) {
-            eng.camera.pos.y += eng.camera.speed * eng.deltaT->d;
+            eng.camera.pos.z += eng.camera.speed * eng.deltaT->d;
         }
         if (keys[5]->down) {
-            eng.camera.pos.y -= eng.camera.speed * eng.deltaT->d;
+            eng.camera.pos.z -= eng.camera.speed * eng.deltaT->d;
         }
         if (keys[6]->down) {
             if (!eng.camera.running) {
