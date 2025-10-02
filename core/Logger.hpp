@@ -26,14 +26,15 @@ public:
 
     #pragma region info
     // Main method for logging
-    template<typename T>
-    void info(const char* str, T value, auto... args) {
+    template<typename T, typename T1>
+    void info(T1 str, T value, auto... args) {
         start(severity::LOG);
 
         log(str, value, args...);
     }
 
-    void info(const char* str) {
+    template<typename T1>
+    void info(T1 str) {
         start(severity::LOG);
 
         log(str);
@@ -42,14 +43,15 @@ public:
 
 
     #pragma region warn
-    template<typename T>
-    void warn(const char* str, T value, auto... args) {
+    template<typename T, typename T1>
+    void warn(T1 str, T value, auto... args) {
         start(severity::WARNING);
 
         log(str, value, args...);
     }
 
-    void warn(const char* str) {
+    template<typename T1>
+    void warn(T1 str) {
         start(severity::WARNING);
 
         log(str);
@@ -58,14 +60,15 @@ public:
 
 
     #pragma region error
-    template<typename T>
-    void error(const char* str, T value, auto... args) {
+    template<typename T, typename T1>
+    void error(T1 str, T value, auto... args) {
         start(severity::ERROR);
 
         log(str, value, args...);
     }
 
-    void error(const char* str) {
+    template<typename T1>
+    void error(T1 str) {
         start(severity::ERROR);
 
         log(str);
@@ -74,14 +77,15 @@ public:
 
 
     #pragma region success
-    template<typename T>
-    void success(const char* str, T value, auto... args) {
+    template<typename T, typename T1>
+    void success(T1 str, T value, auto... args) {
         start(severity::SUCCESS);
 
         log(str, value, args...);
     }
 
-    void success(const char* str) {
+    template<typename T1>
+    void success(T1 str) {
         start(severity::SUCCESS);
 
         log(str);
@@ -90,8 +94,8 @@ public:
 
 private:
     // Stub methods
-    template<typename T>
-    void log(const char* str, T value, auto... args) {
+    template<typename T, typename T1>
+    void log(T1 str, T value, auto... args) {
         // Printing
         tempLog(str, value, args...);
 
@@ -99,7 +103,8 @@ private:
         std::cout << "\033[0m" << std::endl;
     }
 
-    void log(const char* str) {
+    template<typename T1>
+    void log(T1 str) {
         // Printing
         std::cout << str;
 
