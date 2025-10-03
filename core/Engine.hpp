@@ -30,12 +30,20 @@ public:
         initialize(window);
     }
 
-    static void updateUniformBuffer(uint32_t currentImage, VkExtent2D& swapchainExtent, std::vector<void*>& uniformBuffersMapped, Graphics::UniformBufferObject& ubo, glm::vec3 pos, Camera& camera) {
+    static void updateUniformBuffer(uint32_t currentImage, VkExtent2D& swapchainExtent, std::vector<void*>& uniformBufferMapped, Graphics::UniformBufferObject& ubo, glm::vec3 pos, Camera& camera) {
         ubo.model = glm::translate(glm::mat4(1.0f), pos);
         ubo.view = glm::lookAt(camera.pos + glm::vec3(0), camera.pos + camera.look, glm::vec3(0.0f, 0.0f, 1.0f));
         ubo.proj = glm::perspective(camera.fov,  (float) swapchainExtent.width / (float) swapchainExtent.height, 0.1f, 2048.0f);
         ubo.proj[1][1] *= -1;
-        memcpy(uniformBuffersMapped[currentImage], &ubo, sizeof(ubo));
+        memcpy(uniformBufferMapped[currentImage], &ubo, sizeof(ubo));
+    }
+
+    static void updateModelBuffer(uint32_t currentImage, std::vector<void*>& modelBufferMapped, Graphics::ModelBufferObject& mbo, std::vector<ModelInstance> mdls_i1) {
+        for (auto mdl_i : mdls_i1) {
+            mbo.mdls.emplace_back(glm::translate(glm::mat4(1.0f), mdl_i.pos));
+        }
+
+        memcpy(modelBufferMapped[currentImage], &mbo, sizeof(ubo));
     }
 
     // Draw
@@ -53,6 +61,8 @@ public:
         }
 
         updateUniformBuffer(currentFrame, swapchainExtent, uniformBuffersMapped, ubo, glm::vec3(), camera);
+
+        updateModelBuffer(currentFrame, modelBuffersMapped, mbo, mdls_i);
 
         vkResetFences(device, 1, &inFlightFences[currentFrame]);
 
@@ -169,6 +179,7 @@ public:
 
     bool framebufferResized = false;
     Graphics::UniformBufferObject ubo{};
+    Graphics::ModelBufferObject mbo{};
 
     // Controls
     Camera camera{};
@@ -240,6 +251,10 @@ private:
     VkBuffer stagingBuffer{};
     VkDeviceMemory stagingBufferMemory{};
 
+    std::vector<VkBuffer> modelBuffers;
+    std::vector<VkDeviceMemory> modelBuffersMemory;
+    std::vector<void*> modelBuffersMapped;
+
     // Image
     VkImage textureImage{};
     VkDeviceMemory textureImageMemory{};
@@ -264,33 +279,52 @@ private:
 
     #pragma endregion
 
-    std::vector<ParsedModel> mdls_p;
+    std::vector<std::shared_ptr<ParsedModel>> mdls;
     std::vector<ModelInstance> mdls_i;
 
     void loadModels() {
         std::string location = "/mnt/sda1/CLionProjects/2g43s/core/models/";
-        std::vector<std::string> names;
+        std::vector<std::string> files{
+            "cabinet.glb"
+        };
 
-        for (const std::string& name : names) {
+        for (auto name : files) {
             std::filesystem::path path = location + name;
-            mdls_p.emplace_back(ParsedModel(path));
+            mdls.emplace_back(std::make_shared<ParsedModel>(path));
+        }
+
+        /*
+        for (auto mdl : mdls) {
+            mdls_i.emplace_back(mdl);
+        }
+        */
+
+        for (int i = 0; i < 100; ++i) {
+            mdls_i.emplace_back(
+                mdls[0],
+                glm::vec3(
+                    Tools::randomNum<glm::uint32>(-2048,2048),
+                    Tools::randomNum<glm::uint32>(-2048,2048),
+                    Tools::randomNum<glm::uint32>(-2048,2048)
+                    )
+                );
         }
     }
 
     // Initializaiton of engine and its counterparts
     void initialize(SDL_Window* window) {
-
         this->window = window;
-        std::filesystem::path path = "/mnt/sda1/CLionProjects/2g43s/core/models/cabinet.glb";
-        ParsedModel model = ParsedModel(path);
 
+        loadModels();
 
-        for (std::vector<uint32_t> index : model.indices) {
-            indices.append_range(index);
-        }
+        for (ModelInstance mdl_i : mdls_i) {
+            for (auto index : mdl_i.mdl->indices) {
+                indices.append_range(index);
+            }
 
-        for (std::vector<Graphics::Vertex> mesh : model.meshes) {
-            vertices.append_range(mesh);
+            for (auto mesh : mdl_i.mdl->meshes) {
+                vertices.append_range(mesh);
+            }
         }
 
         // Engine related stuff
@@ -325,20 +359,29 @@ private:
 
         // Graphics
         Graphics::createRenderPass(device, physicalDevice, swapchainImageFormat, renderPass);
+
         Graphics::createDescriptorSetLayout(device, descriptorSetLayout);
         Graphics::createGraphicsPipeline(device, pipelineLayout, renderPass, graphicsPipeline, descriptorSetLayout, pipelineLayout, renderPass);
         Graphics::createCommandPool(device, physicalDevice, commandPool, surface);
+
         Graphics::createDepthResources(device, physicalDevice, commandPool, graphicsQueue, depthImage, depthImageMemory, depthImageView, swapchainExtent);
         Graphics::createFramebuffers(device, depthImageView, swapChainFramebuffers, swapchainImageViews, renderPass, swapchainExtent);
+
         Graphics::createTextureImage(device, commandPool, graphicsQueue, physicalDevice, stagingBuffer, stagingBufferMemory, textureImage, textureImageMemory);
         Graphics::createTextureImageView(device, textureImage, textureImageView);
         Graphics::createTextureSampler(device, physicalDevice, textureSampler);
+
         Graphics::createVertexBuffer(device, physicalDevice, commandPool, graphicsQueue, vertexBuffer, vertexBufferMemory, vertices);
         Graphics::createIndexBuffer(device, physicalDevice, commandPool, graphicsQueue, indexBuffer, indexBufferMemory, indices);
+
         Graphics::createUniformBuffers(device, physicalDevice, uniformBuffers, uniformBuffersMemory, uniformBuffersMapped, MAX_FRAMES_IN_FLIGHT);
+        Graphics::createModelBufferss(device, physicalDevice, uniformBuffers, uniformBuffersMemory, uniformBuffersMapped, MAX_FRAMES_IN_FLIGHT);
+
         Graphics::createDescriptorPool(device, MAX_FRAMES_IN_FLIGHT, descriptorPool);
         Graphics::createDescriptorSets(device, MAX_FRAMES_IN_FLIGHT, descriptorSetLayout, descriptorPool, descriptorSets, uniformBuffers, textureImageView, textureSampler);
+
         Graphics::createCommandBuffer(device, commandPool, commandBuffers, MAX_FRAMES_IN_FLIGHT);
+
         Graphics::createSyncObjects(device, imageAvailableSemaphores, renderFinishedSemaphores, inFlightFences, MAX_FRAMES_IN_FLIGHT);
     }
 
