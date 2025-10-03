@@ -1,10 +1,18 @@
-#version 450
+#version 460
 
 layout(binding = 0) uniform UniformBufferObject {
     mat4 model;
     mat4 view;
     mat4 proj;
 } ubo;
+
+struct ObjectData{
+	mat4 model;
+};
+
+layout(std140,set = 1, binding = 2) readonly buffer ObjectBuffer{
+	ObjectData objects[];
+} objectBuffer;
 
 layout(location = 0) in vec3 inPosition;
 layout(location = 1) in vec3 inColor;
