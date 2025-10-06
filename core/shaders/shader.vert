@@ -10,7 +10,7 @@ struct ObjectData{
 	mat4 model;
 };
 
-layout(std140,set = 1, binding = 2) readonly buffer ObjectBuffer{
+layout(std140, binding = 2) readonly buffer ObjectBuffer{
 	ObjectData objects[];
 } objectBuffer;
 
@@ -22,7 +22,7 @@ layout(location = 0) out vec3 fragColor;
 layout(location = 1) out vec2 fragTexCoord;
 
 void main() {
-    gl_Position = ubo.proj * ubo.view * ubo.model * vec4(inPosition, 1.0);
+    gl_Position = ubo.proj * ubo.view * objectBuffer.objects[gl_InstanceIndex].model * vec4(inPosition, 1.0);
     fragColor = inColor;
     fragTexCoord = inTexCoord;
 }
