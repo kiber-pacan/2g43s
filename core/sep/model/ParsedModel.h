@@ -2,15 +2,16 @@
 #define PARSEDMODEL_H
 #include <vector>
 
+#include "Vertex.h"
 #include "../../Logger.hpp"
-#include "../graphics/Graphics.hpp"
 #include "fastgltf/core.hpp"
 #include "fastgltf/tools.hpp"
 
 class ParsedModel {
     public:
-    std::vector<std::vector<Graphics::Vertex>> meshes{};
-    std::vector<std::vector<uint32_t>> indices{};
+    std::vector<std::vector<Vertex>> meshes{};
+    std::vector<uint32_t> indices{};
+    std::string name;
 
     ParsedModel(std::filesystem::path& path) {
         loadModel(loadAsset(path));
@@ -44,7 +45,7 @@ class ParsedModel {
                 auto* position = primitive.findAttribute("POSITION");
                 auto& positionAccessor = asset.accessors[position->accessorIndex];
 
-                std::vector<Graphics::Vertex> tempMesh(positionAccessor.count);
+                std::vector<Vertex> tempMesh(positionAccessor.count);
                 std::vector<std::uint32_t> tempIndices{};
 
 
@@ -90,7 +91,7 @@ class ParsedModel {
                 }
 
 
-                this->indices.emplace_back(tempIndices);
+                this->indices.append_range(tempIndices);
             }
         }
     }
