@@ -19,7 +19,9 @@ struct KeyListener {
             KeyBinding::of(SDL_SCANCODE_LCTRL),
             KeyBinding::of(SDL_SCANCODE_LSHIFT),
             KeyBinding::of(SDL_SCANCODE_ESCAPE),
-            KeyBinding::of(SDL_SCANCODE_R)
+            KeyBinding::of(SDL_SCANCODE_R),
+            KeyBinding::of(SDL_SCANCODE_MINUS),
+            KeyBinding::of(SDL_SCANCODE_EQUALS),
         };
     }
 
@@ -95,6 +97,14 @@ struct KeyListener {
         }
         if (keys[8]->down) {
             eng.camera.respawn();
+        }
+        if (keys[9]->down) {
+            eng.camera.speed -= 50.0f;
+            if (eng.camera.speed < 1.0f) eng.camera.speed = 1.0f;
+        }
+        if (keys[10]->down) {
+            eng.camera.speed += 50.0f;
+            if (eng.camera.speed > 100.0f) eng.camera.speed = 512.0f;
         }
     }
 };
