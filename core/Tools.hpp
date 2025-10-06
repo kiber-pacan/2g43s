@@ -12,21 +12,17 @@ class Tools {
 
     // Handy dandy method for easy bounded random
     template<typename T>
-    static T randomNum(auto min, auto max) {
-        if (min > max) std::cerr << "you passed min that greater than max, you gonna get bad random results!" << std::endl;
+    static T randomNum(T min, T max) {
+        static std::random_device rd; // максимально случайное семя от системы
+        static std::mt19937_64 rng(rd()); // генератор с большим периодом
 
-        // Get time from epoch, we gonna use it as random seed
-        const unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
-
-        // Creating random engine with seed, so numbers never gonna repeat
-        std::minstd_rand0 rand (seed);
-
-        // Some old trick to bound random number
-        const auto range = max - min + 1;
-        T num = rand() % T(range + min);
-
-        // returning the result
-        return num;
+        if constexpr (std::is_integral_v<T>) {
+            std::uniform_int_distribution<T> dist(min, max);
+            return dist(rng);
+        } else {
+            std::uniform_real_distribution<T> dist(min, max);
+            return dist(rng);
+        }
     }
 
     // For reading shader files
