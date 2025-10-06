@@ -29,7 +29,7 @@ struct Graphics {
     struct ModelBufferObject {
         std::vector<glm::mat4> mdls;
         bool dirty = true;
-        uint8_t frame = 0;
+        size_t frame = 0;
     };
 
     static VkShaderModule createShaderModule(const std::vector<char>& code, const VkDevice& device) {
@@ -45,7 +45,6 @@ struct Graphics {
 
         return shaderModule;
     }
-
 
     #pragma region Main
 
@@ -334,7 +333,7 @@ struct Graphics {
     // Buffers and shit
     #pragma region Buffers
 
-    static void createBuffer(VkDevice& device, VkPhysicalDevice& physDevice, VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory) {
+    static void createBuffer(VkDevice& device, VkPhysicalDevice& physicalDevice, VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory) {
         VkBufferCreateInfo bufferInfo{};
         bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
         bufferInfo.size = size;
@@ -351,7 +350,7 @@ struct Graphics {
         VkMemoryAllocateInfo allocInfo{};
         allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
         allocInfo.allocationSize = memRequirements.size;
-        allocInfo.memoryTypeIndex = Graphics::findMemoryType(memRequirements.memoryTypeBits, properties, physDevice);
+        allocInfo.memoryTypeIndex = Graphics::findMemoryType(memRequirements.memoryTypeBits, properties, physicalDevice);
 
         if (vkAllocateMemory(device, &allocInfo, nullptr, &bufferMemory) != VK_SUCCESS) {
             throw std::runtime_error("failed to allocate buffer memory!");
@@ -360,7 +359,7 @@ struct Graphics {
         vkBindBufferMemory(device, buffer, bufferMemory, 0);
     }
 
-    static void copyBuffer(VkDevice& device, VkPhysicalDevice& physDevice, VkCommandPool& commandPool, VkQueue& graphicsQueue, VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size) {
+    static void copyBuffer(VkDevice& device, VkPhysicalDevice& physicalDevice, VkCommandPool& commandPool, VkQueue& graphicsQueue, VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size) {
         VkCommandBuffer commandBuffer = beginSingleTimeCommands(device, commandPool);
 
         VkBufferCopy copyRegion{};
@@ -410,12 +409,12 @@ struct Graphics {
         }
     }
 
-    static void createVertexBuffer(VkDevice& device, VkPhysicalDevice& physDevice, VkCommandPool& commandPool, VkQueue& graphicsQueue, VkBuffer& vertexBuffer, VkDeviceMemory& vertexBufferMemory, const ModelBus& mdlBus) {
+    static void createVertexBuffer(VkDevice& device, VkPhysicalDevice& physicalDevice, VkCommandPool& commandPool, VkQueue& graphicsQueue, VkBuffer& vertexBuffer, VkDeviceMemory& vertexBufferMemory, const ModelBus& mdlBus) {
         VkDeviceSize bufferSize = mdlBus.getVertexBufferSize();
 
         VkBuffer stagingBuffer;
         VkDeviceMemory stagingBufferMemory;
-        createBuffer(device, physDevice, bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
+        createBuffer(device, physicalDevice, bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
 
         std::vector<Vertex> vertices = mdlBus.getVertices();
         void* data;
@@ -424,20 +423,20 @@ struct Graphics {
         memcpy(data, vertices.data(), (size_t) bufferSize);
         vkUnmapMemory(device, stagingBufferMemory);
 
-        createBuffer(device, physDevice, bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, vertexBuffer, vertexBufferMemory);
+        createBuffer(device, physicalDevice, bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, vertexBuffer, vertexBufferMemory);
 
-        copyBuffer(device, physDevice, commandPool, graphicsQueue, stagingBuffer, vertexBuffer, bufferSize);
+        copyBuffer(device, physicalDevice, commandPool, graphicsQueue, stagingBuffer, vertexBuffer, bufferSize);
 
         vkDestroyBuffer(device, stagingBuffer, nullptr);
         vkFreeMemory(device, stagingBufferMemory, nullptr);
     }
 
-    static void createIndexBuffer(VkDevice& device, VkPhysicalDevice& physDevice, VkCommandPool& commandPool, VkQueue& graphicsQueue, VkBuffer &indexBuffer, VkDeviceMemory& indexBufferMemory, const ModelBus& mdlBus) {
+    static void createIndexBuffer(VkDevice& device, VkPhysicalDevice& physicalDevice, VkCommandPool& commandPool, VkQueue& graphicsQueue, VkBuffer &indexBuffer, VkDeviceMemory& indexBufferMemory, const ModelBus& mdlBus) {
         VkDeviceSize bufferSize = mdlBus.getIndexBufferSize();
 
         VkBuffer stagingBuffer;
         VkDeviceMemory stagingBufferMemory;
-        createBuffer(device, physDevice, bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
+        createBuffer(device, physicalDevice, bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
 
         std::vector<u_int32_t> indices = mdlBus.getIndices();
         void* data;
@@ -445,15 +444,15 @@ struct Graphics {
         memcpy(data, indices.data(), (size_t) bufferSize);
         vkUnmapMemory(device, stagingBufferMemory);
 
-        createBuffer(device, physDevice, bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, indexBuffer, indexBufferMemory);
+        createBuffer(device, physicalDevice, bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, indexBuffer, indexBufferMemory);
 
-        copyBuffer(device, physDevice, commandPool, graphicsQueue, stagingBuffer, indexBuffer, bufferSize);
+        copyBuffer(device, physicalDevice, commandPool, graphicsQueue, stagingBuffer, indexBuffer, bufferSize);
 
         vkDestroyBuffer(device, stagingBuffer, nullptr);
         vkFreeMemory(device, stagingBufferMemory, nullptr);
     }
 
-    static void createUniformBuffers(VkDevice& device, VkPhysicalDevice& physDevice, std::vector<VkBuffer>& uniformBuffers, std::vector<VkDeviceMemory>& uniformBuffersMemory, std::vector<void*>& uniformBuffersMapped, const int& MAX_FRAMES_IN_FLIGHT) {
+    static void createUniformBuffers(VkDevice& device, VkPhysicalDevice& physicalDevice, std::vector<VkBuffer>& uniformBuffers, std::vector<VkDeviceMemory>& uniformBuffersMemory, std::vector<void*>& uniformBuffersMapped, const int& MAX_FRAMES_IN_FLIGHT) {
         VkDeviceSize bufferSize = sizeof(Graphics::UniformBufferObject);
 
         uniformBuffers.resize(MAX_FRAMES_IN_FLIGHT);
@@ -461,13 +460,13 @@ struct Graphics {
         uniformBuffersMapped.resize(MAX_FRAMES_IN_FLIGHT);
 
         for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-            createBuffer(device, physDevice, bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, uniformBuffers[i], uniformBuffersMemory[i]);
+            createBuffer(device, physicalDevice, bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, uniformBuffers[i], uniformBuffersMemory[i]);
 
             vkMapMemory(device, uniformBuffersMemory[i], 0, bufferSize, 0, &uniformBuffersMapped[i]);
         }
     }
 
-    static void createModelBuffers(VkDevice& device, VkPhysicalDevice& physDevice, std::vector<VkBuffer>& modelBuffers, std::vector<VkDeviceMemory>& modelBuffersMemory, std::vector<void*>& modelBuffersMapped, const int& MAX_FRAMES_IN_FLIGHT, const ModelBus& mdlBus) {
+    static void createModelBuffers(VkDevice& device, VkPhysicalDevice& physicalDevice, std::vector<VkBuffer>& modelBuffers, std::vector<VkDeviceMemory>& modelBuffersMemory, std::vector<void*>& modelBuffersMapped, const int& MAX_FRAMES_IN_FLIGHT, const ModelBus& mdlBus) {
         const VkDeviceSize bufferSize = sizeof(ModelBufferObject) * ModelBus::MAX_MODELS;
 
         modelBuffers.resize(MAX_FRAMES_IN_FLIGHT);
@@ -475,11 +474,50 @@ struct Graphics {
         modelBuffersMapped.resize(MAX_FRAMES_IN_FLIGHT);
 
         for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-            createBuffer(device, physDevice, bufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, modelBuffers[i], modelBuffersMemory[i]);
+            createBuffer(device, physicalDevice, bufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, modelBuffers[i], modelBuffersMemory[i]);
 
             vkMapMemory(device, modelBuffersMemory[i], 0, bufferSize, 0, &modelBuffersMapped[i]);
         }
     }
+
+    static void createDrawCommandsBuffer(VkDevice& device, VkPhysicalDevice& physicalDevice, VkCommandPool& commandPool, VkQueue& graphicsQueue, VkBuffer& drawCommandsBuffer, VkDeviceMemory& drawCommandsBufferMemory, const ModelBus& mdlBus) {
+        const VkDeviceSize bufferSize = sizeof(mdlBus.drawCommands[0]) * mdlBus.drawCommands.size();
+
+        VkBuffer stagingBuffer;
+        VkDeviceMemory stagingBufferMemory;
+        createBuffer(device, physicalDevice, bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
+
+        void* data;
+        vkMapMemory(device, stagingBufferMemory, 0, bufferSize, 0, &data);
+        memcpy(data, mdlBus.drawCommands.data(), (size_t) bufferSize);
+        vkUnmapMemory(device, stagingBufferMemory);
+
+        createBuffer(device, physicalDevice, bufferSize, VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, drawCommandsBuffer, drawCommandsBufferMemory);
+
+        copyBuffer(device, physicalDevice, commandPool, graphicsQueue, stagingBuffer, drawCommandsBuffer, bufferSize);
+
+        vkDestroyBuffer(device, stagingBuffer, nullptr);
+        vkFreeMemory(device, stagingBufferMemory, nullptr);
+    }
+
+    static void updateDrawCommandsBuffer(VkDevice& device, VkPhysicalDevice& physicalDevice, VkCommandPool& commandPool, VkQueue& graphicsQueue, VkBuffer& drawCommandsBuffer, const std::vector<VkDrawIndexedIndirectCommand>& drawCommands) {
+        VkDeviceSize bufferSize = sizeof(drawCommands[0]) * drawCommands.size();
+
+        VkBuffer stagingBuffer;
+        VkDeviceMemory stagingBufferMemory;
+        createBuffer(device, physicalDevice, bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
+
+        void* data;
+        vkMapMemory(device, stagingBufferMemory, 0, bufferSize, 0, &data);
+        memcpy(data, drawCommands.data(), (size_t) bufferSize);
+        vkUnmapMemory(device, stagingBufferMemory);
+
+        copyBuffer(device, physicalDevice, commandPool, graphicsQueue, stagingBuffer, drawCommandsBuffer, bufferSize);
+
+        vkDestroyBuffer(device, stagingBuffer, nullptr);
+        vkFreeMemory(device, stagingBufferMemory, nullptr);
+    }
+
 
     #pragma endregion
 
@@ -622,7 +660,7 @@ struct Graphics {
         }
     }
 
-    static void recordCommandBuffer(VkCommandBuffer& commandBuffer, uint32_t imageIndex, VkRenderPass& renderPass, std::vector<VkFramebuffer>& swapChainFramebuffers, VkExtent2D& swapchainExtent, VkPipeline& graphicsPipeline, VkBuffer& vertexBuffer, VkBuffer& indexBuffer, VkPipelineLayout& pipelineLayout, std::vector<VkDescriptorSet>& descriptorSets, uint32_t& currentFrame, Color clear_color, const ModelBus& mdlBus) {
+    static void recordCommandBuffer(VkDevice& device, VkPhysicalDevice& physicalDevice, VkCommandPool& commandPool, VkQueue& graphicsQueue, VkCommandBuffer& commandBuffer, uint32_t imageIndex, VkRenderPass& renderPass, std::vector<VkFramebuffer>& swapChainFramebuffers, VkExtent2D& swapchainExtent, VkPipeline& graphicsPipeline, VkBuffer& vertexBuffer, VkBuffer& indexBuffer, VkPipelineLayout& pipelineLayout, std::vector<VkDescriptorSet>& descriptorSets, uint32_t& currentFrame, Color clear_color, ModelBus& mdlBus, VkBuffer& drawCommandsBuffer, VkDeviceMemory& drawCommandsBufferMemory) {
         VkCommandBufferBeginInfo beginInfo{};
         beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 
@@ -685,7 +723,8 @@ struct Graphics {
             int32_t vertexOffset = 0;
             uint32_t firstInstance = 0;
 
-            for (auto& mdl : mdlBus.mdls) {
+            for (size_t i = 0; i < mdlBus.mdls.size() && mdlBus.dirtyCommands; i++) {
+                const auto& mdl = mdlBus.mdls[i];
                 size_t instanceCount = mdlBus.getInstanceCount(mdl);
                 uint32_t indexCount = mdl->indices.size();
 
@@ -698,12 +737,21 @@ struct Graphics {
                 std::cout << "" << std::endl;
                 */
 
-                vkCmdDrawIndexed(commandBuffer, indexCount, instanceCount, firstIndex, vertexOffset, firstInstance);
+                mdlBus.addCommands(indexCount, instanceCount, firstIndex, vertexOffset, firstInstance);
+                if (i == mdlBus.mdls.size() - 1) {
+                    updateDrawCommandsBuffer(device, physicalDevice, commandPool, graphicsQueue, drawCommandsBuffer, mdlBus.drawCommands);
+                    break;
+                }
+                mdlBus.dirtyCommands = false;
                 firstIndex += indexCount;
+                vertexOffset += ModelBus::getVertexCount(mdl);
                 vertexOffset += ModelBus::getVertexCount(mdl);
                 firstInstance += instanceCount;
             }
 
+            if (drawCommandsBuffer == VK_NULL_HANDLE) createDrawCommandsBuffer(device, physicalDevice, commandPool, graphicsQueue, drawCommandsBuffer, drawCommandsBufferMemory, mdlBus);
+
+            vkCmdDrawIndexedIndirect(commandBuffer, drawCommandsBuffer, 0, mdlBus.drawCommands.size(), sizeof(VkDrawIndexedIndirectCommand));
 
         vkCmdEndRenderPass(commandBuffer);
 

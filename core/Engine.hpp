@@ -52,9 +52,7 @@ public:
             mbo.frame += 1;
             memcpy(modelBufferMapped[currentImage], mbo.mdls.data(), sizeof(mbo.mdls[0]) * mbo.mdls.size());
 
-            std::cout << "Loaded matrices" << std::endl;
-
-            if (mbo.frame > MAX_FRAMES_IN_FLIGHT) {
+            if (mbo.frame == MAX_FRAMES_IN_FLIGHT) {
                 mbo.dirty = false;
             }
         }
@@ -81,7 +79,7 @@ public:
         vkResetFences(device, 1, &inFlightFences[currentFrame]);
 
         vkResetCommandBuffer(commandBuffers[currentFrame], /*VkCommandBufferResetFlagBits*/ 0);
-        Graphics::recordCommandBuffer(commandBuffers[currentFrame], imageIndex, renderPass, swapChainFramebuffers, swapchainExtent, graphicsPipeline, vertexBuffer, indexBuffer, pipelineLayout, descriptorSets, currentFrame, clear_color, mdlBus);
+        Graphics::recordCommandBuffer(device, physicalDevice, commandPool, graphicsQueue, commandBuffers[currentFrame], imageIndex, renderPass, swapChainFramebuffers, swapchainExtent, graphicsPipeline, vertexBuffer, indexBuffer, pipelineLayout, descriptorSets, currentFrame, clear_color, mdlBus, drawCommandsBuffer, drawCommandsBufferMemory);
 
         VkSubmitInfo submitInfo{};
         submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -131,9 +129,7 @@ public:
     // Clean trash before closing app
     void cleanup() {
         vkDeviceWaitIdle(device);
-        vkDestroyImageView(device, depthImageView, nullptr);
-        vkDestroyImage(device, depthImage, nullptr);
-        vkFreeMemory(device, depthImageMemory, nullptr);
+
 
         cleanupSwapchain();
 
@@ -175,6 +171,10 @@ public:
         vkDestroyRenderPass(device, renderPass, nullptr);
 
         vkDestroyCommandPool(device, commandPool, nullptr);
+
+
+        vkDestroyBuffer(device, drawCommandsBuffer, nullptr);
+        vkFreeMemory(device, drawCommandsBufferMemory, nullptr);
 
         vkDestroyDevice(device, nullptr);
 
@@ -265,16 +265,19 @@ private:
     VkBuffer indexBuffer{};
     VkDeviceMemory indexBufferMemory{};
 
-    std::vector<VkBuffer> uniformBuffers;
-    std::vector<VkDeviceMemory> uniformBuffersMemory;
-    std::vector<void*> uniformBuffersMapped;
+    std::vector<VkBuffer> uniformBuffers{};
+    std::vector<VkDeviceMemory> uniformBuffersMemory{};
+    std::vector<void*> uniformBuffersMapped{};
 
     VkBuffer stagingBuffer{};
     VkDeviceMemory stagingBufferMemory{};
 
-    std::vector<VkBuffer> modelBuffers;
-    std::vector<VkDeviceMemory> modelBuffersMemory;
-    std::vector<void*> modelBuffersMapped;
+    std::vector<VkBuffer> modelBuffers{};
+    std::vector<VkDeviceMemory> modelBuffersMemory{};
+    std::vector<void*> modelBuffersMapped{};
+
+    VkBuffer drawCommandsBuffer{};
+    VkDeviceMemory drawCommandsBufferMemory{};
 
     // Image
     VkImage textureImage{};
@@ -303,10 +306,6 @@ private:
         this->window = window;
 
         mdlBus.test();
-
-        std::cout << mdlBus.mdls_i.size() << std::endl;
-        std::cout << mdlBus.mdls.size() << std::endl;
-
 
         // Engine related stuff
         sid = Tools::randomNum<uint64_t>(1000000000,9999999999);
@@ -363,11 +362,16 @@ private:
 
         Graphics::createCommandBuffer(device, commandPool, commandBuffers, MAX_FRAMES_IN_FLIGHT);
 
+
         Graphics::createSyncObjects(device, imageAvailableSemaphores, renderFinishedSemaphores, inFlightFences, MAX_FRAMES_IN_FLIGHT);
     }
 
 
     void cleanupSwapchain() {
+        vkDestroyImage(device, depthImage, nullptr);
+        vkFreeMemory(device, depthImageMemory, nullptr);
+        vkDestroyImageView(device, depthImageView, nullptr);
+
         for (auto & swapChainFramebuffer : swapChainFramebuffers) {
             vkDestroyFramebuffer(device, swapChainFramebuffer, nullptr);
         }

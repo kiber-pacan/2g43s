@@ -14,6 +14,9 @@ struct ModelBus {
     std::vector<std::shared_ptr<ParsedModel>> mdls{};
     std::vector<ModelInstance> mdls_i{};
 
+    std::vector<VkDrawIndexedIndirectCommand> drawCommands{};
+    bool dirtyCommands = true;
+
     constexpr static
     uint32_t MAX_MODELS = 65536;
 
@@ -192,6 +195,20 @@ struct ModelBus {
 
     #pragma endregion
 
+    #pragma region commands
+
+    void addCommands(const uint32_t indexCount, const uint32_t instanceCount, const uint32_t firstIndex, const int32_t  vertexOffset, const uint32_t firstInstance) {
+        VkDrawIndexedIndirectCommand drawCommand{};
+        drawCommand.indexCount = indexCount;
+        drawCommand.instanceCount = instanceCount;
+        drawCommand.firstIndex = firstIndex;
+        drawCommand.vertexOffset = vertexOffset;
+        drawCommand.firstInstance = firstInstance;
+
+        drawCommands.emplace_back(drawCommand);
+    }
+    #pragma endregion
+
 
 
     void test() {
@@ -204,7 +221,8 @@ struct ModelBus {
                     createModelInstance(
                     mdls[0],
                     "model" + std::to_string(x + y + z),
-                    glm::vec3(100 * x, 100 * y, 100 * z)
+                    glm::vec3(Tools::randomNum<float>(-1000.0f, 1000.0f), Tools::randomNum<float>(-1000.0f, 1000.0f), Tools::randomNum<float>(-1000.0f, 1000.0f)),
+                    glm::vec3(glm::degrees(Tools::randomNum<float>(-360.0f, 360.0f)), glm::degrees(Tools::randomNum<float>(-360.0f, 360.0f)), glm::degrees(Tools::randomNum<float>(-360.0f, 360.0f)))
                     );
                 }
             }
