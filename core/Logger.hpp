@@ -30,7 +30,10 @@ public:
     void info(T1 str, T value, auto... args) {
         start(severity::LOG);
 
-        log(str, value, args...);
+        if constexpr (std::is_arithmetic_v<T1>)
+            log(std::to_string(str), value, args...);
+        else
+            log(str, value, args...);
     }
 
     template<typename T1>
@@ -47,7 +50,10 @@ public:
     void warn(T1 str, T value, auto... args) {
         start(severity::WARNING);
 
-        log(str, value, args...);
+        if constexpr (std::is_arithmetic_v<T1>)
+            log(std::to_string(str), value, args...);
+        else
+            log(str, value, args...);
     }
 
     template<typename T1>
@@ -64,7 +70,10 @@ public:
     void error(T1 str, T value, auto... args) {
         start(severity::ERROR);
 
-        log(str, value, args...);
+        if constexpr (std::is_arithmetic_v<T1>)
+            log(std::to_string(str), value, args...);
+        else
+            log(str, value, args...);
     }
 
     template<typename T1>
@@ -81,7 +90,10 @@ public:
     void success(T1 str, T value, auto... args) {
         start(severity::SUCCESS);
 
-        log(str, value, args...);
+        if constexpr (std::is_arithmetic_v<T1>)
+            log(std::to_string(str), value, args...);
+        else
+            log(str, value, args...);
     }
 
     template<typename T1>
