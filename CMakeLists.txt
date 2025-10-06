@@ -11,15 +11,13 @@ set(CMAKE_CXX_EXTENSIONS off)
 project(2g43s)
 set(EXECUTABLE_NAME ${PROJECT_NAME})
 
-#Set of source files
-set(include
+add_executable(${EXECUTABLE_NAME}
         main.cpp
 
         core/Engine.hpp
         core/Tools.hpp
         core/Logger.hpp
 
-        #core/sep/camera/CamListener.hpp
         core/sep/camera/Camera.h
 
         core/sep/control/KeyBinding.hpp
@@ -34,6 +32,7 @@ set(include
 
         core/sep/model/ModelInstance.h
         core/sep/model/ParsedModel.h
+        core/sep/model/ModelBus.h
 
         core/sep/util/Debug.hpp
         core/sep/util/Queue.hpp
@@ -44,9 +43,9 @@ set(include
         core/sep/entity/Entity.h
 
         core/sep/util/Color.h
+        core/sep/model/Vertex.h
+        core/sep/entity/CameraEntity.h
 )
-
-add_executable(${EXECUTABLE_NAME})
 
 #Adding sources to project
 target_sources(${EXECUTABLE_NAME} PRIVATE ${include})
