@@ -47,6 +47,9 @@ add_executable(${EXECUTABLE_NAME}
         core/sep/entity/CameraEntity.h
 )
 
+set(CMAKE_CXX_FLAGS_RELEASE "-Ofast -march=native -flto -funroll-loops -fomit-frame-pointer -ffast-math -fno-math-errno -DNDEBUG")
+set(CMAKE_EXE_LINKER_FLAGS_RELEASE "-flto")
+
 #Adding sources to project
 target_sources(${EXECUTABLE_NAME} PRIVATE ${include})
 
