@@ -11,50 +11,15 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <chrono>
 #define STB_IMAGE_IMPLEMENTATION
+#include "../model/ModelBus.h"
 #include "stb/stb_image.h"
+#include "../model/Vertex.h"
 
 
 namespace fs = std::filesystem;
 
 struct Graphics {
     // Vertex shader stuff
-
-    struct Vertex {
-        glm::vec3 pos;
-        glm::vec3 color;
-        glm::vec2 texCoord;
-
-        static VkVertexInputBindingDescription getBindingDescription() {
-            VkVertexInputBindingDescription bindingDescription{};
-            bindingDescription.binding = 0;
-            bindingDescription.stride = sizeof(Vertex);
-            bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-
-            return bindingDescription;
-        }
-
-        static std::array<VkVertexInputAttributeDescription, 3> getAttributeDescriptions() {
-            std::array<VkVertexInputAttributeDescription, 3> attributeDescriptions{};
-
-            attributeDescriptions[0].binding = 0;
-            attributeDescriptions[0].location = 0;
-            attributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;
-            attributeDescriptions[0].offset = offsetof(Vertex, pos);
-
-            attributeDescriptions[1].binding = 0;
-            attributeDescriptions[1].location = 1;
-            attributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
-            attributeDescriptions[1].offset = offsetof(Vertex, color);
-
-            attributeDescriptions[2].binding = 0;
-            attributeDescriptions[2].location = 2;
-            attributeDescriptions[2].format = VK_FORMAT_R32G32_SFLOAT;
-            attributeDescriptions[2].offset = offsetof(Vertex, texCoord);
-
-            return attributeDescriptions;
-        }
-    };
-
     struct UniformBufferObject {
         glm::mat4 model;
         glm::mat4 view;
@@ -63,9 +28,11 @@ struct Graphics {
 
     struct ModelBufferObject {
         std::vector<glm::mat4> mdls;
+        bool dirty = true;
+        uint8_t frame = 0;
     };
 
-    static VkShaderModule createShaderModule(const std::vector<char>& code, VkDevice& device) {
+    static VkShaderModule createShaderModule(const std::vector<char>& code, const VkDevice& device) {
         VkShaderModuleCreateInfo createInfo{};
         createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
         createInfo.codeSize = code.size();
@@ -82,7 +49,7 @@ struct Graphics {
 
     #pragma region Main
 
-        static void createGraphicsPipeline(VkDevice& device, VkPipelineLayout& pipelinelayout, VkRenderPass& renderpass, VkPipeline& graphicsPipeline, VkDescriptorSetLayout& descriptorSetLayout, VkPipelineLayout& pipelineLayout, VkRenderPass& renderPass) {
+        static void createGraphicsPipeline(VkDevice& device, VkPipelineLayout& pipelinelayout, VkRenderPass& renderPass, VkPipeline& graphicsPipeline, VkDescriptorSetLayout& descriptorSetLayout, VkPipelineLayout& pipelineLayout) {
         auto vertShaderCode = Tools::readFile("/mnt/sda1/CLionProjects/2g43s/core/shaders/vert.spv");
         auto fragShaderCode = Tools::readFile("/mnt/sda1/CLionProjects/2g43s/core/shaders/frag.spv");
 
@@ -131,7 +98,7 @@ struct Graphics {
         rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
         rasterizer.lineWidth = 1.0f;
         rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
-        rasterizer.frontFace = VK_FRONT_FACE_CLOCKWISE;
+        rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
         rasterizer.depthBiasEnable = VK_FALSE;
 
         VkPipelineMultisampleStateCreateInfo multisampling{};
@@ -281,7 +248,7 @@ struct Graphics {
 
     // Sync
 
-    static void createSyncObjects(VkDevice& device, std::vector<VkSemaphore>& imageAvailableSemaphores, std::vector<VkSemaphore>& renderFinishedSemaphores, std::vector<VkFence>& inFlightFences, int MAX_FRAMES_IN_FLIGHT) {
+    static void createSyncObjects(const VkDevice& device, std::vector<VkSemaphore>& imageAvailableSemaphores, std::vector<VkSemaphore>& renderFinishedSemaphores, std::vector<VkFence>& inFlightFences, const int MAX_FRAMES_IN_FLIGHT) {
         imageAvailableSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
         renderFinishedSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
         inFlightFences.resize(MAX_FRAMES_IN_FLIGHT);
@@ -443,15 +410,17 @@ struct Graphics {
         }
     }
 
-    static void createVertexBuffer(VkDevice& device, VkPhysicalDevice& physDevice, VkCommandPool& commandPool, VkQueue& graphicsQueue, VkBuffer& vertexBuffer, VkDeviceMemory& vertexBufferMemory, std::vector<Graphics::Vertex>& vertices) {
-        VkDeviceSize bufferSize = sizeof(vertices[0]) * vertices.size();
+    static void createVertexBuffer(VkDevice& device, VkPhysicalDevice& physDevice, VkCommandPool& commandPool, VkQueue& graphicsQueue, VkBuffer& vertexBuffer, VkDeviceMemory& vertexBufferMemory, const ModelBus& mdlBus) {
+        VkDeviceSize bufferSize = mdlBus.getVertexBufferSize();
 
         VkBuffer stagingBuffer;
         VkDeviceMemory stagingBufferMemory;
         createBuffer(device, physDevice, bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
 
+        std::vector<Vertex> vertices = mdlBus.getVertices();
         void* data;
         vkMapMemory(device, stagingBufferMemory, 0, bufferSize, 0, &data);
+
         memcpy(data, vertices.data(), (size_t) bufferSize);
         vkUnmapMemory(device, stagingBufferMemory);
 
@@ -463,13 +432,14 @@ struct Graphics {
         vkFreeMemory(device, stagingBufferMemory, nullptr);
     }
 
-    static void createIndexBuffer(VkDevice& device, VkPhysicalDevice& physDevice, VkCommandPool& commandPool, VkQueue& graphicsQueue, VkBuffer &indexBuffer, VkDeviceMemory& indexBufferMemory, std::vector<uint32_t>& indices) {
-        VkDeviceSize bufferSize = sizeof(indices[0]) * indices.size();
+    static void createIndexBuffer(VkDevice& device, VkPhysicalDevice& physDevice, VkCommandPool& commandPool, VkQueue& graphicsQueue, VkBuffer &indexBuffer, VkDeviceMemory& indexBufferMemory, const ModelBus& mdlBus) {
+        VkDeviceSize bufferSize = mdlBus.getIndexBufferSize();
 
         VkBuffer stagingBuffer;
         VkDeviceMemory stagingBufferMemory;
         createBuffer(device, physDevice, bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
 
+        std::vector<u_int32_t> indices = mdlBus.getIndices();
         void* data;
         vkMapMemory(device, stagingBufferMemory, 0, bufferSize, 0, &data);
         memcpy(data, indices.data(), (size_t) bufferSize);
@@ -497,15 +467,15 @@ struct Graphics {
         }
     }
 
-    static void createModelBufferss(VkDevice& device, VkPhysicalDevice& physDevice, std::vector<VkBuffer>& modelBuffers, std::vector<VkDeviceMemory>& modelBuffersMemory, std::vector<void*>& modelBuffersMapped, const int& MAX_FRAMES_IN_FLIGHT) {
-        VkDeviceSize bufferSize = sizeof(Graphics::ModelBufferObject);
+    static void createModelBuffers(VkDevice& device, VkPhysicalDevice& physDevice, std::vector<VkBuffer>& modelBuffers, std::vector<VkDeviceMemory>& modelBuffersMemory, std::vector<void*>& modelBuffersMapped, const int& MAX_FRAMES_IN_FLIGHT, const ModelBus& mdlBus) {
+        const VkDeviceSize bufferSize = sizeof(ModelBufferObject) * ModelBus::MAX_MODELS;
 
         modelBuffers.resize(MAX_FRAMES_IN_FLIGHT);
         modelBuffersMemory.resize(MAX_FRAMES_IN_FLIGHT);
         modelBuffersMapped.resize(MAX_FRAMES_IN_FLIGHT);
 
         for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-            createBuffer(device, physDevice, bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, modelBuffers[i], modelBuffersMemory[i]);
+            createBuffer(device, physDevice, bufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, modelBuffers[i], modelBuffersMemory[i]);
 
             vkMapMemory(device, modelBuffersMemory[i], 0, bufferSize, 0, &modelBuffersMapped[i]);
         }
@@ -533,11 +503,11 @@ struct Graphics {
         samplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
         VkDescriptorSetLayoutBinding mboLayoutBinding{};
-        uboLayoutBinding.binding = 2;
-        uboLayoutBinding.descriptorCount = 1;
-        uboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        uboLayoutBinding.pImmutableSamplers = nullptr;
-        uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+        mboLayoutBinding.binding = 2;
+        mboLayoutBinding.descriptorCount = 1;
+        mboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        mboLayoutBinding.pImmutableSamplers = nullptr;
+        mboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 
         std::array<VkDescriptorSetLayoutBinding, 3> bindings = {uboLayoutBinding, samplerLayoutBinding, mboLayoutBinding};
 
@@ -555,9 +525,11 @@ struct Graphics {
         std::array<VkDescriptorPoolSize, 3> poolSizes{};
         poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
         poolSizes[0].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
+
         poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
         poolSizes[1].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
-        poolSizes[2].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+
+        poolSizes[2].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
         poolSizes[2].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
 
         VkDescriptorPoolCreateInfo poolInfo{};
@@ -571,7 +543,7 @@ struct Graphics {
         }
     }
 
-    static void createDescriptorSets(VkDevice device, const int& MAX_FRAMES_IN_FLIGHT, VkDescriptorSetLayout& descriptorSetLayout, VkDescriptorPool& descriptorPool, std::vector<VkDescriptorSet>& descriptorSets, std::vector<VkBuffer>& uniformBuffers, VkImageView& textureImageView, VkSampler& textureSampler) {
+    static void createDescriptorSets(VkDevice device, const int& MAX_FRAMES_IN_FLIGHT, VkDescriptorSetLayout& descriptorSetLayout, VkDescriptorPool& descriptorPool, std::vector<VkDescriptorSet>& descriptorSets, std::vector<VkBuffer>& uniformBuffers, std::vector<VkBuffer>& modelBuffers, VkImageView& textureImageView, VkSampler& textureSampler) {
         std::vector<VkDescriptorSetLayout> layouts(MAX_FRAMES_IN_FLIGHT, descriptorSetLayout);
         VkDescriptorSetAllocateInfo allocInfo{};
         allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
@@ -591,9 +563,9 @@ struct Graphics {
             uboBufferInfo.range = sizeof(UniformBufferObject);
 
             VkDescriptorBufferInfo mboBufferInfo{};
-            mboBufferInfo.buffer = uniformBuffers[i];
+            mboBufferInfo.buffer = modelBuffers[i];
             mboBufferInfo.offset = 0;
-            mboBufferInfo.range = sizeof(ModelBufferObject);
+            mboBufferInfo.range = sizeof(ModelBufferObject) * ModelBus::MAX_MODELS;
 
 
             VkDescriptorImageInfo imageInfo{};
@@ -623,7 +595,7 @@ struct Graphics {
             descriptorWrites[2].dstSet = descriptorSets[i];
             descriptorWrites[2].dstBinding = 2;
             descriptorWrites[2].dstArrayElement = 0;
-            descriptorWrites[2].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+            descriptorWrites[2].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
             descriptorWrites[2].descriptorCount = 1;
             descriptorWrites[2].pBufferInfo = &mboBufferInfo;
 
@@ -650,7 +622,7 @@ struct Graphics {
         }
     }
 
-    static void recordCommandBuffer(VkCommandBuffer& commandBuffer, uint32_t imageIndex, VkRenderPass& renderPass, std::vector<VkFramebuffer>& swapChainFramebuffers, VkExtent2D& swapchainExtent, VkPipeline& graphicsPipeline, std::vector<uint32_t>& indices, VkBuffer& vertexBuffer, VkBuffer& indexBuffer, VkPipelineLayout& pipelineLayout, std::vector<VkDescriptorSet>& descriptorSets, uint32_t& currentFrame, Color clear_color) {
+    static void recordCommandBuffer(VkCommandBuffer& commandBuffer, uint32_t imageIndex, VkRenderPass& renderPass, std::vector<VkFramebuffer>& swapChainFramebuffers, VkExtent2D& swapchainExtent, VkPipeline& graphicsPipeline, VkBuffer& vertexBuffer, VkBuffer& indexBuffer, VkPipelineLayout& pipelineLayout, std::vector<VkDescriptorSet>& descriptorSets, uint32_t& currentFrame, Color clear_color, const ModelBus& mdlBus) {
         VkCommandBufferBeginInfo beginInfo{};
         beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 
@@ -699,13 +671,39 @@ struct Graphics {
 
             VkBuffer vertexBuffers[] = {vertexBuffer};
             VkDeviceSize offsets[] = {0};
+
             vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
 
             vkCmdBindIndexBuffer(commandBuffer, indexBuffer, 0, VK_INDEX_TYPE_UINT32);
 
             vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSets[currentFrame], 0, nullptr);
 
-            vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
+            //vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(mdlBus.mdls[0]->indices.size()), 1, 0, 0, 0);
+
+
+            uint32_t firstIndex = 0;
+            int32_t vertexOffset = 0;
+            uint32_t firstInstance = 0;
+
+            for (auto& mdl : mdlBus.mdls) {
+                size_t instanceCount = mdlBus.getInstanceCount(mdl);
+                uint32_t indexCount = mdl->indices.size();
+
+                /*
+                std::cout << "Instance count: " << instanceCount << std::endl;
+                std::cout << "Index count: " << indexCount << std::endl;
+                std::cout << "Vertex count: " << ModelBus::getVertexCount(mdl) << std::endl;
+                std::cout << "First index: " << firstIndex << std::endl;
+                std::cout << "Vertex offset: " << vertexOffset << std::endl;
+                std::cout << "" << std::endl;
+                */
+
+                vkCmdDrawIndexed(commandBuffer, indexCount, instanceCount, firstIndex, vertexOffset, firstInstance);
+                firstIndex += indexCount;
+                vertexOffset += ModelBus::getVertexCount(mdl);
+                firstInstance += instanceCount;
+            }
+
 
         vkCmdEndRenderPass(commandBuffer);
 

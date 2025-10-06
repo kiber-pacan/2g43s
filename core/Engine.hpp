@@ -14,6 +14,7 @@
 #include "glm/glm.hpp"
 #include "sep/camera/Camera.h"
 #include "sep/graphics/Delta.hpp"
+#include "sep/model/ModelBus.h"
 #include "sep/model/ModelInstance.h"
 #include "sep/model/ParsedModel.h"
 
@@ -30,20 +31,33 @@ public:
         initialize(window);
     }
 
-    static void updateUniformBuffer(uint32_t currentImage, VkExtent2D& swapchainExtent, std::vector<void*>& uniformBufferMapped, Graphics::UniformBufferObject& ubo, glm::vec3 pos, Camera& camera) {
+    static void updateUniformBuffer(const uint32_t currentImage, const VkExtent2D& swapchainExtent, const std::vector<void*>& uniformBufferMapped, Graphics::UniformBufferObject& ubo, const glm::vec3 pos, const Camera& camera) {
         ubo.model = glm::translate(glm::mat4(1.0f), pos);
         ubo.view = glm::lookAt(camera.pos + glm::vec3(0), camera.pos + camera.look, glm::vec3(0.0f, 0.0f, 1.0f));
-        ubo.proj = glm::perspective(camera.fov,  (float) swapchainExtent.width / (float) swapchainExtent.height, 0.1f, 2048.0f);
+        ubo.proj = glm::perspective(camera.fov,  (float) swapchainExtent.width / (float) swapchainExtent.height, 0.1f, 4096.0f);
         ubo.proj[1][1] *= -1;
         memcpy(uniformBufferMapped[currentImage], &ubo, sizeof(ubo));
     }
 
-    static void updateModelBuffer(uint32_t currentImage, std::vector<void*>& modelBufferMapped, Graphics::ModelBufferObject& mbo, std::vector<ModelInstance> mdls_i1) {
-        for (auto mdl_i : mdls_i1) {
-            mbo.mdls.emplace_back(glm::translate(glm::mat4(1.0f), mdl_i.pos));
+    static int i2;
+    static void updateModelBuffer(const uint32_t currentImage, const std::vector<void*>& modelBufferMapped, Graphics::ModelBufferObject& mbo, const std::vector<ModelInstance>& mdls_i, const uint32_t& currentFrame) {
+        if (mbo.mdls.size() != mdls_i.size()) {
+            mbo.mdls.clear();
+            for (const auto& mdl_i : mdls_i) {
+                mbo.mdls.emplace_back(mdl_i.mdlMat);
+            }
         }
 
-        memcpy(modelBufferMapped[currentImage], &mbo, sizeof(ubo));
+        if (mbo.dirty) {
+            mbo.frame += 1;
+            memcpy(modelBufferMapped[currentImage], mbo.mdls.data(), sizeof(mbo.mdls[0]) * mbo.mdls.size());
+
+            std::cout << "Loaded matrices" << std::endl;
+
+            if (mbo.frame > MAX_FRAMES_IN_FLIGHT) {
+                mbo.dirty = false;
+            }
+        }
     }
 
     // Draw
@@ -62,12 +76,12 @@ public:
 
         updateUniformBuffer(currentFrame, swapchainExtent, uniformBuffersMapped, ubo, glm::vec3(), camera);
 
-        updateModelBuffer(currentFrame, modelBuffersMapped, mbo, mdls_i);
+        updateModelBuffer(currentFrame, modelBuffersMapped, mbo, mdlBus.mdls_i, currentFrame);
 
         vkResetFences(device, 1, &inFlightFences[currentFrame]);
 
         vkResetCommandBuffer(commandBuffers[currentFrame], /*VkCommandBufferResetFlagBits*/ 0);
-        Graphics::recordCommandBuffer(commandBuffers[currentFrame], imageIndex, renderPass, swapChainFramebuffers, swapchainExtent, graphicsPipeline, indices, vertexBuffer, indexBuffer, pipelineLayout, descriptorSets, currentFrame, clear_color);
+        Graphics::recordCommandBuffer(commandBuffers[currentFrame], imageIndex, renderPass, swapChainFramebuffers, swapchainExtent, graphicsPipeline, vertexBuffer, indexBuffer, pipelineLayout, descriptorSets, currentFrame, clear_color, mdlBus);
 
         VkSubmitInfo submitInfo{};
         submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -134,6 +148,11 @@ public:
             vkFreeMemory(device, uniformBuffersMemory[i], nullptr);
         }
 
+        for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+            vkDestroyBuffer(device, modelBuffers[i], nullptr);
+            vkFreeMemory(device, modelBuffersMemory[i], nullptr);
+        }
+
         vkDestroyDescriptorPool(device, descriptorPool, nullptr);
 
         vkDestroyDescriptorSetLayout(device, descriptorSetLayout, nullptr);
@@ -182,11 +201,13 @@ public:
     Graphics::ModelBufferObject mbo{};
 
     // Controls
+    // Controls
     Camera camera{};
 
     Delta *deltaT{};
 
     Color clear_color = Color::hex(0x80c4b5);
+    ModelBus mdlBus{};
     #pragma endregion PublicVars
 
 private:
@@ -269,63 +290,23 @@ private:
     std::vector<VkFence> inFlightFences{};
 
     // Frames
-    const int MAX_FRAMES_IN_FLIGHT = 2;
+    static constexpr int MAX_FRAMES_IN_FLIGHT = 2;
     uint32_t currentFrame = 0;
 
     // Shader stuff
-    std::vector<Graphics::Vertex> vertices;
-
-    std::vector<uint32_t> indices;
 
     #pragma endregion
 
-    std::vector<std::shared_ptr<ParsedModel>> mdls;
-    std::vector<ModelInstance> mdls_i;
-
-    void loadModels() {
-        std::string location = "/mnt/sda1/CLionProjects/2g43s/core/models/";
-        std::vector<std::string> files{
-            "cabinet.glb"
-        };
-
-        for (auto name : files) {
-            std::filesystem::path path = location + name;
-            mdls.emplace_back(std::make_shared<ParsedModel>(path));
-        }
-
-        /*
-        for (auto mdl : mdls) {
-            mdls_i.emplace_back(mdl);
-        }
-        */
-
-        for (int i = 0; i < 100; ++i) {
-            mdls_i.emplace_back(
-                mdls[0],
-                glm::vec3(
-                    Tools::randomNum<glm::uint32>(-2048,2048),
-                    Tools::randomNum<glm::uint32>(-2048,2048),
-                    Tools::randomNum<glm::uint32>(-2048,2048)
-                    )
-                );
-        }
-    }
-
     // Initializaiton of engine and its counterparts
     void initialize(SDL_Window* window) {
+
         this->window = window;
 
-        loadModels();
+        mdlBus.test();
 
-        for (ModelInstance mdl_i : mdls_i) {
-            for (auto index : mdl_i.mdl->indices) {
-                indices.append_range(index);
-            }
+        std::cout << mdlBus.mdls_i.size() << std::endl;
+        std::cout << mdlBus.mdls.size() << std::endl;
 
-            for (auto mesh : mdl_i.mdl->meshes) {
-                vertices.append_range(mesh);
-            }
-        }
 
         // Engine related stuff
         sid = Tools::randomNum<uint64_t>(1000000000,9999999999);
@@ -361,7 +342,7 @@ private:
         Graphics::createRenderPass(device, physicalDevice, swapchainImageFormat, renderPass);
 
         Graphics::createDescriptorSetLayout(device, descriptorSetLayout);
-        Graphics::createGraphicsPipeline(device, pipelineLayout, renderPass, graphicsPipeline, descriptorSetLayout, pipelineLayout, renderPass);
+        Graphics::createGraphicsPipeline(device, pipelineLayout, renderPass, graphicsPipeline, descriptorSetLayout, pipelineLayout);
         Graphics::createCommandPool(device, physicalDevice, commandPool, surface);
 
         Graphics::createDepthResources(device, physicalDevice, commandPool, graphicsQueue, depthImage, depthImageMemory, depthImageView, swapchainExtent);
@@ -371,14 +352,14 @@ private:
         Graphics::createTextureImageView(device, textureImage, textureImageView);
         Graphics::createTextureSampler(device, physicalDevice, textureSampler);
 
-        Graphics::createVertexBuffer(device, physicalDevice, commandPool, graphicsQueue, vertexBuffer, vertexBufferMemory, vertices);
-        Graphics::createIndexBuffer(device, physicalDevice, commandPool, graphicsQueue, indexBuffer, indexBufferMemory, indices);
+        Graphics::createVertexBuffer(device, physicalDevice, commandPool, graphicsQueue, vertexBuffer, vertexBufferMemory, mdlBus);
+        Graphics::createIndexBuffer(device, physicalDevice, commandPool, graphicsQueue, indexBuffer, indexBufferMemory, mdlBus);
 
         Graphics::createUniformBuffers(device, physicalDevice, uniformBuffers, uniformBuffersMemory, uniformBuffersMapped, MAX_FRAMES_IN_FLIGHT);
-        Graphics::createModelBufferss(device, physicalDevice, uniformBuffers, uniformBuffersMemory, uniformBuffersMapped, MAX_FRAMES_IN_FLIGHT);
+        Graphics::createModelBuffers(device, physicalDevice, modelBuffers, modelBuffersMemory, modelBuffersMapped, MAX_FRAMES_IN_FLIGHT, mdlBus);
 
         Graphics::createDescriptorPool(device, MAX_FRAMES_IN_FLIGHT, descriptorPool);
-        Graphics::createDescriptorSets(device, MAX_FRAMES_IN_FLIGHT, descriptorSetLayout, descriptorPool, descriptorSets, uniformBuffers, textureImageView, textureSampler);
+        Graphics::createDescriptorSets(device, MAX_FRAMES_IN_FLIGHT, descriptorSetLayout, descriptorPool, descriptorSets, uniformBuffers, modelBuffers, textureImageView, textureSampler);
 
         Graphics::createCommandBuffer(device, commandPool, commandBuffers, MAX_FRAMES_IN_FLIGHT);
 
