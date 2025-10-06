@@ -1,12 +1,12 @@
 #ifndef CAMERA_H
 #define CAMERA_H
-#include "../entity/Entity.h"
+#include "../entity/CameraEntity.h"
 
 struct KeyBinding;
 class Engine;
 
-struct Camera : Entity {
-    Camera(float fov, float sens, float speed, float bonus, glm::vec3 pos) {
+struct Camera final : CameraEntity {
+    Camera(const float fov, const float sens, const float speed, const float bonus, const glm::vec3 pos) {
         this->fov = fov;
         this->sens = sens;
         this->speed = speed;
