@@ -358,7 +358,7 @@ private:
         Graphics::createModelBuffers(device, physicalDevice, modelBuffers, modelBuffersMemory, modelBuffersMapped, MAX_FRAMES_IN_FLIGHT, mdlBus);
 
         Graphics::createDescriptorPool(device, MAX_FRAMES_IN_FLIGHT, descriptorPool);
-        Graphics::createDescriptorSets(device, MAX_FRAMES_IN_FLIGHT, descriptorSetLayout, descriptorPool, descriptorSets, uniformBuffers, modelBuffers, textureImageView, textureSampler);
+        Graphics::createDescriptorSets(device, MAX_FRAMES_IN_FLIGHT, descriptorSetLayout, descriptorPool, descriptorSets, uniformBuffers, modelBuffers, textureImageView, textureSampler, mdlBus);
 
         Graphics::createCommandBuffer(device, commandPool, commandBuffers, MAX_FRAMES_IN_FLIGHT);
 
