@@ -18,9 +18,13 @@ struct ModelBus {
     bool dirtyCommands = true;
 
     constexpr static
-    uint32_t MAX_MODELS = 65536;
+    uint32_t MAX_MODELS = 4294967295;
 
-    ModelBus() = default;
+    Logger* LOGGER;
+
+    ModelBus() {
+        LOGGER = Logger::of("ModelBus");
+    }
 
     //TODO: CONSIDER SWITCHING TO BETTER ALTERNATIVE!!!
     /*
@@ -78,24 +82,24 @@ struct ModelBus {
 
 
     #pragma region instanceModels
-    void createModelInstance(const std::string& model, const std::string& name, const glm::vec3 p = glm::vec3(0.0f), const glm::vec3 l = glm::vec3(0.0f), const glm::vec3 s = glm::vec3(1.0f)) {
+    void createModelInstance(const std::string& model, const glm::vec3 p = glm::vec3(0.0f), const glm::vec3 l = glm::vec3(0.0f), const glm::vec3 s = glm::vec3(1.0f)) {
         for (const std::shared_ptr<ParsedModel> & mdl: mdls) {
             if (mdl->name == model) {
-                mdls_i.emplace_back(mdl, p, l, s, name);
+                mdls_i.emplace_back(mdl, p, l, s);
             }
         }
     }
 
-    void createModelInstance(const std::shared_ptr<ParsedModel>& mdl, const std::string& name, const glm::vec3 p = glm::vec3(0.0f), const glm::vec3 l = glm::vec3(0.0f), const glm::vec3 s = glm::vec3(1.0f)) {
-        mdls_i.emplace_back(mdl, p, l, s, name);
+    void createModelInstance(const std::shared_ptr<ParsedModel>& mdl, const glm::vec3 p = glm::vec3(0.0f), const glm::vec3 l = glm::vec3(0.0f), const glm::vec3 s = glm::vec3(1.0f)) {
+        mdls_i.emplace_back(mdl, p, l, s);
     }
 
     void destroyModelInstance(const std::string& name) {
-        for (int i = 0; i < mdls_i.size(); ++i) {
+        /*for (int i = 0; i < mdls_i.size(); ++i) {
             if (mdls_i[i].name == name) {
                 mdls_i.erase(mdls_i.begin() + i);
             }
-        }
+        }*/
     }
 
 
@@ -212,29 +216,25 @@ struct ModelBus {
 
 
     void test() {
-        loadModel("/mnt/sda1/CLionProjects/2g43s/core/models/", "cabinet.glb");
+        loadModel("/mnt/sda1/CLionProjects/2g43s/core/models/", "cube_1_material.glb");
         loadModel("/mnt/sda1/CLionProjects/2g43s/core/models/", "landscape.glb");
 
-        for (int x = 0; x < 100; ++x) {
-            for (int y = 0; y < 50; ++y) {
-                for (int z = 0; z < 1; ++z) {
-                    createModelInstance(
-                    mdls[0],
-                    "model" + std::to_string(x + y + z),
-                    glm::vec3(Tools::randomNum<float>(-1000.0f, 1000.0f), Tools::randomNum<float>(-1000.0f, 1000.0f), Tools::randomNum<float>(-1000.0f, 1000.0f)),
-                    glm::vec3(glm::degrees(Tools::randomNum<float>(-360.0f, 360.0f)), glm::degrees(Tools::randomNum<float>(-360.0f, 360.0f)), glm::degrees(Tools::randomNum<float>(-360.0f, 360.0f)))
-                    );
-                }
-            }
+        auto start = std::chrono::high_resolution_clock::now();
+
+        for (int x = 0; x < 1000000; ++x) {
+            glm::vec3 temp = glm::vec3(Tools::randomNum<float>(-1000.0f, 1000.0f), Tools::randomNum<float>(-1000.0f, 1000.0f), Tools::randomNum<float>(-1000.0f, 1000.0f));
+            float rand = Tools::randomNum<float>(-1.0f, 1.0f);
+            createModelInstance(
+            mdls[0],
+            temp,
+            temp
+            );
         }
 
-        /*for (int i = 0; i < 10; ++i) {
-            createModelInstance(
-            mdls[1],
-            "model" + std::to_string(i),
-            glm::vec3(0, 0, -1000 + 100 * i)
-            );
-        }*/
+        auto end = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<double> duration = end - start;
+
+        LOGGER->success("Loaded ${} instances in ${} seconds!", mdls_i.size(), duration.count());
     }
 };
 
