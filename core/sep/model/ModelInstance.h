@@ -13,9 +13,8 @@ struct ModelInstance final : Entity {
     explicit ModelInstance(std::shared_ptr<ParsedModel> m,
                   glm::vec3 p = glm::vec3(0.0f),
                   glm::vec3 r = glm::vec3(0.0f),
-                  glm::vec3 s = glm::vec3(1.0f),
-                  std::string n = ""
-                  ) : Entity(p, r, s, n), mdl(std::move(m)) {
+                  glm::vec3 s = glm::vec3(1.0f)
+                  ) : Entity(p, r, s), mdl(std::move(m)) {
 
     }
 };
