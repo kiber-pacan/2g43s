@@ -467,11 +467,10 @@ struct Graphics {
     }
 
     static void createModelBuffers(VkDevice& device, VkPhysicalDevice& physicalDevice, std::vector<VkBuffer>& modelBuffers, std::vector<VkDeviceMemory>& modelBuffersMemory, std::vector<void*>& modelBuffersMapped, const int& MAX_FRAMES_IN_FLIGHT, const ModelBus& mdlBus) {
-        const VkDeviceSize bufferSize = sizeof(ModelBufferObject) * ModelBus::MAX_MODELS;
+        const VkDeviceSize bufferSize = sizeof(mdlBus.mdls_i[0]) * mdlBus.mdls_i.size();
 
         modelBuffers.resize(MAX_FRAMES_IN_FLIGHT);
         modelBuffersMemory.resize(MAX_FRAMES_IN_FLIGHT);
-        modelBuffersMapped.resize(MAX_FRAMES_IN_FLIGHT);
 
         for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
             createBuffer(device, physicalDevice, bufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, modelBuffers[i], modelBuffersMemory[i]);
@@ -581,7 +580,7 @@ struct Graphics {
         }
     }
 
-    static void createDescriptorSets(VkDevice device, const int& MAX_FRAMES_IN_FLIGHT, VkDescriptorSetLayout& descriptorSetLayout, VkDescriptorPool& descriptorPool, std::vector<VkDescriptorSet>& descriptorSets, std::vector<VkBuffer>& uniformBuffers, std::vector<VkBuffer>& modelBuffers, VkImageView& textureImageView, VkSampler& textureSampler) {
+    static void createDescriptorSets(VkDevice device, const int& MAX_FRAMES_IN_FLIGHT, VkDescriptorSetLayout& descriptorSetLayout, VkDescriptorPool& descriptorPool, std::vector<VkDescriptorSet>& descriptorSets, std::vector<VkBuffer>& uniformBuffers, std::vector<VkBuffer>& modelBuffers, VkImageView& textureImageView, VkSampler& textureSampler, ModelBus& mdlBus) {
         std::vector<VkDescriptorSetLayout> layouts(MAX_FRAMES_IN_FLIGHT, descriptorSetLayout);
         VkDescriptorSetAllocateInfo allocInfo{};
         allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
@@ -603,8 +602,7 @@ struct Graphics {
             VkDescriptorBufferInfo mboBufferInfo{};
             mboBufferInfo.buffer = modelBuffers[i];
             mboBufferInfo.offset = 0;
-            mboBufferInfo.range = sizeof(ModelBufferObject) * ModelBus::MAX_MODELS;
-
+            mboBufferInfo.range = sizeof(mdlBus.mdls_i[0]) * mdlBus.mdls_i.size();
 
             VkDescriptorImageInfo imageInfo{};
             imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
