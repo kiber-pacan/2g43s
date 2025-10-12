@@ -18,7 +18,7 @@ add_executable(${EXECUTABLE_NAME}
         core/Tools.hpp
         core/Logger.hpp
 
-        core/sep/camera/Camera.h
+        core/sep/camera/Camera.hpp
 
         core/sep/control/KeyBinding.hpp
         core/sep/control/KeyListener.hpp
@@ -30,9 +30,9 @@ add_executable(${EXECUTABLE_NAME}
         core/sep/graphics/Graphics.hpp
         core/sep/graphics/Delta.hpp
 
-        core/sep/model/ModelInstance.h
-        core/sep/model/ParsedModel.h
-        core/sep/model/ModelBus.h
+        core/sep/model/ModelInstance.hpp
+        core/sep/model/ParsedModel.hpp
+        core/sep/model/ModelBus.hpp
 
         core/sep/util/Debug.hpp
         core/sep/util/Queue.hpp
@@ -40,11 +40,12 @@ add_executable(${EXECUTABLE_NAME}
         core/sep/window/Surface.hpp
         core/sep/window/Swapchain.hpp
 
-        core/sep/entity/Entity.h
+        core/sep/entity/Entity.hpp
 
-        core/sep/util/Color.h
-        core/sep/model/Vertex.h
-        core/sep/entity/CameraEntity.h
+        core/sep/util/Color.hpp
+        core/sep/model/Vertex.hpp
+        core/sep/entity/CameraEntity.hpp
+        core/sep/util/Random.hpp
 )
 
 set(CMAKE_CXX_FLAGS_RELEASE "-Ofast -march=native -flto -funroll-loops -fomit-frame-pointer -ffast-math -fno-math-errno -DNDEBUG")
@@ -68,7 +69,10 @@ else ()
     find_package(glm REQUIRED CONFIG)
     add_subdirectory("libs/fastgltf")
     include_directories("/libs/stb")
-    #find_package(stb REQUIRED CONFIG)
+    find_package(OpenMP REQUIRED)
+    if(OpenMP_CXX_FOUND)
+        target_link_libraries(${EXECUTABLE_NAME} PRIVATE OpenMP::OpenMP_CXX)
+    endif()
 endif ()
 
 include_directories(${Vulkan_INCLUDE_DIRS})
