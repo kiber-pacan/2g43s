@@ -1,6 +1,6 @@
 #ifndef CAMERA_H
 #define CAMERA_H
-#include "../entity/CameraEntity.h"
+#include "../entity/CameraEntity.hpp"
 
 struct KeyBinding;
 class Engine;

@@ -2,7 +2,7 @@
 #define PARSEDMODEL_H
 #include <vector>
 
-#include "Vertex.h"
+#include "Vertex.hpp"
 #include "../../Logger.hpp"
 #include "fastgltf/core.hpp"
 #include "fastgltf/tools.hpp"

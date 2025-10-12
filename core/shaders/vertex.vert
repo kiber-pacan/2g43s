@@ -7,11 +7,11 @@ layout(binding = 0) uniform UniformBufferObject {
 } ubo;
 
 struct ObjectData{
-	mat4 model;
+    mat4 model;
 };
 
 layout(std140, binding = 2) readonly buffer ObjectBuffer{
-	ObjectData objects[];
+    ObjectData objects[];
 } objectBuffer;
 
 layout(location = 0) in vec3 inPosition;
