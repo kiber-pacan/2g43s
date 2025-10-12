@@ -11,6 +11,7 @@
 
 #include "core/sep/control/KeyListener.hpp"
 #include "core/sep/control/MouseListener.hpp"
+#include "core/sep/util/Random.hpp"
 
 struct AppContext {
     SDL_Window* win{};
@@ -52,7 +53,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
         if (width != bbwidth){
             LOGGER->info("This is a highdpi environment.");
         }
-        LOGGER->info("Random number: ${} (between 1 and 100)", Tools::randomNum<uint32_t>(1,100));
+        LOGGER->info("Random number: ${} (between 1 and 100)", Random::randomNum<uint32_t>(1,100));
     }
 
     //Set up Vulkan engine
