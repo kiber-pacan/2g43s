@@ -1,6 +1,7 @@
 echo "Compiling shaders"
 
-glslc shader.vert -o vert.spv
-glslc shader.frag -o frag.spv
+glslc vertex.vert -o vert.spv
+glslc fragment.frag -o frag.spv
+glslc compute.comp -o comp.spv
 
 echo "Done!"
