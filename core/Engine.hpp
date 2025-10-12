@@ -12,11 +12,11 @@
 #include "sep/window/Swapchain.hpp"
 #include "sep/graphics/Graphics.hpp"
 #include "glm/glm.hpp"
-#include "sep/camera/Camera.h"
+#include "sep/camera/Camera.hpp"
 #include "sep/graphics/Delta.hpp"
-#include "sep/model/ModelBus.h"
-#include "sep/model/ModelInstance.h"
-#include "sep/model/ParsedModel.h"
+#include "sep/model/ModelBus.hpp"
+#include "sep/model/ModelInstance.hpp"
+#include "sep/model/ParsedModel.hpp"
 
 // Parameters
 inline int HEIGHT = 720;
@@ -31,16 +31,15 @@ public:
         initialize(window);
     }
 
-    static void updateUniformBuffer(const uint32_t currentImage, const VkExtent2D& swapchainExtent, const std::vector<void*>& uniformBufferMapped, Graphics::UniformBufferObject& ubo, const glm::vec3 pos, const Camera& camera) {
+    static void updateUniformBuffer(const uint32_t currentImage, const VkExtent2D& swapchainExtent, const std::vector<void*>& uniformBuffersMapped, Graphics::UniformBufferObject& ubo, const glm::vec3 pos, const Camera& camera) {
         ubo.model = glm::translate(glm::mat4(1.0f), pos);
         ubo.view = glm::lookAt(camera.pos + glm::vec3(0), camera.pos + camera.look, glm::vec3(0.0f, 0.0f, 1.0f));
         ubo.proj = glm::perspective(camera.fov,  (float) swapchainExtent.width / (float) swapchainExtent.height, 0.1f, 4096.0f);
         ubo.proj[1][1] *= -1;
-        memcpy(uniformBufferMapped[currentImage], &ubo, sizeof(ubo));
+        memcpy(uniformBuffersMapped[currentImage], &ubo, sizeof(ubo));
     }
 
-    static int i2;
-    static void updateModelBuffer(const uint32_t currentImage, const std::vector<void*>& modelBufferMapped, Graphics::ModelBufferObject& mbo, const std::vector<ModelInstance>& mdls_i, const uint32_t& currentFrame) {
+    /*static void updateModelBuffer(const uint32_t currentImage, const std::vector<void*>& modelBufferMapped, Graphics::ModelBufferObject& mbo, const std::vector<ModelInstance>& mdls_i, const uint32_t& currentFrame) {
         if (mbo.mdls.size() != mdls_i.size()) {
             mbo.mdls.clear();
             for (const auto& mdl_i : mdls_i) {
@@ -56,10 +55,46 @@ public:
                 mbo.dirty = false;
             }
         }
+    }*/
+
+    static void updateModelDataBuffer(const uint32_t currentImage, const std::vector<void*>& modelDataBuffersMapped, Graphics::ModelDataBufferObject& mdbo, const std::vector<ModelInstance>& mdls_i, const uint32_t& currentFrame) {
+        const size_t count = mdls_i.size();
+        if (mdbo.pos.size() != count) {
+            mdbo.pos.clear();
+            mdbo.rot.clear();
+            mdbo.scl.clear();
+            mdbo.pos.reserve(count);
+            mdbo.rot.reserve(count);
+            mdbo.scl.reserve(count);
+            for (const auto& mdl_i : mdls_i) {
+                mdbo.pos.emplace_back(mdl_i.pos);
+                mdbo.rot.emplace_back(mdl_i.rot);
+                mdbo.scl.emplace_back(mdl_i.scl);
+            }
+        }
+        
+        if (mdbo.dirty) {
+            mdbo.frame += 1;
+
+            auto* dst = static_cast<glm::vec4*>(modelDataBuffersMapped[currentImage]);
+
+            for (size_t i = 0; i < mdbo.pos.size(); ++i) {
+                dst[i * 3 + 0] = mdbo.pos[i];
+                dst[i * 3 + 1] = mdbo.rot[i];
+                dst[i * 3 + 2] = mdbo.scl[i];
+            }
+
+            if (mdbo.frame == MAX_FRAMES_IN_FLIGHT) {
+                mdbo.dirty = false;
+            }
+        }
     }
+
 
     // Draw
     void drawFrame() {
+        auto start = std::chrono::high_resolution_clock::now();
+
         vkWaitForFences(device, 1, &inFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
 
         uint32_t imageIndex;
@@ -73,13 +108,14 @@ public:
         }
 
         updateUniformBuffer(currentFrame, swapchainExtent, uniformBuffersMapped, ubo, glm::vec3(), camera);
+        updateModelDataBuffer(currentFrame, modelDataBuffersMapped, mdbo, mdlBus.mdls_i, currentFrame);
 
-        updateModelBuffer(currentFrame, modelBuffersMapped, mbo, mdlBus.mdls_i, currentFrame);
+        //updateModelBuffer(currentFrame, modelBuffersMapped, mbo, mdlBus.mdls_i, currentFrame);
 
         vkResetFences(device, 1, &inFlightFences[currentFrame]);
 
         vkResetCommandBuffer(commandBuffers[currentFrame], /*VkCommandBufferResetFlagBits*/ 0);
-        Graphics::recordCommandBuffer(device, physicalDevice, commandPool, graphicsQueue, commandBuffers[currentFrame], imageIndex, renderPass, swapChainFramebuffers, swapchainExtent, graphicsPipeline, vertexBuffer, indexBuffer, pipelineLayout, descriptorSets, currentFrame, clear_color, mdlBus, drawCommandsBuffer, drawCommandsBufferMemory);
+        Graphics::recordCommandBuffer(device, physicalDevice, graphicsCommandPool, graphicsQueue, commandBuffers[currentFrame], imageIndex, renderPass, swapChainFramebuffers, swapchainExtent, graphicsPipeline, computePipeline, vertexBuffer, indexBuffer, graphicsPipelineLayout, computePipelineLayout, graphicsDescriptorSets, computeDescriptorSets, currentFrame, clear_color, mdlBus, modelBuffers, modelDataBuffers, drawCommandsBuffer, drawCommandsBufferMemory, MAX_FRAMES_IN_FLIGHT, computeDirty);
 
         VkSubmitInfo submitInfo{};
         submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -123,6 +159,15 @@ public:
         }
 
         currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
+
+        static bool i = true;
+        if (i) {
+            i = false;
+            auto end = std::chrono::high_resolution_clock::now();
+            std::chrono::duration<double> duration = end - start;
+
+            LOGGER->success("draw frame in ${} seconds!", duration.count());
+        }
     }
 
 
@@ -149,9 +194,16 @@ public:
             vkFreeMemory(device, modelBuffersMemory[i], nullptr);
         }
 
-        vkDestroyDescriptorPool(device, descriptorPool, nullptr);
+        for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+            vkDestroyBuffer(device, modelDataBuffers[i], nullptr);
+            vkFreeMemory(device, modelDataBuffersMemory[i], nullptr);
+        }
 
-        vkDestroyDescriptorSetLayout(device, descriptorSetLayout, nullptr);
+        vkDestroyDescriptorPool(device, graphicsDescriptorPool, nullptr);
+        vkDestroyDescriptorSetLayout(device, graphicsDescriptorSetLayout, nullptr);
+
+        vkDestroyDescriptorPool(device, computeDescriptorPool, nullptr);
+        vkDestroyDescriptorSetLayout(device, computeDescriptorSetLayout, nullptr);
 
         vkDestroyBuffer(device, vertexBuffer, nullptr);
         vkFreeMemory(device, vertexBufferMemory, nullptr);
@@ -166,11 +218,17 @@ public:
         }
 
         vkDestroyPipeline(device, graphicsPipeline, nullptr);
-        vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
+        vkDestroyPipelineLayout(device, graphicsPipelineLayout, nullptr);
+
+        vkDestroyPipeline(device, computePipeline, nullptr);
+        vkDestroyPipelineLayout(device, computePipelineLayout, nullptr);
+
 
         vkDestroyRenderPass(device, renderPass, nullptr);
 
-        vkDestroyCommandPool(device, commandPool, nullptr);
+        vkDestroyCommandPool(device, graphicsCommandPool, nullptr);
+
+        vkDestroyCommandPool(device, computeCommandPool, nullptr);
 
 
         vkDestroyBuffer(device, drawCommandsBuffer, nullptr);
@@ -199,6 +257,7 @@ public:
     bool framebufferResized = false;
     Graphics::UniformBufferObject ubo{};
     Graphics::ModelBufferObject mbo{};
+    Graphics::ModelDataBufferObject mdbo{};
 
     // Controls
     // Controls
@@ -241,13 +300,23 @@ private:
 
     // Graphics
     VkPipeline graphicsPipeline{};
-    VkPipelineLayout pipelineLayout{};
+    VkPipelineLayout graphicsPipelineLayout{};
+    VkDescriptorSetLayout graphicsDescriptorSetLayout{};
 
-    VkDescriptorSetLayout descriptorSetLayout{};
-    std::vector<VkDescriptorSet> descriptorSets{};
+    std::vector<VkDescriptorSet> graphicsDescriptorSets{};
+    VkDescriptorPool graphicsDescriptorPool{};
+    VkCommandPool graphicsCommandPool{};
 
-    VkDescriptorPool descriptorPool{};
-    VkCommandPool commandPool{};
+    // Compute
+    VkPipeline computePipeline{};
+    VkPipelineLayout computePipelineLayout{};
+    VkDescriptorSetLayout computeDescriptorSetLayout{};
+    bool computeDirty = true;
+
+    std::vector<VkDescriptorSet> computeDescriptorSets{};
+    VkDescriptorPool computeDescriptorPool{};
+    VkCommandPool computeCommandPool{};
+
 
     VkRenderPass renderPass{};
 
@@ -276,6 +345,10 @@ private:
     std::vector<VkDeviceMemory> modelBuffersMemory{};
     std::vector<void*> modelBuffersMapped{};
 
+    std::vector<VkBuffer> modelDataBuffers{};
+    std::vector<VkDeviceMemory> modelDataBuffersMemory{};
+    std::vector<void*> modelDataBuffersMapped{};
+
     VkBuffer drawCommandsBuffer{};
     VkDeviceMemory drawCommandsBufferMemory{};
 
@@ -285,7 +358,6 @@ private:
     VkImageView textureImageView{};
 
     VkSampler textureSampler{};
-
 
     // Fences
     std::vector<VkSemaphore> imageAvailableSemaphores{};
@@ -308,7 +380,7 @@ private:
         mdlBus.test();
 
         // Engine related stuff
-        sid = Tools::randomNum<uint64_t>(1000000000,9999999999);
+        sid = Random::randomNum<uint64_t>(1000000000,9999999999);
         LOGGER = Logger::of("engine.hpp");
 
         initializeVulkan();
@@ -340,27 +412,35 @@ private:
         // Graphics
         Graphics::createRenderPass(device, physicalDevice, swapchainImageFormat, renderPass);
 
-        Graphics::createDescriptorSetLayout(device, descriptorSetLayout);
-        Graphics::createGraphicsPipeline(device, pipelineLayout, renderPass, graphicsPipeline, descriptorSetLayout, pipelineLayout);
-        Graphics::createCommandPool(device, physicalDevice, commandPool, surface);
+        Graphics::createGraphicsDescriptorSetLayout(device, graphicsDescriptorSetLayout);
+        Graphics::createComputeDescriptorSetLayout(device, computeDescriptorSetLayout);
 
-        Graphics::createDepthResources(device, physicalDevice, commandPool, graphicsQueue, depthImage, depthImageMemory, depthImageView, swapchainExtent);
+        Graphics::createGraphicsPipeline(device, graphicsPipelineLayout, renderPass, graphicsPipeline, graphicsDescriptorSetLayout);
+        Graphics::createComputePipeline(device, computeDescriptorSetLayout, computePipelineLayout, computePipeline);
+
+        Graphics::createCommandPool(device, physicalDevice, graphicsCommandPool, surface);
+
+        Graphics::createDepthResources(device, physicalDevice, graphicsCommandPool, graphicsQueue, depthImage, depthImageMemory, depthImageView, swapchainExtent);
         Graphics::createFramebuffers(device, depthImageView, swapChainFramebuffers, swapchainImageViews, renderPass, swapchainExtent);
 
-        Graphics::createTextureImage(device, commandPool, graphicsQueue, physicalDevice, stagingBuffer, stagingBufferMemory, textureImage, textureImageMemory);
+        Graphics::createTextureImage(device, graphicsCommandPool, graphicsQueue, physicalDevice, stagingBuffer, stagingBufferMemory, textureImage, textureImageMemory);
         Graphics::createTextureImageView(device, textureImage, textureImageView);
         Graphics::createTextureSampler(device, physicalDevice, textureSampler);
 
-        Graphics::createVertexBuffer(device, physicalDevice, commandPool, graphicsQueue, vertexBuffer, vertexBufferMemory, mdlBus);
-        Graphics::createIndexBuffer(device, physicalDevice, commandPool, graphicsQueue, indexBuffer, indexBufferMemory, mdlBus);
+        Graphics::createVertexBuffer(device, physicalDevice, graphicsCommandPool, graphicsQueue, vertexBuffer, vertexBufferMemory, mdlBus);
+        Graphics::createIndexBuffer(device, physicalDevice, graphicsCommandPool, graphicsQueue, indexBuffer, indexBufferMemory, mdlBus);
 
         Graphics::createUniformBuffers(device, physicalDevice, uniformBuffers, uniformBuffersMemory, uniformBuffersMapped, MAX_FRAMES_IN_FLIGHT);
         Graphics::createModelBuffers(device, physicalDevice, modelBuffers, modelBuffersMemory, modelBuffersMapped, MAX_FRAMES_IN_FLIGHT, mdlBus);
+        Graphics::createModelDataBuffers(device, physicalDevice, modelDataBuffers, modelDataBuffersMemory, modelDataBuffersMapped, MAX_FRAMES_IN_FLIGHT, mdlBus);
 
-        Graphics::createDescriptorPool(device, MAX_FRAMES_IN_FLIGHT, descriptorPool);
-        Graphics::createDescriptorSets(device, MAX_FRAMES_IN_FLIGHT, descriptorSetLayout, descriptorPool, descriptorSets, uniformBuffers, modelBuffers, textureImageView, textureSampler, mdlBus);
+        Graphics::createGraphicsDescriptorPool(device, MAX_FRAMES_IN_FLIGHT, graphicsDescriptorPool);
+        Graphics::createGraphicsDescriptorSets(device, MAX_FRAMES_IN_FLIGHT, graphicsDescriptorSetLayout, graphicsDescriptorPool, graphicsDescriptorSets, uniformBuffers, textureImageView, textureSampler, modelBuffers, mdlBus);
 
-        Graphics::createCommandBuffer(device, commandPool, commandBuffers, MAX_FRAMES_IN_FLIGHT);
+        Graphics::createComputeDescriptorPool(device, MAX_FRAMES_IN_FLIGHT, computeDescriptorPool);
+        Graphics::createComputeDescriptorSets(device, MAX_FRAMES_IN_FLIGHT, computeDescriptorSetLayout, computeDescriptorPool, computeDescriptorSets, modelBuffers, mdlBus, modelDataBuffers);
+
+        Graphics::createCommandBuffer(device, graphicsCommandPool, commandBuffers, MAX_FRAMES_IN_FLIGHT);
 
 
         Graphics::createSyncObjects(device, imageAvailableSemaphores, renderFinishedSemaphores, inFlightFences, MAX_FRAMES_IN_FLIGHT);
@@ -392,7 +472,7 @@ private:
         Swapchain::createSwapchain(device, physicalDevice, surface, window, swapchain, swapchainImages, swapchainImageFormat, swapchainExtent);
         Swapchain::createImageViews(device, swapchainImageViews, swapchainImages, swapchainImageFormat);
 
-        Graphics::createDepthResources(device, physicalDevice, commandPool, graphicsQueue, depthImage, depthImageMemory, depthImageView, swapchainExtent);
+        Graphics::createDepthResources(device, physicalDevice, graphicsCommandPool, graphicsQueue, depthImage, depthImageMemory, depthImageView, swapchainExtent);
         Graphics::createFramebuffers(device, depthImageView, swapChainFramebuffers, swapchainImageViews, renderPass, swapchainExtent);
     }
 
@@ -425,11 +505,19 @@ private:
         // Validation layers initialization
         VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo{};
         if (enableValidationLayers) {
+            VkValidationFeaturesEXT validationFeatures = {};
+            VkValidationFeatureEnableEXT enables[] = {};
+            validationFeatures.pEnabledValidationFeatures = enables;
+            validationFeatures.pNext = &debugCreateInfo;
+
             createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
             createInfo.ppEnabledLayerNames = validationLayers.data();
 
             Debug::populateDebugMessengerCreateInfo(debugCreateInfo);
+            debugCreateInfo.pNext = nullptr;
+
             createInfo.pNext = &debugCreateInfo;
+
         } else {
             createInfo.enabledLayerCount = 0;
             createInfo.pNext = nullptr;

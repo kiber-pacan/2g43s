@@ -11,9 +11,9 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <chrono>
 #define STB_IMAGE_IMPLEMENTATION
-#include "../model/ModelBus.h"
+#include "../model/ModelBus.hpp"
 #include "stb/stb_image.h"
-#include "../model/Vertex.h"
+#include "../model/Vertex.hpp"
 
 
 namespace fs = std::filesystem;
@@ -32,6 +32,20 @@ struct Graphics {
         size_t frame = 0;
     };
 
+    struct ModelDataBufferObject {
+        std::vector<glm::vec4> pos;
+        std::vector<glm::vec4> rot;
+        std::vector<glm::vec4> scl;
+        bool dirty = true;
+        size_t frame = 0;
+    };
+
+    struct ModelDataBuffer{
+        std::vector<glm::vec4> pos;
+        std::vector<glm::vec4> rot;
+        std::vector<glm::vec4> scl;
+    };
+
     static VkShaderModule createShaderModule(const std::vector<char>& code, const VkDevice& device) {
         VkShaderModuleCreateInfo createInfo{};
         createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
@@ -48,7 +62,7 @@ struct Graphics {
 
     #pragma region Main
 
-        static void createGraphicsPipeline(VkDevice& device, VkPipelineLayout& pipelinelayout, VkRenderPass& renderPass, VkPipeline& graphicsPipeline, VkDescriptorSetLayout& descriptorSetLayout, VkPipelineLayout& pipelineLayout) {
+    static void createGraphicsPipeline(VkDevice& device, VkPipelineLayout& pipelineLayout, VkRenderPass& renderPass, VkPipeline& graphicsPipeline, VkDescriptorSetLayout& descriptorSetLayout) {
         auto vertShaderCode = Tools::readFile("/mnt/sda1/CLionProjects/2g43s/core/shaders/vert.spv");
         auto fragShaderCode = Tools::readFile("/mnt/sda1/CLionProjects/2g43s/core/shaders/frag.spv");
 
@@ -178,7 +192,38 @@ struct Graphics {
         vkDestroyShaderModule(device, vertShaderModule, nullptr);
     }
 
-        static void createRenderPass(VkDevice& device, VkPhysicalDevice physicalDevice, VkFormat& swapchainImageFormat, VkRenderPass& renderPass) {
+    static void createComputePipeline(VkDevice& device, VkDescriptorSetLayout& descriptorSetLayout, VkPipelineLayout& computePipelineLayout, VkPipeline& computePipeline) {
+        auto compShaderCode = Tools::readFile("/mnt/sda1/CLionProjects/2g43s/core/shaders/comp.spv");
+
+        VkShaderModule compShaderModule = createShaderModule(compShaderCode, device);
+
+        VkPipelineShaderStageCreateInfo compShaderStageInfo{};
+        compShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+        compShaderStageInfo.stage = VK_SHADER_STAGE_COMPUTE_BIT;
+        compShaderStageInfo.module = compShaderModule;
+        compShaderStageInfo.pName = "main";
+
+        VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
+        pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+        pipelineLayoutInfo.setLayoutCount = 1;
+        pipelineLayoutInfo.pSetLayouts = &descriptorSetLayout;
+
+        if (vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &computePipelineLayout) != VK_SUCCESS) {
+            throw std::runtime_error("failed to create compute pipeline layout!");
+        }
+
+        VkComputePipelineCreateInfo pipelineInfo{};
+        pipelineInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+        pipelineInfo.stage = compShaderStageInfo;
+        pipelineInfo.layout = computePipelineLayout;
+
+        if (vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &computePipeline) != VK_SUCCESS) {
+            throw std::runtime_error("failed to create compute pipeline!");
+        }
+        vkDestroyShaderModule(device, compShaderModule, nullptr);
+    }
+
+    static void createRenderPass(VkDevice& device, VkPhysicalDevice physicalDevice, VkFormat& swapchainImageFormat, VkRenderPass& renderPass) {
         VkAttachmentDescription colorAttachment{};
         colorAttachment.format = swapchainImageFormat;
         colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -471,11 +516,26 @@ struct Graphics {
 
         modelBuffers.resize(MAX_FRAMES_IN_FLIGHT);
         modelBuffersMemory.resize(MAX_FRAMES_IN_FLIGHT);
+        modelBuffersMapped.resize(MAX_FRAMES_IN_FLIGHT);
 
         for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
             createBuffer(device, physicalDevice, bufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, modelBuffers[i], modelBuffersMemory[i]);
 
             vkMapMemory(device, modelBuffersMemory[i], 0, bufferSize, 0, &modelBuffersMapped[i]);
+        }
+    }
+
+    static void createModelDataBuffers(VkDevice& device, VkPhysicalDevice& physicalDevice, std::vector<VkBuffer>& modelDataBuffers, std::vector<VkDeviceMemory>& modelDataBuffersMemory, std::vector<void*>& modelDataBuffersMapped, const int& MAX_FRAMES_IN_FLIGHT, const ModelBus& mdlBus) {
+        const VkDeviceSize bufferSize = sizeof(glm::vec4) * mdlBus.mdls_i.size() * 3;
+
+        modelDataBuffers.resize(MAX_FRAMES_IN_FLIGHT);
+        modelDataBuffersMemory.resize(MAX_FRAMES_IN_FLIGHT);
+        modelDataBuffersMapped.resize(MAX_FRAMES_IN_FLIGHT);
+
+        for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+            createBuffer(device, physicalDevice, bufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, modelDataBuffers[i], modelDataBuffersMemory[i]);
+
+            vkMapMemory(device, modelDataBuffersMemory[i], 0, bufferSize, 0, &modelDataBuffersMapped[i]);
         }
     }
 
@@ -524,7 +584,7 @@ struct Graphics {
     // Descriptor stuff
     #pragma region Descriptor
 
-    static void createDescriptorSetLayout(VkDevice& device, VkDescriptorSetLayout& descriptorSetLayout) {
+    static void createGraphicsDescriptorSetLayout(VkDevice& device, VkDescriptorSetLayout& graphicsDescriptorSetLayout) {
         VkDescriptorSetLayoutBinding uboLayoutBinding{};
         uboLayoutBinding.binding = 0;
         uboLayoutBinding.descriptorCount = 1;
@@ -553,12 +613,12 @@ struct Graphics {
         layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
         layoutInfo.pBindings = bindings.data();
 
-        if (vkCreateDescriptorSetLayout(device, &layoutInfo, nullptr, &descriptorSetLayout) != VK_SUCCESS) {
+        if (vkCreateDescriptorSetLayout(device, &layoutInfo, nullptr, &graphicsDescriptorSetLayout) != VK_SUCCESS) {
             throw std::runtime_error("failed to create descriptor set layout!");
         }
     }
 
-    static void createDescriptorPool(VkDevice& device, const int& MAX_FRAMES_IN_FLIGHT, VkDescriptorPool& descriptorPool) {
+    static void createGraphicsDescriptorPool(VkDevice& device, const int& MAX_FRAMES_IN_FLIGHT, VkDescriptorPool& graphicsDescriptorPool) {
         std::array<VkDescriptorPoolSize, 3> poolSizes{};
         poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
         poolSizes[0].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
@@ -569,27 +629,28 @@ struct Graphics {
         poolSizes[2].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
         poolSizes[2].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
 
+
         VkDescriptorPoolCreateInfo poolInfo{};
         poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
         poolInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
         poolInfo.pPoolSizes = poolSizes.data();
         poolInfo.maxSets = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
 
-        if (vkCreateDescriptorPool(device, &poolInfo, nullptr, &descriptorPool) != VK_SUCCESS) {
+        if (vkCreateDescriptorPool(device, &poolInfo, nullptr, &graphicsDescriptorPool) != VK_SUCCESS) {
             throw std::runtime_error("failed to create descriptor pool!");
         }
     }
 
-    static void createDescriptorSets(VkDevice device, const int& MAX_FRAMES_IN_FLIGHT, VkDescriptorSetLayout& descriptorSetLayout, VkDescriptorPool& descriptorPool, std::vector<VkDescriptorSet>& descriptorSets, std::vector<VkBuffer>& uniformBuffers, std::vector<VkBuffer>& modelBuffers, VkImageView& textureImageView, VkSampler& textureSampler, ModelBus& mdlBus) {
-        std::vector<VkDescriptorSetLayout> layouts(MAX_FRAMES_IN_FLIGHT, descriptorSetLayout);
+    static void createGraphicsDescriptorSets(VkDevice device, const int& MAX_FRAMES_IN_FLIGHT, VkDescriptorSetLayout& graphicsDescriptorSetLayout, VkDescriptorPool& graphicsDescriptorPool, std::vector<VkDescriptorSet>& graphicsDescriptorSets, std::vector<VkBuffer>& uniformBuffers, VkImageView& textureImageView, VkSampler& textureSampler, std::vector<VkBuffer>& modelBuffers, ModelBus& mdlBus) {
+        std::vector<VkDescriptorSetLayout> layouts(MAX_FRAMES_IN_FLIGHT, graphicsDescriptorSetLayout);
         VkDescriptorSetAllocateInfo allocInfo{};
         allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-        allocInfo.descriptorPool = descriptorPool;
+        allocInfo.descriptorPool = graphicsDescriptorPool;
         allocInfo.descriptorSetCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
         allocInfo.pSetLayouts = layouts.data();
 
-        descriptorSets.resize(MAX_FRAMES_IN_FLIGHT);
-        if (vkAllocateDescriptorSets(device, &allocInfo, descriptorSets.data()) != VK_SUCCESS) {
+        graphicsDescriptorSets.resize(MAX_FRAMES_IN_FLIGHT);
+        if (vkAllocateDescriptorSets(device, &allocInfo, graphicsDescriptorSets.data()) != VK_SUCCESS) {
             throw std::runtime_error("failed to allocate descriptor sets!");
         }
 
@@ -599,20 +660,20 @@ struct Graphics {
             uboBufferInfo.offset = 0;
             uboBufferInfo.range = sizeof(UniformBufferObject);
 
-            VkDescriptorBufferInfo mboBufferInfo{};
-            mboBufferInfo.buffer = modelBuffers[i];
-            mboBufferInfo.offset = 0;
-            mboBufferInfo.range = sizeof(mdlBus.mdls_i[0]) * mdlBus.mdls_i.size();
-
             VkDescriptorImageInfo imageInfo{};
             imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
             imageInfo.imageView = textureImageView;
             imageInfo.sampler = textureSampler;
 
+            VkDescriptorBufferInfo mboBufferInfo{};
+            mboBufferInfo.buffer = modelBuffers[i];
+            mboBufferInfo.offset = 0;
+            mboBufferInfo.range = sizeof(mdlBus.mdls_i[0]) * mdlBus.mdls_i.size();
+
             std::array<VkWriteDescriptorSet, 3> descriptorWrites{};
 
             descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            descriptorWrites[0].dstSet = descriptorSets[i];
+            descriptorWrites[0].dstSet = graphicsDescriptorSets[i];
             descriptorWrites[0].dstBinding = 0;
             descriptorWrites[0].dstArrayElement = 0;
             descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
@@ -620,7 +681,7 @@ struct Graphics {
             descriptorWrites[0].pBufferInfo = &uboBufferInfo;
 
             descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            descriptorWrites[1].dstSet = descriptorSets[i];
+            descriptorWrites[1].dstSet = graphicsDescriptorSets[i];
             descriptorWrites[1].dstBinding = 1;
             descriptorWrites[1].dstArrayElement = 0;
             descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
@@ -628,7 +689,7 @@ struct Graphics {
             descriptorWrites[1].pImageInfo = &imageInfo;
 
             descriptorWrites[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            descriptorWrites[2].dstSet = descriptorSets[i];
+            descriptorWrites[2].dstSet = graphicsDescriptorSets[i];
             descriptorWrites[2].dstBinding = 2;
             descriptorWrites[2].dstArrayElement = 0;
             descriptorWrites[2].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
@@ -636,6 +697,99 @@ struct Graphics {
             descriptorWrites[2].pBufferInfo = &mboBufferInfo;
 
             vkUpdateDescriptorSets(device, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
+        }
+    }
+
+
+    static void createComputeDescriptorSetLayout(VkDevice& device, VkDescriptorSetLayout& computeDescriptorSetLayout) {
+        VkDescriptorSetLayoutBinding mdboLayoutBinding{};
+        mdboLayoutBinding.binding = 0;
+        mdboLayoutBinding.descriptorCount = 1;
+        mdboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        mdboLayoutBinding.pImmutableSamplers = nullptr;
+        mdboLayoutBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+
+        VkDescriptorSetLayoutBinding mboLayoutBinding{};
+        mboLayoutBinding.binding = 1;
+        mboLayoutBinding.descriptorCount = 1;
+        mboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        mboLayoutBinding.pImmutableSamplers = nullptr;
+        mboLayoutBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+
+        std::array<VkDescriptorSetLayoutBinding, 2> bindings = {mdboLayoutBinding, mboLayoutBinding};
+
+        VkDescriptorSetLayoutCreateInfo layoutInfo{};
+        layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+        layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
+        layoutInfo.pBindings = bindings.data();
+
+        if (vkCreateDescriptorSetLayout(device, &layoutInfo, nullptr, &computeDescriptorSetLayout) != VK_SUCCESS) {
+            throw std::runtime_error("failed to create descriptor set layout!");
+        }
+    }
+
+    static void createComputeDescriptorPool(VkDevice& device, const int& MAX_FRAMES_IN_FLIGHT, VkDescriptorPool& computeDescriptorPool) {
+        std::array<VkDescriptorPoolSize, 2> poolSizes{};
+        poolSizes[0].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        poolSizes[0].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
+
+        poolSizes[1].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        poolSizes[1].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
+
+        VkDescriptorPoolCreateInfo poolInfo{};
+        poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+        poolInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
+        poolInfo.pPoolSizes = poolSizes.data();
+        poolInfo.maxSets = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
+
+        if (vkCreateDescriptorPool(device, &poolInfo, nullptr, &computeDescriptorPool) != VK_SUCCESS) {
+            throw std::runtime_error("failed to create descriptor pool!");
+        }
+    }
+
+    static void createComputeDescriptorSets(const VkDevice device, const int& MAX_FRAMES_IN_FLIGHT, const VkDescriptorSetLayout& computeDescriptorSetLayout, const VkDescriptorPool& computeDescriptorPool, std::vector<VkDescriptorSet>& computeDescriptorSets, const std::vector<VkBuffer>& modelBuffers, const ModelBus& mdlBus, const std::vector<VkBuffer>& modelDataBuffers) {
+        std::vector layouts(MAX_FRAMES_IN_FLIGHT, computeDescriptorSetLayout);
+        VkDescriptorSetAllocateInfo allocInfo{};
+        allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+        allocInfo.descriptorPool = computeDescriptorPool;
+        allocInfo.descriptorSetCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
+        allocInfo.pSetLayouts = layouts.data();
+
+        computeDescriptorSets.resize(MAX_FRAMES_IN_FLIGHT);
+        if (vkAllocateDescriptorSets(device, &allocInfo, computeDescriptorSets.data()) != VK_SUCCESS) {
+            throw std::runtime_error("failed to allocate descriptor sets!");
+        }
+
+        for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+            VkDescriptorBufferInfo mdboBufferInfo{};
+            mdboBufferInfo.buffer = modelDataBuffers[i];
+            mdboBufferInfo.offset = 0;
+            mdboBufferInfo.range = VK_WHOLE_SIZE;
+
+            VkDescriptorBufferInfo mboBufferInfo{};
+            mboBufferInfo.buffer = modelBuffers[i];
+            mboBufferInfo.offset = 0;
+            mboBufferInfo.range = sizeof(mdlBus.mdls_i[0]) * mdlBus.mdls_i.size();
+
+            std::array<VkWriteDescriptorSet, 2> descriptorWrites{};
+
+            descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            descriptorWrites[0].dstSet = computeDescriptorSets[i];
+            descriptorWrites[0].dstBinding = 0;
+            descriptorWrites[0].dstArrayElement = 0;
+            descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+            descriptorWrites[0].descriptorCount = 1;
+            descriptorWrites[0].pBufferInfo = &mdboBufferInfo;
+
+            descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            descriptorWrites[1].dstSet = computeDescriptorSets[i];
+            descriptorWrites[1].dstBinding = 1;
+            descriptorWrites[1].dstArrayElement = 0;
+            descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+            descriptorWrites[1].descriptorCount = 1;
+            descriptorWrites[1].pBufferInfo = &mboBufferInfo;
+
+            vkUpdateDescriptorSets(device, descriptorWrites.size(), descriptorWrites.data(), 0, nullptr);
         }
     }
 
@@ -658,7 +812,9 @@ struct Graphics {
         }
     }
 
-    static void recordCommandBuffer(VkDevice& device, VkPhysicalDevice& physicalDevice, VkCommandPool& commandPool, VkQueue& graphicsQueue, VkCommandBuffer& commandBuffer, uint32_t imageIndex, VkRenderPass& renderPass, std::vector<VkFramebuffer>& swapChainFramebuffers, VkExtent2D& swapchainExtent, VkPipeline& graphicsPipeline, VkBuffer& vertexBuffer, VkBuffer& indexBuffer, VkPipelineLayout& pipelineLayout, std::vector<VkDescriptorSet>& descriptorSets, uint32_t& currentFrame, Color clear_color, ModelBus& mdlBus, VkBuffer& drawCommandsBuffer, VkDeviceMemory& drawCommandsBufferMemory) {
+    static void recordCommandBuffer(VkDevice& device, VkPhysicalDevice& physicalDevice, VkCommandPool& commandPool, VkQueue& graphicsQueue, VkCommandBuffer& commandBuffer, uint32_t imageIndex, VkRenderPass& renderPass, std::vector<VkFramebuffer>& swapChainFramebuffers, VkExtent2D& swapchainExtent, VkPipeline& graphicsPipeline, VkPipeline& computePipeline, VkBuffer& vertexBuffer, VkBuffer& indexBuffer, VkPipelineLayout& graphicsPipelineLayout, VkPipelineLayout& computePipelineLayout, std::vector<VkDescriptorSet>& graphicsDescriptorSets, std::vector<VkDescriptorSet>& computeDescriptorSets, uint32_t& currentFrame, Color clear_color, ModelBus& mdlBus, std::vector<VkBuffer>& modelBuffers, std::vector<VkBuffer> modelDataBuffers, VkBuffer& drawCommandsBuffer, VkDeviceMemory& drawCommandsBufferMemory, int MAX_FRAMES_IN_FLIGHT, bool& computeDirty) {
+        auto start = std::chrono::high_resolution_clock::now();
+
         VkCommandBufferBeginInfo beginInfo{};
         beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 
@@ -687,9 +843,71 @@ struct Graphics {
         renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
         renderPassInfo.pClearValues = clearValues.data();
 
+        vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, computePipeline);
+        vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, computePipelineLayout, 0, 1, &computeDescriptorSets[currentFrame], 0, nullptr);
+
+        static size_t frame = 0;
+
+        uint32_t firstIndex = 0;
+        int32_t vertexOffset = 0;
+        uint32_t firstInstance = 0;
+
+        for (size_t i = 0; i < mdlBus.mdls.size() && mdlBus.dirtyCommands; i++) {
+            const auto& mdl = mdlBus.mdls[i];
+            size_t instanceCount = mdlBus.getInstanceCount(mdl);
+            uint32_t indexCount = mdl->indices.size();
+
+            mdlBus.addCommands(indexCount, instanceCount, firstIndex, vertexOffset, firstInstance);
+            if (i == mdlBus.mdls.size() - 1) {
+                updateDrawCommandsBuffer(device, physicalDevice, commandPool, graphicsQueue, drawCommandsBuffer, mdlBus.drawCommands);
+                break;
+            }
+
+            mdlBus.dirtyCommands = false;
+            firstIndex += indexCount;
+            vertexOffset += ModelBus::getVertexCount(mdl);
+            firstInstance += instanceCount;
+        }
+
+        if (computeDirty) {
+            frame++;
+            if (frame == MAX_FRAMES_IN_FLIGHT) {
+                computeDirty = false;
+                frame = 0;
+            }
+
+            const uint32_t workgroupSize = 256;
+            const size_t totalInstances = mdlBus.mdls_i.size();
+            uint32_t groupCount = (totalInstances + workgroupSize - 1) / workgroupSize;
+
+            vkCmdDispatch(commandBuffer, groupCount, 1, 1);
+
+            VkBufferMemoryBarrier bufBarrier{};
+            bufBarrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+            bufBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+            bufBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+            bufBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            bufBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            bufBarrier.buffer = modelDataBuffers[currentFrame];
+            bufBarrier.offset = 0;
+            bufBarrier.size = VK_WHOLE_SIZE;
+
+            vkCmdPipelineBarrier(
+                commandBuffer,
+                VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                VK_PIPELINE_STAGE_VERTEX_SHADER_BIT,
+                0,
+                0, nullptr,
+                1, &bufBarrier,
+                0, nullptr
+            );
+        }
+
         vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 
             vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
+            vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipelineLayout, 0, 1, &graphicsDescriptorSets[currentFrame], 0, nullptr);
+
 
             VkViewport viewport{};
             viewport.x = 0.0f;
@@ -712,41 +930,6 @@ struct Graphics {
 
             vkCmdBindIndexBuffer(commandBuffer, indexBuffer, 0, VK_INDEX_TYPE_UINT32);
 
-            vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSets[currentFrame], 0, nullptr);
-
-            //vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(mdlBus.mdls[0]->indices.size()), 1, 0, 0, 0);
-
-
-            uint32_t firstIndex = 0;
-            int32_t vertexOffset = 0;
-            uint32_t firstInstance = 0;
-
-            for (size_t i = 0; i < mdlBus.mdls.size() && mdlBus.dirtyCommands; i++) {
-                const auto& mdl = mdlBus.mdls[i];
-                size_t instanceCount = mdlBus.getInstanceCount(mdl);
-                uint32_t indexCount = mdl->indices.size();
-
-                /*
-                std::cout << "Instance count: " << instanceCount << std::endl;
-                std::cout << "Index count: " << indexCount << std::endl;
-                std::cout << "Vertex count: " << ModelBus::getVertexCount(mdl) << std::endl;
-                std::cout << "First index: " << firstIndex << std::endl;
-                std::cout << "Vertex offset: " << vertexOffset << std::endl;
-                std::cout << "" << std::endl;
-                */
-
-                mdlBus.addCommands(indexCount, instanceCount, firstIndex, vertexOffset, firstInstance);
-                if (i == mdlBus.mdls.size() - 1) {
-                    updateDrawCommandsBuffer(device, physicalDevice, commandPool, graphicsQueue, drawCommandsBuffer, mdlBus.drawCommands);
-                    break;
-                }
-                mdlBus.dirtyCommands = false;
-                firstIndex += indexCount;
-                vertexOffset += ModelBus::getVertexCount(mdl);
-                vertexOffset += ModelBus::getVertexCount(mdl);
-                firstInstance += instanceCount;
-            }
-
             if (drawCommandsBuffer == VK_NULL_HANDLE) createDrawCommandsBuffer(device, physicalDevice, commandPool, graphicsQueue, drawCommandsBuffer, drawCommandsBufferMemory, mdlBus);
 
             vkCmdDrawIndexedIndirect(commandBuffer, drawCommandsBuffer, 0, mdlBus.drawCommands.size(), sizeof(VkDrawIndexedIndirectCommand));
@@ -755,6 +938,16 @@ struct Graphics {
 
         if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
             throw std::runtime_error("failed to record command buffer!");
+        }
+
+        static bool i = true;
+        if (i) {
+            i = false;
+            auto end = std::chrono::high_resolution_clock::now();
+            std::chrono::duration<double> duration = end - start;
+            Logger* LOGGER = Logger::of("recordCommandBuffer");
+
+            LOGGER->success("${} seconds!", duration.count());
         }
     }
 
