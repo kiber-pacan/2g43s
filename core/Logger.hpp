@@ -4,7 +4,7 @@
 #include <string>
 #include <iostream>
 
-#include "sep/util/Color.h"
+#include "sep/util/Color.hpp"
 
 // Just look at names of class and file...
 class Logger {
