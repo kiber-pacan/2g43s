@@ -1,14 +1,13 @@
-//
-// Created by down on 03.10.2025.
-//
-
 #ifndef INC_2G43S_MODELBUS_H
 #define INC_2G43S_MODELBUS_H
 #include <memory>
 #include <vector>
 
-#include "ModelInstance.h"
-#include "ParsedModel.h"
+#include "ModelInstance.hpp"
+#include "ParsedModel.hpp"
+#include <omp.h>
+
+#include "../util/Random.hpp"
 
 struct ModelBus {
     std::vector<std::shared_ptr<ParsedModel>> mdls{};
@@ -82,16 +81,20 @@ struct ModelBus {
 
 
     #pragma region instanceModels
-    void createModelInstance(const std::string& model, const glm::vec3 p = glm::vec3(0.0f), const glm::vec3 l = glm::vec3(0.0f), const glm::vec3 s = glm::vec3(1.0f)) {
+    void addModelInstance(const std::string& model, const glm::vec4 p = glm::vec4(0.0f), const glm::vec4 r = glm::vec4(0.0f), const glm::vec4 s = glm::vec4(1.0f)) {
         for (const std::shared_ptr<ParsedModel> & mdl: mdls) {
             if (mdl->name == model) {
-                mdls_i.emplace_back(mdl, p, l, s);
+                mdls_i.emplace_back(mdl, p, r, s);
             }
         }
     }
 
-    void createModelInstance(const std::shared_ptr<ParsedModel>& mdl, const glm::vec3 p = glm::vec3(0.0f), const glm::vec3 l = glm::vec3(0.0f), const glm::vec3 s = glm::vec3(1.0f)) {
-        mdls_i.emplace_back(mdl, p, l, s);
+    void addModelInstance(const std::shared_ptr<ParsedModel>& mdl, const glm::vec4 p = glm::vec4(0.0f), const glm::vec4 r = glm::vec4(0.0f), const glm::vec4 s = glm::vec4(1.0f)) {
+        mdls_i.emplace_back(mdl, p, r, s);
+    }
+
+    static ModelInstance createModelInstance(const std::shared_ptr<ParsedModel>& mdl, const glm::vec4 p = glm::vec4(0.0f), const glm::vec4 r = glm::vec4(0.0f), const glm::vec4 s = glm::vec4(1.0f)) {
+        return ModelInstance(mdl, p, r, s);
     }
 
     void destroyModelInstance(const std::string& name) {
@@ -199,6 +202,7 @@ struct ModelBus {
 
     #pragma endregion
 
+
     #pragma region commands
 
     void addCommands(const uint32_t indexCount, const uint32_t instanceCount, const uint32_t firstIndex, const int32_t  vertexOffset, const uint32_t firstInstance) {
@@ -220,15 +224,21 @@ struct ModelBus {
         loadModel("/mnt/sda1/CLionProjects/2g43s/core/models/", "landscape.glb");
 
         auto start = std::chrono::high_resolution_clock::now();
+        static size_t count = 1000000;
+        mdls_i.resize(count);
 
-        for (int x = 0; x < 1000000; ++x) {
-            glm::vec3 temp = glm::vec3(Tools::randomNum<float>(-1000.0f, 1000.0f), Tools::randomNum<float>(-1000.0f, 1000.0f), Tools::randomNum<float>(-1000.0f, 1000.0f));
-            float rand = Tools::randomNum<float>(-1.0f, 1.0f);
-            createModelInstance(
-            mdls[0],
-            temp,
-            temp
-            );
+        #pragma omp single
+        std::cout << "Threads: " << omp_get_num_threads() << std::endl;
+
+        #pragma omp parallel for default(none) shared(mdls, count)
+        for (int i = 0; i < count; ++i) {
+            const glm::vec4 temp(
+                Random::randomNum_T<float>(-1000.f, 1000.f),
+                Random::randomNum_T<float>(-1000.f, 1000.f),
+                Random::randomNum_T<float>(-1000.f, 1000.f),
+                0
+                );
+            mdls_i[i] = ModelInstance(mdls[0], temp, temp);
         }
 
         auto end = std::chrono::high_resolution_clock::now();
