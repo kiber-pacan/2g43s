@@ -137,6 +137,10 @@ struct ModelBus {
             indices.append_range(mdl->indices);
         }
 
+        for (uint32_t index : indices) {
+            //std::cout << index << std::endl;
+        }
+
         return indices;
     }
 
@@ -144,8 +148,12 @@ struct ModelBus {
         std::vector<Vertex> vertices{};
         for (const auto& mdl: mdls) {
             for (const auto& mesh: mdl->meshes) {
-                vertices.append_range(mesh);
+                //vertices.append_range(mesh);
             }
+        }
+
+        for (Vertex vertex : vertices) {
+            std::cout << vertex.pos.x << " " << vertex.pos.y << " " << vertex.pos.z << std::endl;
         }
 
         return vertices;
@@ -221,10 +229,10 @@ struct ModelBus {
 
     void test() {
         loadModel("/mnt/sda1/CLionProjects/2g43s/core/models/", "cube_1_material.glb");
-        loadModel("/mnt/sda1/CLionProjects/2g43s/core/models/", "landscape.glb");
+        //loadModel("/mnt/sda1/CLionProjects/2g43s/core/models/", "landscape.glb");
 
         auto start = std::chrono::high_resolution_clock::now();
-        static size_t count = 1000000;
+        static size_t count = 10000000;
         mdls_i.resize(count);
 
         #pragma omp single

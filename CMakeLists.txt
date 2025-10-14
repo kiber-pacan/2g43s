@@ -43,9 +43,13 @@ add_executable(${EXECUTABLE_NAME}
         core/sep/entity/Entity.hpp
 
         core/sep/util/Color.hpp
-        core/sep/model/Vertex.hpp
+        core/sep/model/primitives/Vertex.hpp
         core/sep/entity/CameraEntity.hpp
         core/sep/util/Random.hpp
+        core/sep/model/primitives/Shere.hpp
+        core/sep/buffers/UniformBufferObject.hpp
+        core/sep/buffers/ModelBufferObject.hpp
+        core/sep/buffers/ModelDataBufferObject.hpp
 )
 
 set(CMAKE_CXX_FLAGS_RELEASE "-Ofast -march=native -flto -funroll-loops -fomit-frame-pointer -ffast-math -fno-math-errno -DNDEBUG")

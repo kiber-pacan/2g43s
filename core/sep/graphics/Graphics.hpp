@@ -13,7 +13,7 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "../model/ModelBus.hpp"
 #include "stb/stb_image.h"
-#include "../model/Vertex.hpp"
+#include "../model/primitives/Vertex.hpp"
 
 
 namespace fs = std::filesystem;
@@ -21,7 +21,6 @@ namespace fs = std::filesystem;
 struct Graphics {
     // Vertex shader stuff
     struct UniformBufferObject {
-        glm::mat4 model;
         glm::mat4 view;
         glm::mat4 proj;
     };
@@ -38,12 +37,6 @@ struct Graphics {
         std::vector<glm::vec4> scl;
         bool dirty = true;
         size_t frame = 0;
-    };
-
-    struct ModelDataBuffer{
-        std::vector<glm::vec4> pos;
-        std::vector<glm::vec4> rot;
-        std::vector<glm::vec4> scl;
     };
 
     static VkShaderModule createShaderModule(const std::vector<char>& code, const VkDevice& device) {
@@ -375,7 +368,7 @@ struct Graphics {
     #pragma endregion
 
 
-    // Buffers and shit
+    // buffers and shit
     #pragma region Buffers
 
     static void createBuffer(VkDevice& device, VkPhysicalDevice& physicalDevice, VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory) {

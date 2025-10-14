@@ -32,7 +32,6 @@ public:
     }
 
     static void updateUniformBuffer(const uint32_t currentImage, const VkExtent2D& swapchainExtent, const std::vector<void*>& uniformBuffersMapped, Graphics::UniformBufferObject& ubo, const glm::vec3 pos, const Camera& camera) {
-        ubo.model = glm::translate(glm::mat4(1.0f), pos);
         ubo.view = glm::lookAt(camera.pos + glm::vec3(0), camera.pos + camera.look, glm::vec3(0.0f, 0.0f, 1.0f));
         ubo.proj = glm::perspective(camera.fov,  (float) swapchainExtent.width / (float) swapchainExtent.height, 0.1f, 4096.0f);
         ubo.proj[1][1] *= -1;
@@ -325,7 +324,7 @@ private:
     VkDeviceMemory depthImageMemory{};
     VkImageView depthImageView{};
 
-    // Buffers
+    // buffers
     std::vector<VkCommandBuffer> commandBuffers{};
 
     VkBuffer vertexBuffer{};
@@ -374,6 +373,7 @@ private:
 
     // Initializaiton of engine and its counterparts
     void initialize(SDL_Window* window) {
+        auto start = std::chrono::high_resolution_clock::now();
 
         this->window = window;
 
@@ -385,13 +385,15 @@ private:
 
         initializeVulkan();
 
+        auto end = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<double> duration = end - start;
+
         // Success!?
-        LOGGER->success("Vulkan engine started successfully!");
+        LOGGER->success("2g43s engine started successfully in ${} seconds!", duration.count());
     }
 
     // Vulkan related stuff
     void initializeVulkan() {
-        ubo.model = glm::mat4(1.0f);
         deltaT = new Delta();
 
         // Basic things

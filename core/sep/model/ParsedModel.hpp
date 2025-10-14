@@ -2,7 +2,7 @@
 #define PARSEDMODEL_H
 #include <vector>
 
-#include "Vertex.hpp"
+#include "primitives/Vertex.hpp"
 #include "../../Logger.hpp"
 #include "fastgltf/core.hpp"
 #include "fastgltf/tools.hpp"
@@ -48,7 +48,6 @@ class ParsedModel {
                 std::vector<Vertex> tempMesh(positionAccessor.count);
                 std::vector<std::uint32_t> tempIndices{};
 
-
                 fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec3>(asset, positionAccessor, [&](fastgltf::math::fvec3 pos, std::size_t idx) {
                     tempMesh[idx] = {
                         {pos[0], pos[1], pos[2]},
@@ -76,10 +75,8 @@ class ParsedModel {
                     baseVertex += static_cast<uint32_t>(m.size());
                 }
 
-                // Теперь добавляем вершины этого меша
                 this->meshes.emplace_back(std::move(tempMesh));
 
-                // Загружаем индексы
                 if (primitive.indicesAccessor.has_value()) {
                     auto& accessor = asset.accessors[primitive.indicesAccessor.value()];
                     tempIndices.resize(accessor.count);
