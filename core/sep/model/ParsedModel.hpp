@@ -13,11 +13,11 @@ class ParsedModel {
     std::vector<uint32_t> indices{};
     std::string name;
 
-    ParsedModel(std::filesystem::path& path) {
+    explicit ParsedModel(std::filesystem::path& path) {
         loadModel(loadAsset(path));
     }
 
-    fastgltf::Asset loadAsset(std::filesystem::path& path) {
+    static fastgltf::Asset loadAsset(const std::filesystem::path& path) {
         Logger* LOGGER = Logger::of("ParsedModel.h");
 
         constexpr auto options = fastgltf::Options::DontRequireValidAssetMember | fastgltf::Options::AllowDouble | fastgltf::Options::LoadExternalBuffers | fastgltf::Options::LoadExternalImages | fastgltf::Options::GenerateMeshIndices;
@@ -26,7 +26,7 @@ class ParsedModel {
         fastgltf::Parser parser(extensions);
         auto buffer = fastgltf::GltfDataBuffer::FromPath(path);
 
-        if (!bool(buffer)) {
+        if (!static_cast<bool>(buffer)) {
             LOGGER->error("Failed to open glTF file: ${}", fastgltf::getErrorMessage(buffer.error()));
         }
 
