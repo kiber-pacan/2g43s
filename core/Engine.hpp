@@ -14,7 +14,7 @@
 #include "glm/glm.hpp"
 #include "sep/camera/Camera.hpp"
 #include "sep/graphics/Delta.hpp"
-#include "sep/model/ModelBus.hpp"
+#include "sep/model/bus/ModelBus.hpp"
 #include "sep/model/ModelInstance.hpp"
 #include "sep/model/ParsedModel.hpp"
 

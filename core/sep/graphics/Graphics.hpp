@@ -11,9 +11,10 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <chrono>
 #define STB_IMAGE_IMPLEMENTATION
-#include "../model/ModelBus.hpp"
+#include "../model/bus/ModelBus.hpp"
 #include "stb/stb_image.h"
 #include "../model/primitives/Vertex.hpp"
+#include "../../Tools.hpp"
 
 
 namespace fs = std::filesystem;
@@ -56,8 +57,8 @@ struct Graphics {
     #pragma region Main
 
     static void createGraphicsPipeline(VkDevice& device, VkPipelineLayout& pipelineLayout, VkRenderPass& renderPass, VkPipeline& graphicsPipeline, VkDescriptorSetLayout& descriptorSetLayout) {
-        auto vertShaderCode = Tools::readFile("/mnt/sda1/CLionProjects/2g43s/core/shaders/vert.spv");
-        auto fragShaderCode = Tools::readFile("/mnt/sda1/CLionProjects/2g43s/core/shaders/frag.spv");
+        auto vertShaderCode = Tools::readFile("/home/down1/2g43s/core/shaders/vert.spv");
+        auto fragShaderCode = Tools::readFile("/home/down1/2g43s/core/shaders/frag.spv");
 
         VkShaderModule vertShaderModule = createShaderModule(vertShaderCode, device);
         VkShaderModule fragShaderModule = createShaderModule(fragShaderCode, device);
@@ -186,7 +187,7 @@ struct Graphics {
     }
 
     static void createComputePipeline(VkDevice& device, VkDescriptorSetLayout& descriptorSetLayout, VkPipelineLayout& computePipelineLayout, VkPipeline& computePipeline) {
-        auto compShaderCode = Tools::readFile("/mnt/sda1/CLionProjects/2g43s/core/shaders/comp.spv");
+        auto compShaderCode = Tools::readFile("/home/down1/2g43s/core/shaders/comp.spv");
 
         VkShaderModule compShaderModule = createShaderModule(compShaderCode, device);
 
@@ -841,25 +842,26 @@ struct Graphics {
 
         static size_t frame = 0;
 
-        uint32_t firstIndex = 0;
-        int32_t vertexOffset = 0;
-        uint32_t firstInstance = 0;
+        if (mdlBus.dirtyCommands) {
+            uint32_t firstIndex = 0;
+            int32_t vertexOffset = 0;
+            uint32_t firstInstance = 0;
 
-        for (size_t i = 0; i < mdlBus.mdls.size() && mdlBus.dirtyCommands; i++) {
-            const auto& mdl = mdlBus.mdls[i];
-            size_t instanceCount = mdlBus.getInstanceCount(mdl);
-            uint32_t indexCount = mdl->indices.size();
+            for (size_t i = 0; i < mdlBus.mdls.size(); i++) {
+                const auto& mdl = mdlBus.mdls[i];
+                size_t instanceCount = mdlBus.getInstanceCount(mdl);
+                uint32_t indexCount = mdl->indices.size();
 
-            mdlBus.addCommands(indexCount, instanceCount, firstIndex, vertexOffset, firstInstance);
-            if (i == mdlBus.mdls.size() - 1) {
-                updateDrawCommandsBuffer(device, physicalDevice, commandPool, graphicsQueue, drawCommandsBuffer, mdlBus.drawCommands);
-                break;
+                mdlBus.addCommands(indexCount, instanceCount, firstIndex, vertexOffset, firstInstance);
+
+                firstIndex += indexCount;
+                vertexOffset += ModelBus::getVertexCount(mdl);
+                firstInstance += instanceCount;
             }
 
+            //updateDrawCommandsBuffer(device, physicalDevice, commandPool, graphicsQueue, drawCommandsBuffer, mdlBus.drawCommands);
+
             mdlBus.dirtyCommands = false;
-            firstIndex += indexCount;
-            vertexOffset += ModelBus::getVertexCount(mdl);
-            firstInstance += instanceCount;
         }
 
         if (computeDirty) {
@@ -1041,7 +1043,7 @@ struct Graphics {
 
     static void createTextureImage(VkDevice& device, VkCommandPool& commandPool, VkQueue& graphicsQueue, VkPhysicalDevice& physicalDevice, VkBuffer& stagingBuffer, VkDeviceMemory& stagingBufferMemory, VkImage& textureImage, VkDeviceMemory& textureImageMemory) {
         int texWidth, texHeight, texChannels;
-        stbi_uc* pixels = stbi_load("/mnt/sda1/CLionProjects/2g43s/core/textures/odd-eyed-cat.jpg", &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
+        stbi_uc* pixels = stbi_load("/home/down1/2g43s/core/textures/odd-eyed-cat.jpg", &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
         VkDeviceSize imageSize = texWidth * texHeight * 4;
 
         if (!pixels) {
