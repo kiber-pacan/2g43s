@@ -32,7 +32,7 @@ add_executable(${EXECUTABLE_NAME}
 
         core/sep/model/ModelInstance.hpp
         core/sep/model/ParsedModel.hpp
-        core/sep/model/ModelBus.hpp
+        core/sep/model/bus/ModelBus.hpp
 
         core/sep/util/Debug.hpp
         core/sep/util/Queue.hpp
@@ -50,6 +50,7 @@ add_executable(${EXECUTABLE_NAME}
         core/sep/buffers/UniformBufferObject.hpp
         core/sep/buffers/ModelBufferObject.hpp
         core/sep/buffers/ModelDataBufferObject.hpp
+        core/sep/model/bus/ModelBus.cpp
 )
 
 set(CMAKE_CXX_FLAGS_RELEASE "-Ofast -march=native -flto -funroll-loops -fomit-frame-pointer -ffast-math -fno-math-errno -DNDEBUG")
