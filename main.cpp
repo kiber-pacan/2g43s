@@ -3,8 +3,8 @@
 #include <cmath>
 #include <vulkan/vulkan.h>
 #include "core/Engine.hpp"
-#include "core/Logger.hpp"
-#include "core/Tools.hpp"
+#include "core/sep/util/Logger.hpp"
+#include "core/sep/util/Tools.hpp"
 
 #define GLM_FORCE_RADIANS
 #include <glm/glm.hpp>
@@ -14,8 +14,7 @@
 #include "core/sep/util/Random.hpp"
 
 struct AppContext {
-    SDL_Window* win{};
-    Engine eng;
+    Engine engine;
     bool quit = true;
 
     KeyListener* kL;
@@ -62,7 +61,6 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
 
     // set up the application data
     *appstate = new AppContext{
-        window,
         vulkan_engine,
         false,
         new KeyListener(),
@@ -80,30 +78,36 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
 SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *e) {
     auto* app = static_cast<AppContext *>(appstate);
 
+    // Close on hitting button
     if (e->type == SDL_EVENT_QUIT) {
-        app->quit = true;
         return SDL_APP_SUCCESS;
     }
-
+    // Close on ESC
     if(app->quit) {
         return SDL_APP_SUCCESS;
     }
 
-    app->kL->listen(e, app->eng, app->quit);
-    app->mL->listen(e, app->win, app->eng.camera);
+    if (e->type == SDL_EVENT_WINDOW_RESIZED) {
+        int width, height;
+        SDL_GetWindowSizeInPixels(app->engine.window, &width, &height);
+        LOGGER->info("Window resized w:${}, h:${}", width, height);
+        app->engine.framebufferResized = true;
+    }
+
+    app->kL->listen(e);
+    app->mL->listen(app->engine.camera);
 
     return SDL_APP_CONTINUE;
 }
 
 SDL_AppResult SDL_AppIterate(void *appstate) {
     auto* app = static_cast<AppContext *>(appstate);
-    Engine& eng = app->eng;
 
-    app->eng.deltaT->calculateDelta();
-    app->kL->iterateKeys(eng, app->quit);
+    app->engine.deltaT->calculateDelta();
+    app->kL->iterateKeys(app->engine, app->quit);
 
-    eng.drawFrame();
-    vkDeviceWaitIdle(eng.device);
+    app->engine.drawFrame();
+    vkDeviceWaitIdle(app->engine.device);
 
     return SDL_APP_CONTINUE;
 }
@@ -111,8 +115,8 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
 void SDL_AppQuit(void *appstate, SDL_AppResult result) {
     // Cleanup
     if (auto* app = static_cast<AppContext *>(appstate)) {
-        app->eng.cleanup();
-        SDL_DestroyWindow(app->win);
+        app->engine.cleanup();
+        SDL_DestroyWindow(app->engine.window);
         delete app;
     }
 
