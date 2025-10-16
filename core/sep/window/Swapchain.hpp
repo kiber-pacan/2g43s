@@ -20,12 +20,14 @@ struct SwapchainSupportDetails {
 struct Swapchain {
 
     // Main method for creating swapchain
-    static void createSwapchain(VkDevice& device, VkPhysicalDevice& physicalDevice, VkSurfaceKHR& surface, SDL_Window* window, VkSwapchainKHR& swapchain, std::vector<VkImage>& swapchainImages, VkFormat& swapchainImageFormat, VkExtent2D& swapchainExtent) {
-        SwapchainSupportDetails swapchainSupport = querySwapchainSupport(physicalDevice, surface);
+    static void createSwapchain(const VkDevice& device, VkPhysicalDevice& physicalDevice, VkSurfaceKHR& surface, SDL_Window* window, VkSwapchainKHR& swapchain, std::vector<VkImage>& swapchainImages, VkFormat& swapchainImageFormat, VkExtent2D& swapchainExtent) {
+        const SwapchainSupportDetails swapchainSupport = querySwapchainSupport(physicalDevice, surface);
 
-        VkSurfaceFormatKHR surfaceFormat = chooseSwapSurfaceFormat(swapchainSupport.formats);
-        VkPresentModeKHR presentMode = chooseSwapPresentMode(swapchainSupport.presentModes);
-        VkExtent2D extent = chooseSwapExtent(swapchainSupport.capabilities, window);
+        const VkSurfaceFormatKHR surfaceFormat = chooseSwapSurfaceFormat(swapchainSupport.formats);
+        const VkPresentModeKHR presentMode = chooseSwapPresentMode(swapchainSupport.presentModes);
+
+        // Width / Height
+        const VkExtent2D extent = chooseSwapExtent(swapchainSupport.capabilities, window);
 
         uint32_t imageCount = swapchainSupport.capabilities.minImageCount + 1;
         if (swapchainSupport.capabilities.maxImageCount > 0 && imageCount > swapchainSupport.capabilities.maxImageCount) {
