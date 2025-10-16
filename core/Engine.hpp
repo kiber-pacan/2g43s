@@ -1,10 +1,10 @@
-#ifndef ENGINE_H
-#define ENGINE_H
+#ifndef ENGINE_HPP
+#define ENGINE_HPP
 
 #include <SDL3/SDL_vulkan.h>
 
-#include "Tools.hpp"
-#include "Logger.hpp"
+#include "sep/util/Tools.hpp"
+#include "sep/util/Logger.hpp"
 #include "sep/util/Debug.hpp"
 #include "sep/device/LogDevice.hpp"
 #include "sep/device/PhysDevice.hpp"
@@ -17,6 +17,7 @@
 #include "sep/model/bus/ModelBus.hpp"
 #include "sep/model/ModelInstance.hpp"
 #include "sep/model/ParsedModel.hpp"
+#include <ranges>
 
 // Parameters
 inline int HEIGHT = 720;
@@ -31,44 +32,24 @@ public:
         initialize(window);
     }
 
-    static void updateUniformBuffer(const uint32_t currentImage, const VkExtent2D& swapchainExtent, const std::vector<void*>& uniformBuffersMapped, Graphics::UniformBufferObject& ubo, const glm::vec3 pos, const Camera& camera) {
+    static void updateUniformBuffer(const uint32_t currentImage, const VkExtent2D& swapchainExtent, const std::vector<void*>& uniformBuffersMapped, UniformBufferObject& ubo, const glm::vec3 pos, const Camera& camera) {
         ubo.view = glm::lookAt(camera.pos + glm::vec3(0), camera.pos + camera.look, glm::vec3(0.0f, 0.0f, 1.0f));
-        ubo.proj = glm::perspective(camera.fov,  (float) swapchainExtent.width / (float) swapchainExtent.height, 0.1f, 4096.0f);
+        ubo.proj = glm::perspective(camera.fov,  static_cast<float>(swapchainExtent.width) / static_cast<float>(swapchainExtent.height), 0.1f, 4096.0f);
         ubo.proj[1][1] *= -1;
         memcpy(uniformBuffersMapped[currentImage], &ubo, sizeof(ubo));
     }
 
-    /*static void updateModelBuffer(const uint32_t currentImage, const std::vector<void*>& modelBufferMapped, Graphics::ModelBufferObject& mbo, const std::vector<ModelInstance>& mdls_i, const uint32_t& currentFrame) {
-        if (mbo.mdls.size() != mdls_i.size()) {
-            mbo.mdls.clear();
-            for (const auto& mdl_i : mdls_i) {
-                mbo.mdls.emplace_back(mdl_i.mdlMat);
-            }
-        }
-
-        if (mbo.dirty) {
-            mbo.frame += 1;
-            memcpy(modelBufferMapped[currentImage], mbo.mdls.data(), sizeof(mbo.mdls[0]) * mbo.mdls.size());
-
-            if (mbo.frame == MAX_FRAMES_IN_FLIGHT) {
-                mbo.dirty = false;
-            }
-        }
-    }*/
-
-    static void updateModelDataBuffer(const uint32_t currentImage, const std::vector<void*>& modelDataBuffersMapped, Graphics::ModelDataBufferObject& mdbo, const std::vector<ModelInstance>& mdls_i, const uint32_t& currentFrame) {
-        const size_t count = mdls_i.size();
-        if (mdbo.pos.size() != count) {
+    static void updateModelDataBuffer(const uint32_t currentImage, const std::vector<void*>& modelDataBuffersMapped, ModelDataBufferObject& mdbo, const ModelBus& mdlBus, const uint32_t& currentFrame) {
+        if (mdlBus.dirtyCommands) {
             mdbo.pos.clear();
             mdbo.rot.clear();
             mdbo.scl.clear();
-            mdbo.pos.reserve(count);
-            mdbo.rot.reserve(count);
-            mdbo.scl.reserve(count);
-            for (const auto& mdl_i : mdls_i) {
-                mdbo.pos.emplace_back(mdl_i.pos);
-                mdbo.rot.emplace_back(mdl_i.rot);
-                mdbo.scl.emplace_back(mdl_i.scl);
+            for (const auto& group : std::views::transform(std::views::values(mdlBus.groups_map), &ModelGroup::instances)) {
+                for (const auto& instance : group) {
+                    mdbo.pos.emplace_back(instance.pos);
+                    mdbo.rot.emplace_back(instance.rot);
+                    mdbo.scl.emplace_back(instance.scl);
+                }
             }
         }
         
@@ -107,7 +88,7 @@ public:
         }
 
         updateUniformBuffer(currentFrame, swapchainExtent, uniformBuffersMapped, ubo, glm::vec3(), camera);
-        updateModelDataBuffer(currentFrame, modelDataBuffersMapped, mdbo, mdlBus.mdls_i, currentFrame);
+        updateModelDataBuffer(currentFrame, modelDataBuffersMapped, mdbo, mdlBus, currentFrame);
 
         //updateModelBuffer(currentFrame, modelBuffersMapped, mbo, mdlBus.mdls_i, currentFrame);
 
@@ -171,7 +152,7 @@ public:
 
 
     // Clean trash before closing app
-    void cleanup() {
+    void cleanup() const {
         vkDeviceWaitIdle(device);
 
 
@@ -246,25 +227,29 @@ public:
     #pragma endregion
 
     #pragma region PublicVars
+    // Window
+    SDL_Window* window{};
+
     // Session ID
     uint64_t sid{};
+
+
+    Color clear_color = Color::hex(0x80c4b5);
 
     // Devices
     VkPhysicalDevice physicalDevice{};
     VkDevice device{};
 
     bool framebufferResized = false;
-    Graphics::UniformBufferObject ubo{};
-    Graphics::ModelBufferObject mbo{};
-    Graphics::ModelDataBufferObject mdbo{};
+    UniformBufferObject ubo{};
+    ModelBufferObject mbo{};
+    ModelDataBufferObject mdbo{};
 
-    // Controls
     // Controls
     Camera camera{};
 
     Delta *deltaT{};
 
-    Color clear_color = Color::hex(0x80c4b5);
     ModelBus mdlBus{};
     #pragma endregion PublicVars
 
@@ -281,7 +266,6 @@ private:
 
     // Window
     VkSurfaceKHR surface{};
-    SDL_Window* window{};
 
     // Queues
     VkQueue presentQueue{};
@@ -371,9 +355,9 @@ private:
 
     #pragma endregion
 
-    // Initializaiton of engine and its counterparts
+    // Initialization of engine and its counterparts
     void initialize(SDL_Window* window) {
-        auto start = std::chrono::high_resolution_clock::now();
+        const auto start = std::chrono::high_resolution_clock::now();
 
         this->window = window;
 
@@ -449,7 +433,7 @@ private:
     }
 
 
-    void cleanupSwapchain() {
+    void cleanupSwapchain() const {
         vkDestroyImage(device, depthImage, nullptr);
         vkFreeMemory(device, depthImageMemory, nullptr);
         vkDestroyImageView(device, depthImageView, nullptr);
@@ -561,4 +545,4 @@ private:
     }
 };
 
-#endif //ENGINE_H
+#endif //ENGINE_HPP
