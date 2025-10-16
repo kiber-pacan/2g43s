@@ -8,14 +8,14 @@
 #include "cmath"
 
 struct MouseListener {
-    static void listen(SDL_Event *e, SDL_Window* win, Camera& camera) {
+    static void listen(Camera& camera) {
         float x, y;
 
         SDL_GetRelativeMouseState(&x, &y);
         moveCamera(x, y, camera);
     }
 
-    static void moveCamera(float x, float y, Camera& camera) {
+    static void moveCamera(const float& x, const float& y, Camera& camera) {
         float& pitch = camera.pitch;
         float& yaw = camera.yaw;
 
