@@ -1,9 +1,9 @@
 #Set cmake version
 cmake_minimum_required(VERSION 3.28)
 
-#Setting c++ 23 standard
-set(CMAKE_CXX_STANDARD 23)
-set(DCMAKE_CXX_STANDARD 23)
+#Setting c++ 26 standard
+set(CMAKE_CXX_STANDARD 26)
+set(DCMAKE_CXX_STANDARD 26)
 set(CMAKE_CXX_STANDARD_REQUIRED on)
 set(CMAKE_CXX_EXTENSIONS off)
 
@@ -15,8 +15,8 @@ add_executable(${EXECUTABLE_NAME}
         main.cpp
 
         core/Engine.hpp
-        core/Tools.hpp
-        core/Logger.hpp
+        core/sep/util/Tools.hpp
+        core/sep/util/Logger.hpp
 
         core/sep/camera/Camera.hpp
 
@@ -46,11 +46,15 @@ add_executable(${EXECUTABLE_NAME}
         core/sep/model/primitives/Vertex.hpp
         core/sep/entity/CameraEntity.hpp
         core/sep/util/Random.hpp
-        core/sep/model/primitives/Shere.hpp
+        core/sep/model/primitives/Sphere.hpp
         core/sep/buffers/UniformBufferObject.hpp
         core/sep/buffers/ModelBufferObject.hpp
         core/sep/buffers/ModelDataBufferObject.hpp
         core/sep/model/bus/ModelBus.cpp
+)
+
+target_include_directories(${EXECUTABLE_NAME} PRIVATE
+        ${PROJECT_SOURCE_DIR}/core/sep
 )
 
 set(CMAKE_CXX_FLAGS_RELEASE "-Ofast -march=native -flto -funroll-loops -fomit-frame-pointer -ffast-math -fno-math-errno -DNDEBUG")
