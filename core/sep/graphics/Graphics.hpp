@@ -1,7 +1,7 @@
 #ifndef GRAPHICS_H
 #define GRAPHICS_H
 
-#include <fstream>
+ #include <fstream>
 #include <bits/fs_fwd.h>
 #include <vulkan/vulkan.h>
 #include <filesystem>
@@ -11,35 +11,20 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <chrono>
 #define STB_IMAGE_IMPLEMENTATION
-#include "../model/bus/ModelBus.hpp"
 #include "stb/stb_image.h"
-#include "../model/primitives/Vertex.hpp"
-#include "../../Tools.hpp"
+
+#include "model/bus/ModelBus.hpp"
+#include "model/primitives/Vertex.hpp"
+#include "../util/Tools.hpp"
+
+#include "buffers/UniformBufferObject.hpp"
+#include "buffers/ModelBufferObject.hpp"
+#include "buffers/ModelDataBufferObject.hpp"
 
 
 namespace fs = std::filesystem;
 
 struct Graphics {
-    // Vertex shader stuff
-    struct UniformBufferObject {
-        glm::mat4 view;
-        glm::mat4 proj;
-    };
-
-    struct ModelBufferObject {
-        std::vector<glm::mat4> mdls;
-        bool dirty = true;
-        size_t frame = 0;
-    };
-
-    struct ModelDataBufferObject {
-        std::vector<glm::vec4> pos;
-        std::vector<glm::vec4> rot;
-        std::vector<glm::vec4> scl;
-        bool dirty = true;
-        size_t frame = 0;
-    };
-
     static VkShaderModule createShaderModule(const std::vector<char>& code, const VkDevice& device) {
         VkShaderModuleCreateInfo createInfo{};
         createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
@@ -492,7 +477,7 @@ struct Graphics {
     }
 
     static void createUniformBuffers(VkDevice& device, VkPhysicalDevice& physicalDevice, std::vector<VkBuffer>& uniformBuffers, std::vector<VkDeviceMemory>& uniformBuffersMemory, std::vector<void*>& uniformBuffersMapped, const int& MAX_FRAMES_IN_FLIGHT) {
-        VkDeviceSize bufferSize = sizeof(Graphics::UniformBufferObject);
+        VkDeviceSize bufferSize = sizeof(UniformBufferObject);
 
         uniformBuffers.resize(MAX_FRAMES_IN_FLIGHT);
         uniformBuffersMemory.resize(MAX_FRAMES_IN_FLIGHT);
@@ -506,7 +491,7 @@ struct Graphics {
     }
 
     static void createModelBuffers(VkDevice& device, VkPhysicalDevice& physicalDevice, std::vector<VkBuffer>& modelBuffers, std::vector<VkDeviceMemory>& modelBuffersMemory, std::vector<void*>& modelBuffersMapped, const int& MAX_FRAMES_IN_FLIGHT, const ModelBus& mdlBus) {
-        const VkDeviceSize bufferSize = sizeof(mdlBus.mdls_i[0]) * mdlBus.mdls_i.size();
+        const VkDeviceSize bufferSize = mdlBus.getModelBufferSize();
 
         modelBuffers.resize(MAX_FRAMES_IN_FLIGHT);
         modelBuffersMemory.resize(MAX_FRAMES_IN_FLIGHT);
@@ -520,7 +505,7 @@ struct Graphics {
     }
 
     static void createModelDataBuffers(VkDevice& device, VkPhysicalDevice& physicalDevice, std::vector<VkBuffer>& modelDataBuffers, std::vector<VkDeviceMemory>& modelDataBuffersMemory, std::vector<void*>& modelDataBuffersMapped, const int& MAX_FRAMES_IN_FLIGHT, const ModelBus& mdlBus) {
-        const VkDeviceSize bufferSize = sizeof(glm::vec4) * mdlBus.mdls_i.size() * 3;
+        const VkDeviceSize bufferSize = mdlBus.createModelDataBuffers();
 
         modelDataBuffers.resize(MAX_FRAMES_IN_FLIGHT);
         modelDataBuffersMemory.resize(MAX_FRAMES_IN_FLIGHT);
@@ -662,7 +647,7 @@ struct Graphics {
             VkDescriptorBufferInfo mboBufferInfo{};
             mboBufferInfo.buffer = modelBuffers[i];
             mboBufferInfo.offset = 0;
-            mboBufferInfo.range = sizeof(mdlBus.mdls_i[0]) * mdlBus.mdls_i.size();
+            mboBufferInfo.range = mdlBus.getModelBufferSize();
 
             std::array<VkWriteDescriptorSet, 3> descriptorWrites{};
 
@@ -763,7 +748,7 @@ struct Graphics {
             VkDescriptorBufferInfo mboBufferInfo{};
             mboBufferInfo.buffer = modelBuffers[i];
             mboBufferInfo.offset = 0;
-            mboBufferInfo.range = sizeof(mdlBus.mdls_i[0]) * mdlBus.mdls_i.size();
+            mboBufferInfo.range = mdlBus.getModelBufferSize();
 
             std::array<VkWriteDescriptorSet, 2> descriptorWrites{};
 
@@ -847,15 +832,15 @@ struct Graphics {
             int32_t vertexOffset = 0;
             uint32_t firstInstance = 0;
 
-            for (size_t i = 0; i < mdlBus.mdls.size(); i++) {
-                const auto& mdl = mdlBus.mdls[i];
-                size_t instanceCount = mdlBus.getInstanceCount(mdl);
-                uint32_t indexCount = mdl->indices.size();
+            for (auto it = mdlBus.groups_map.begin(); it != mdlBus.groups_map.end(); it++) {
+                const auto& file = it->first;
+                size_t instanceCount = mdlBus.getInstanceCount(file);
+                uint32_t indexCount = mdlBus.getIndexCount(file);
 
                 mdlBus.addCommands(indexCount, instanceCount, firstIndex, vertexOffset, firstInstance);
 
                 firstIndex += indexCount;
-                vertexOffset += ModelBus::getVertexCount(mdl);
+                vertexOffset += mdlBus.getVertexCount(file);
                 firstInstance += instanceCount;
             }
 
@@ -872,7 +857,7 @@ struct Graphics {
             }
 
             const uint32_t workgroupSize = 256;
-            const size_t totalInstances = mdlBus.mdls_i.size();
+            const size_t totalInstances = mdlBus.getTotalInstanceCount();
             uint32_t groupCount = (totalInstances + workgroupSize - 1) / workgroupSize;
 
             vkCmdDispatch(commandBuffer, groupCount, 1, 1);
@@ -1086,7 +1071,6 @@ struct Graphics {
 
         VkPhysicalDeviceFeatures supportedFeatures;
         vkGetPhysicalDeviceFeatures(physicalDevice, &supportedFeatures);
-
         supportedFeatures.samplerAnisotropy ? samplerInfo.anisotropyEnable = VK_TRUE : VK_FALSE;
 
         VkPhysicalDeviceProperties properties{};
