@@ -17,10 +17,10 @@ struct Entity {
     glm::vec4 scl{};
 
     explicit Entity(
-        const glm::vec4 p = glm::vec4(0.0f),
-        const glm::vec4 r = glm::vec4(0.0f),
-        const glm::vec4 s = glm::vec4(1.0f)
-    ) : pos(p), rot(r), scl(s) {}
+        const glm::vec4 pos = glm::vec4(0.0f),
+        const glm::vec4 rot = glm::vec4(0.0f),
+        const glm::vec4 scl = glm::vec4(1.0f)
+    ) : pos(pos), rot(rot), scl(scl) {}
 
     virtual void respawn() {
         pos = glm::vec4(0.0f);
