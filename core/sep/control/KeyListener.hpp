@@ -28,7 +28,7 @@ struct KeyListener {
     std::vector<KeyBinding*> keys;
 
 
-    void listen(SDL_Event *e, Engine& eng, bool& quit) {
+    void listen(const SDL_Event *e) const {
         for (KeyBinding* key : keys) {
             if (e->type == SDL_EVENT_KEY_UP && e->key.scancode == key->code) {
                 key->down = false;
@@ -38,7 +38,7 @@ struct KeyListener {
         }
     }
 
-    void iterateKeys(Engine& eng, bool& quit) {
+    void iterateKeys(Engine& eng, bool& quit) const {
         // Movement
         if (keys[0]->down) {
             eng.camera.pos += eng.camera.speed * eng.camera.look * eng.deltaT->d;
