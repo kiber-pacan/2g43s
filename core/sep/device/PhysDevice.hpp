@@ -74,6 +74,11 @@ struct PhysDevice {
             return 0;
         }
 
+        // Maybe you should make your engine work without multiDrawIndirect?
+        if (!deviceFeatures.multiDrawIndirect) {
+            return 0;
+        }
+
         bool extensionsSupport = checkDeviceExtensionSupport(device);
         bool swapChainAdequate = false;
         if (extensionsSupport) {
