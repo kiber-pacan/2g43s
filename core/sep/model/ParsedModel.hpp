@@ -3,7 +3,7 @@
 #include <vector>
 
 #include "primitives/Vertex.hpp"
-#include "../../Logger.hpp"
+#include "../util/Logger.hpp"
 #include "fastgltf/core.hpp"
 #include "fastgltf/tools.hpp"
 
@@ -11,9 +11,10 @@ class ParsedModel {
     public:
     std::vector<std::vector<Vertex>> meshes{};
     std::vector<uint32_t> indices{};
-    std::string name;
 
-    explicit ParsedModel(std::filesystem::path& path) {
+    ParsedModel() = default;
+
+    explicit ParsedModel(const std::string& path) {
         loadModel(loadAsset(path));
     }
 
