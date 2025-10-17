@@ -8,6 +8,8 @@
 struct ModelInstance final : Entity {
     std::weak_ptr<ParsedModel> mdl;
 
+    ModelInstance() = default;
+
     explicit ModelInstance(const std::shared_ptr<ParsedModel>& mdl,
                            glm::vec4 pos = glm::vec4(0.0f),
                            glm::vec4 rot = glm::vec4(0.0f),

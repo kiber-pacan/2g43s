@@ -9,6 +9,7 @@
 
 
 #include "../../util/Random.hpp"
+#include "model/primitives/Sphere.hpp"
 
 struct ModelGroup {
     std::shared_ptr<ParsedModel> model{};
@@ -57,25 +58,36 @@ struct ModelBus {
 
     VkDeviceSize getModelBufferSize() const;
 
-    VkDeviceSize createModelDataBuffers() const;
-
-
-    std::vector<uint32_t> getIndices() const;
-
-    std::vector<Vertex> getVertices() const;
+    VkDeviceSize getModelDataBufferSize() const;
     #pragma endregion
 
 
-    #pragma region helper
+    #pragma region data
+    // Model loading methods
+    std::vector<uint32_t> getAllIndices() const;
+
+    std::vector<uint32_t> getIndices(const std::string& file) const;
+
+
+    std::vector<Vertex> getAllVertices() const;
+
+    std::vector<Vertex> getVertices(const std::string& file) const;
+    #pragma endregion
+
+
+    #pragma region count
     size_t modelsCount() const;
+
 
     size_t getInstanceCount(const std::string& file) const;
 
     size_t getTotalInstanceCount() const;
 
+
     uint32_t getIndexCount(const std::string& name) const;
 
     static uint32_t getIndexCount(const std::shared_ptr<ParsedModel>& model);
+
 
     int32_t getVertexCount(const std::string& name) const;
 

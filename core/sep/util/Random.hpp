@@ -7,8 +7,9 @@ struct Random {
 
     inline static std::mt19937_64 rE{rD()};
     inline static std::vector<std::default_random_engine> rD_T = [] {
+        // Creating random engine for each thread in advance
         std::random_device r;
-        size_t threads = omp_get_max_threads();
+        const size_t threads = omp_get_max_threads();
 
         std::vector<std::default_random_engine> temp;
         temp.resize(threads);
@@ -18,6 +19,7 @@ struct Random {
         return temp;
     }();
 
+    // Basic random function
     template<typename T>
     static T randomNum(T min, T max) {
         if constexpr (std::is_integral_v<T>) {
@@ -29,10 +31,9 @@ struct Random {
         }
     }
 
-
+    // Thread safe randomNum function
     template<typename T>
     static T randomNum_T(T min, T max) {
-        // Каждый поток создаёт свой генератор один раз, seed от random_device
         thread_local std::mt19937_64 rE_T{std::random_device{}()};
 
         if constexpr (std::is_integral_v<T>) {

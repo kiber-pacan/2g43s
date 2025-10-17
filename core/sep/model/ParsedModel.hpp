@@ -1,21 +1,26 @@
 #ifndef PARSEDMODEL_H
 #define PARSEDMODEL_H
+#include <ranges>
 #include <vector>
+#include <glm/ext/quaternion_geometric.hpp>
 
 #include "primitives/Vertex.hpp"
 #include "../util/Logger.hpp"
 #include "fastgltf/core.hpp"
 #include "fastgltf/tools.hpp"
+#include "primitives/Sphere.hpp"
 
 class ParsedModel {
     public:
     std::vector<std::vector<Vertex>> meshes{};
     std::vector<uint32_t> indices{};
+    glm::vec4 sphere{};
 
     ParsedModel() = default;
 
     explicit ParsedModel(const std::string& path) {
         loadModel(loadAsset(path));
+        calcOcclusionSphere();
     }
 
     static fastgltf::Asset loadAsset(const std::filesystem::path& path) {
@@ -92,6 +97,29 @@ class ParsedModel {
                 this->indices.append_range(tempIndices);
             }
         }
+    }
+
+
+    void calcOcclusionSphere() {
+        std::vector<Vertex> vertices; vertices.append_range(std::views::join(meshes));
+
+        // Center
+        for (const Vertex& p : vertices) {
+            sphere.x += p.pos.x;
+            sphere.y += p.pos.y;
+            sphere.z += p.pos.z;
+        }
+
+        sphere /= static_cast<float>(vertices.size());
+
+        // Radius
+        for (const Vertex& p : vertices) {
+            glm::vec3 vec = glm::vec3(sphere.x, sphere.y, sphere.z);
+            sphere.w = std::max(sphere.w, glm::length(p.pos - vec));
+        }
+
+        std::cout << sphere.x << " " << sphere.y << " " << sphere.z << std::endl;
+        std::cout << sphere.w << std::endl;
     }
 };
 

@@ -41,6 +41,7 @@ std::shared_ptr<ParsedModel> ModelBus::getModel(const std::string& file) {
 
 
 #pragma region instanceModels
+/// TIP args: pos, rot, scl (MAX 3 ELEMENTS)
 void ModelBus::createModelInstance(const std::string& file, const auto&... args) {
     static_assert(sizeof...(args) <= 3, "Maximum 3 arguments allowed!");
 
@@ -83,30 +84,37 @@ VkDeviceSize ModelBus::getModelBufferSize() const {
     return bufferSize;
 }
 
-VkDeviceSize ModelBus::createModelDataBuffers() const {
+VkDeviceSize ModelBus::getModelDataBufferSize() const {
     VkDeviceSize bufferSize = 0;
-    for (const auto& instance : std::views::transform(std::views::values(groups_map), &ModelGroup::instances)) {;
-        bufferSize += sizeof(glm::vec4) * instance.size() * 3;
+    for (const auto& instance : std::views::transform(std::views::values(groups_map), &ModelGroup::instances)) {
+        bufferSize += sizeof(glm::vec4) * instance.size() * 4;
     }
 
     return bufferSize;
 }
+#pragma endregion
 
 
-std::vector<uint32_t> ModelBus::getIndices() const {
+#pragma region data
+// Model loading methods
+std::vector<uint32_t> ModelBus::getAllIndices() const {
     std::vector<uint32_t> indices{};
     for (const auto& model : std::views::transform(std::views::values(groups_map), &ModelGroup::model)) {
         indices.append_range(model->indices);
     }
 
-    for (uint32_t index : indices) {
-        //std::cout << index << std::endl;
-    }
-
     return indices;
 }
 
-std::vector<Vertex> ModelBus::getVertices() const {
+std::vector<uint32_t> ModelBus::getIndices(const std::string& file) const {
+    if (const auto& it = groups_map.find(file); it != groups_map.end()) {
+        return it->second.model->indices;
+    }
+    return {};
+}
+
+
+std::vector<Vertex> ModelBus::getAllVertices() const {
     std::vector<Vertex> vertices{};
 
     for (const auto& model : std::views::transform(std::views::values(groups_map), &ModelGroup::model)) {
@@ -115,8 +123,17 @@ std::vector<Vertex> ModelBus::getVertices() const {
         }
     }
 
-    for (Vertex vertex : vertices) {
-        //std::cout << vertex.pos.x << " " << vertex.pos.y << " " << vertex.pos.z << std::endl;
+    return vertices;
+}
+
+std::vector<Vertex> ModelBus::getVertices(const std::string& file) const {
+    std::vector<Vertex> vertices{};
+
+    if (const auto& it = groups_map.find(file); it != groups_map.end()) {
+        const auto& meshes = it->second.model->meshes;
+        std::for_each(meshes.begin(), meshes.end(), [&vertices](const auto& mesh) {
+            vertices.append_range(mesh);
+        });
     }
 
     return vertices;
@@ -124,10 +141,11 @@ std::vector<Vertex> ModelBus::getVertices() const {
 #pragma endregion
 
 
-#pragma region helper
+#pragma region count
 size_t ModelBus::modelsCount() const {
     return groups_map.size();
 }
+
 
 size_t ModelBus::getInstanceCount(const std::string& file) const {
     if (const auto& it = groups_map.find(file); it != groups_map.end()) {
@@ -143,6 +161,7 @@ size_t ModelBus::getTotalInstanceCount() const {
         return sum + instance.size();
     });
 }
+
 
 uint32_t ModelBus::getIndexCount(const std::string& name) const {
     return groups_map.at(name).model->indices.size();
@@ -184,34 +203,25 @@ void ModelBus::addCommands(uint32_t indexCount, uint32_t instanceCount, uint32_t
 
 
 void ModelBus::test() {
-    loadModels("/home/down1/2g43s/core/models/", "cube.glb", "landscape.glb");
+    loadModels("/home/down1/2g43s/core/models/", "cube.glb");
 
-    auto start = std::chrono::high_resolution_clock::now();
-    static size_t count = 100;
-
-    std::vector<ModelInstance> localInstances;
-    localInstances.reserve(count);
-
-    #pragma omp parallel
-    {
-        std::vector<ModelInstance> threadLocal;
-        threadLocal.reserve(count / omp_get_num_threads());
-
-        #pragma omp for
-        for (int i = 0; i < count; ++i) {
-            const glm::vec4 temp(Random::randomNum_T<float>(-10.f, 10.f), Random::randomNum_T<float>(-10.f, 10.f), Random::randomNum_T<float>(-10.f, 10.f), 0 );
-            threadLocal.emplace_back(groups_map["cube.glb"].model, temp, temp);
-        }
-
-        #pragma omp critical
-        localInstances.insert(localInstances.end(), threadLocal.begin(), threadLocal.end());
-    }
+    const auto start = std::chrono::high_resolution_clock::now();
+    static constexpr size_t count = 1000000;
 
     auto& cubeGroup = groups_map["cube.glb"];
-    cubeGroup.instances.insert(cubeGroup.instances.end(), localInstances.begin(),localInstances.end());
+    cubeGroup.instances.resize(count);
 
-    auto end = std::chrono::high_resolution_clock::now();
-    std::chrono::duration<double> duration = end - start;
+    #pragma omp parallel for schedule(static) default(none) shared(count, cubeGroup)
+    for (int i = 0; i < count; ++i) {
+        const glm::vec4 pos(Random::randomNum_T<float>(-1000.f, 1000.f), Random::randomNum_T<float>(-1000.f, 1000.f), Random::randomNum_T<float>(-1000.f, 1000.f), 0);
+        const glm::vec4 pos1(Random::randomNum_T<float>(-1.f, 1.f), Random::randomNum_T<float>(-1.f, 1.f), Random::randomNum_T<float>(-1.f, 1.f), 0);
 
-    LOGGER->success("Loaded ${} instances in ${} seconds!", groups_map.size(), duration.count());
+
+        cubeGroup.instances[i] = ModelInstance(groups_map["cube.glb"].model, pos, pos1);
+    }
+
+    const auto end = std::chrono::high_resolution_clock::now();
+    const std::chrono::duration<double> duration = end - start;
+
+    LOGGER->success("Loaded ${} instances in ${} seconds!", getTotalInstanceCount(), duration.count());
 }

@@ -20,6 +20,8 @@
 #include "buffers/UniformBufferObject.hpp"
 #include "buffers/ModelBufferObject.hpp"
 #include "buffers/ModelDataBufferObject.hpp"
+#include "buffers/AtomicCounterObject.hpp"
+
 
 
 namespace fs = std::filesystem;
@@ -42,8 +44,8 @@ struct Graphics {
     #pragma region Main
 
     static void createGraphicsPipeline(VkDevice& device, VkPipelineLayout& pipelineLayout, VkRenderPass& renderPass, VkPipeline& graphicsPipeline, VkDescriptorSetLayout& descriptorSetLayout) {
-        auto vertShaderCode = Tools::readFile("/home/down1/2g43s/core/shaders/vert.spv");
-        auto fragShaderCode = Tools::readFile("/home/down1/2g43s/core/shaders/frag.spv");
+        auto vertShaderCode = Tools::readFile("/home/down1/2g43s/core/shaders/vertex.spv");
+        auto fragShaderCode = Tools::readFile("/home/down1/2g43s/core/shaders/fragment.spv");
 
         VkShaderModule vertShaderModule = createShaderModule(vertShaderCode, device);
         VkShaderModule fragShaderModule = createShaderModule(fragShaderCode, device);
@@ -171,10 +173,10 @@ struct Graphics {
         vkDestroyShaderModule(device, vertShaderModule, nullptr);
     }
 
-    static void createComputePipeline(VkDevice& device, VkDescriptorSetLayout& descriptorSetLayout, VkPipelineLayout& computePipelineLayout, VkPipeline& computePipeline) {
-        auto compShaderCode = Tools::readFile("/home/down1/2g43s/core/shaders/comp.spv");
+    static void createMatrixComputePipeline(VkDevice& device, VkDescriptorSetLayout& matrixComputeDescriptorSetLayout, VkPipelineLayout& matrixComputePipelineLayout, VkPipeline& matrixComputePipeline) {
+        auto matricesShaderCode = Tools::readFile("/home/down1/2g43s/core/shaders/matrices.spv");
 
-        VkShaderModule compShaderModule = createShaderModule(compShaderCode, device);
+        VkShaderModule compShaderModule = createShaderModule(matricesShaderCode, device);
 
         VkPipelineShaderStageCreateInfo compShaderStageInfo{};
         compShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
@@ -185,18 +187,18 @@ struct Graphics {
         VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
         pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
         pipelineLayoutInfo.setLayoutCount = 1;
-        pipelineLayoutInfo.pSetLayouts = &descriptorSetLayout;
+        pipelineLayoutInfo.pSetLayouts = &matrixComputeDescriptorSetLayout;
 
-        if (vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &computePipelineLayout) != VK_SUCCESS) {
+        if (vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &matrixComputePipelineLayout) != VK_SUCCESS) {
             throw std::runtime_error("failed to create compute pipeline layout!");
         }
 
         VkComputePipelineCreateInfo pipelineInfo{};
         pipelineInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
         pipelineInfo.stage = compShaderStageInfo;
-        pipelineInfo.layout = computePipelineLayout;
+        pipelineInfo.layout = matrixComputePipelineLayout;
 
-        if (vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &computePipeline) != VK_SUCCESS) {
+        if (vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &matrixComputePipeline) != VK_SUCCESS) {
             throw std::runtime_error("failed to create compute pipeline!");
         }
         vkDestroyShaderModule(device, compShaderModule, nullptr);
@@ -440,7 +442,7 @@ struct Graphics {
         VkDeviceMemory stagingBufferMemory;
         createBuffer(device, physicalDevice, bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
 
-        std::vector<Vertex> vertices = mdlBus.getVertices();
+        std::vector<Vertex> vertices = mdlBus.getAllVertices();
         void* data;
         vkMapMemory(device, stagingBufferMemory, 0, bufferSize, 0, &data);
 
@@ -462,7 +464,7 @@ struct Graphics {
         VkDeviceMemory stagingBufferMemory;
         createBuffer(device, physicalDevice, bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
 
-        std::vector<u_int32_t> indices = mdlBus.getIndices();
+        std::vector<u_int32_t> indices = mdlBus.getAllIndices();
         void* data;
         vkMapMemory(device, stagingBufferMemory, 0, bufferSize, 0, &data);
         memcpy(data, indices.data(), (size_t) bufferSize);
@@ -505,7 +507,7 @@ struct Graphics {
     }
 
     static void createModelDataBuffers(VkDevice& device, VkPhysicalDevice& physicalDevice, std::vector<VkBuffer>& modelDataBuffers, std::vector<VkDeviceMemory>& modelDataBuffersMemory, std::vector<void*>& modelDataBuffersMapped, const int& MAX_FRAMES_IN_FLIGHT, const ModelBus& mdlBus) {
-        const VkDeviceSize bufferSize = mdlBus.createModelDataBuffers();
+        const VkDeviceSize bufferSize = mdlBus.getModelDataBufferSize();
 
         modelDataBuffers.resize(MAX_FRAMES_IN_FLIGHT);
         modelDataBuffersMemory.resize(MAX_FRAMES_IN_FLIGHT);
@@ -515,6 +517,20 @@ struct Graphics {
             createBuffer(device, physicalDevice, bufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, modelDataBuffers[i], modelDataBuffersMemory[i]);
 
             vkMapMemory(device, modelDataBuffersMemory[i], 0, bufferSize, 0, &modelDataBuffersMapped[i]);
+        }
+    }
+
+    static void createAtomicCounterBuffers(VkDevice& device, VkPhysicalDevice& physicalDevice, std::vector<VkBuffer>& atomicCounterBuffers, std::vector<VkDeviceMemory>& atomicCounterBuffersMemory, std::vector<void*>& atomicCounterBuffersMapped, const int& MAX_FRAMES_IN_FLIGHT) {
+        const VkDeviceSize bufferSize = sizeof(uint32_t);
+
+        atomicCounterBuffers.resize(MAX_FRAMES_IN_FLIGHT);
+        atomicCounterBuffersMemory.resize(MAX_FRAMES_IN_FLIGHT);
+        atomicCounterBuffersMapped.resize(MAX_FRAMES_IN_FLIGHT);
+
+        for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+            createBuffer(device, physicalDevice, bufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, atomicCounterBuffers[i], atomicCounterBuffersMemory[i]);
+
+            vkMapMemory(device, atomicCounterBuffersMemory[i], 0, bufferSize, 0, &atomicCounterBuffersMapped[i]);
         }
     }
 
@@ -680,7 +696,7 @@ struct Graphics {
     }
 
 
-    static void createComputeDescriptorSetLayout(VkDevice& device, VkDescriptorSetLayout& computeDescriptorSetLayout) {
+    static void createMatrixComputeDescriptorSetLayout(VkDevice& device, VkDescriptorSetLayout& matrixComputeDescriptorSetLayout) {
         VkDescriptorSetLayoutBinding mdboLayoutBinding{};
         mdboLayoutBinding.binding = 0;
         mdboLayoutBinding.descriptorCount = 1;
@@ -695,25 +711,45 @@ struct Graphics {
         mboLayoutBinding.pImmutableSamplers = nullptr;
         mboLayoutBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
 
-        std::array<VkDescriptorSetLayoutBinding, 2> bindings = {mdboLayoutBinding, mboLayoutBinding};
+        VkDescriptorSetLayoutBinding uboLayoutBinding{};
+        uboLayoutBinding.binding = 2;
+        uboLayoutBinding.descriptorCount = 1;
+        uboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        uboLayoutBinding.pImmutableSamplers = nullptr;
+        uboLayoutBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+
+        VkDescriptorSetLayoutBinding atomic_counterLayoutBinding{};
+        atomic_counterLayoutBinding.binding = 3;
+        atomic_counterLayoutBinding.descriptorCount = 1;
+        atomic_counterLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        atomic_counterLayoutBinding.pImmutableSamplers = nullptr;
+        atomic_counterLayoutBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+
+        std::array<VkDescriptorSetLayoutBinding, 4> bindings = {mdboLayoutBinding, mboLayoutBinding, uboLayoutBinding, atomic_counterLayoutBinding};
 
         VkDescriptorSetLayoutCreateInfo layoutInfo{};
         layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
         layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
         layoutInfo.pBindings = bindings.data();
 
-        if (vkCreateDescriptorSetLayout(device, &layoutInfo, nullptr, &computeDescriptorSetLayout) != VK_SUCCESS) {
+        if (vkCreateDescriptorSetLayout(device, &layoutInfo, nullptr, &matrixComputeDescriptorSetLayout) != VK_SUCCESS) {
             throw std::runtime_error("failed to create descriptor set layout!");
         }
     }
 
-    static void createComputeDescriptorPool(VkDevice& device, const int& MAX_FRAMES_IN_FLIGHT, VkDescriptorPool& computeDescriptorPool) {
-        std::array<VkDescriptorPoolSize, 2> poolSizes{};
+    static void createMatrixComputeDescriptorPool(VkDevice& device, const int& MAX_FRAMES_IN_FLIGHT, VkDescriptorPool& matrixComputeDescriptorPool) {
+        std::array<VkDescriptorPoolSize, 4> poolSizes{};
         poolSizes[0].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
         poolSizes[0].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
 
         poolSizes[1].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
         poolSizes[1].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
+
+        poolSizes[2].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        poolSizes[2].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
+
+        poolSizes[3].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        poolSizes[3].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
 
         VkDescriptorPoolCreateInfo poolInfo{};
         poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
@@ -721,21 +757,21 @@ struct Graphics {
         poolInfo.pPoolSizes = poolSizes.data();
         poolInfo.maxSets = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
 
-        if (vkCreateDescriptorPool(device, &poolInfo, nullptr, &computeDescriptorPool) != VK_SUCCESS) {
+        if (vkCreateDescriptorPool(device, &poolInfo, nullptr, &matrixComputeDescriptorPool) != VK_SUCCESS) {
             throw std::runtime_error("failed to create descriptor pool!");
         }
     }
 
-    static void createComputeDescriptorSets(const VkDevice device, const int& MAX_FRAMES_IN_FLIGHT, const VkDescriptorSetLayout& computeDescriptorSetLayout, const VkDescriptorPool& computeDescriptorPool, std::vector<VkDescriptorSet>& computeDescriptorSets, const std::vector<VkBuffer>& modelBuffers, const ModelBus& mdlBus, const std::vector<VkBuffer>& modelDataBuffers) {
-        std::vector layouts(MAX_FRAMES_IN_FLIGHT, computeDescriptorSetLayout);
+    static void createMatrixComputeDescriptorSets(const VkDevice& device, const int& MAX_FRAMES_IN_FLIGHT, const VkDescriptorSetLayout& matrixComputeDescriptorSetLayout, const VkDescriptorPool& matrixComputeDescriptorPool, std::vector<VkDescriptorSet>& matrixComputeDescriptorSets, const std::vector<VkBuffer>& modelBuffers, const ModelBus& mdlBus, const std::vector<VkBuffer>& modelDataBuffers, const std::vector<VkBuffer>& uniformBuffers, const std::vector<VkBuffer>&  atomicCounterBuffers) {
+        std::vector layouts(MAX_FRAMES_IN_FLIGHT, matrixComputeDescriptorSetLayout);
         VkDescriptorSetAllocateInfo allocInfo{};
         allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-        allocInfo.descriptorPool = computeDescriptorPool;
+        allocInfo.descriptorPool = matrixComputeDescriptorPool;
         allocInfo.descriptorSetCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
         allocInfo.pSetLayouts = layouts.data();
 
-        computeDescriptorSets.resize(MAX_FRAMES_IN_FLIGHT);
-        if (vkAllocateDescriptorSets(device, &allocInfo, computeDescriptorSets.data()) != VK_SUCCESS) {
+        matrixComputeDescriptorSets.resize(MAX_FRAMES_IN_FLIGHT);
+        if (vkAllocateDescriptorSets(device, &allocInfo, matrixComputeDescriptorSets.data()) != VK_SUCCESS) {
             throw std::runtime_error("failed to allocate descriptor sets!");
         }
 
@@ -750,10 +786,20 @@ struct Graphics {
             mboBufferInfo.offset = 0;
             mboBufferInfo.range = mdlBus.getModelBufferSize();
 
-            std::array<VkWriteDescriptorSet, 2> descriptorWrites{};
+            VkDescriptorBufferInfo uboBufferInfo{};
+            uboBufferInfo.buffer = uniformBuffers[i];
+            uboBufferInfo.offset = 0;
+            uboBufferInfo.range = sizeof(UniformBufferObject);
+
+            VkDescriptorBufferInfo atomic_counterBufferInfo{};
+            atomic_counterBufferInfo.buffer = atomicCounterBuffers[i];
+            atomic_counterBufferInfo.offset = 0;
+            atomic_counterBufferInfo.range = sizeof(uint32_t);
+
+            std::array<VkWriteDescriptorSet, 4> descriptorWrites{};
 
             descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            descriptorWrites[0].dstSet = computeDescriptorSets[i];
+            descriptorWrites[0].dstSet = matrixComputeDescriptorSets[i];
             descriptorWrites[0].dstBinding = 0;
             descriptorWrites[0].dstArrayElement = 0;
             descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
@@ -761,12 +807,28 @@ struct Graphics {
             descriptorWrites[0].pBufferInfo = &mdboBufferInfo;
 
             descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            descriptorWrites[1].dstSet = computeDescriptorSets[i];
+            descriptorWrites[1].dstSet = matrixComputeDescriptorSets[i];
             descriptorWrites[1].dstBinding = 1;
             descriptorWrites[1].dstArrayElement = 0;
             descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
             descriptorWrites[1].descriptorCount = 1;
             descriptorWrites[1].pBufferInfo = &mboBufferInfo;
+
+            descriptorWrites[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            descriptorWrites[2].dstSet = matrixComputeDescriptorSets[i];
+            descriptorWrites[2].dstBinding = 2;
+            descriptorWrites[2].dstArrayElement = 0;
+            descriptorWrites[2].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+            descriptorWrites[2].descriptorCount = 1;
+            descriptorWrites[2].pBufferInfo = &uboBufferInfo;
+
+            descriptorWrites[3].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            descriptorWrites[3].dstSet = matrixComputeDescriptorSets[i];
+            descriptorWrites[3].dstBinding = 3;
+            descriptorWrites[3].dstArrayElement = 0;
+            descriptorWrites[3].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+            descriptorWrites[3].descriptorCount = 1;
+            descriptorWrites[3].pBufferInfo = &atomic_counterBufferInfo;
 
             vkUpdateDescriptorSets(device, descriptorWrites.size(), descriptorWrites.data(), 0, nullptr);
         }
@@ -791,7 +853,7 @@ struct Graphics {
         }
     }
 
-    static void recordCommandBuffer(VkDevice& device, VkPhysicalDevice& physicalDevice, VkCommandPool& commandPool, VkQueue& graphicsQueue, VkCommandBuffer& commandBuffer, uint32_t imageIndex, VkRenderPass& renderPass, std::vector<VkFramebuffer>& swapChainFramebuffers, VkExtent2D& swapchainExtent, VkPipeline& graphicsPipeline, VkPipeline& computePipeline, VkBuffer& vertexBuffer, VkBuffer& indexBuffer, VkPipelineLayout& graphicsPipelineLayout, VkPipelineLayout& computePipelineLayout, std::vector<VkDescriptorSet>& graphicsDescriptorSets, std::vector<VkDescriptorSet>& computeDescriptorSets, uint32_t& currentFrame, Color clear_color, ModelBus& mdlBus, std::vector<VkBuffer>& modelBuffers, std::vector<VkBuffer> modelDataBuffers, VkBuffer& drawCommandsBuffer, VkDeviceMemory& drawCommandsBufferMemory, int MAX_FRAMES_IN_FLIGHT, bool& computeDirty) {
+    static void recordCommandBuffer(VkDevice& device, VkPhysicalDevice& physicalDevice, VkCommandPool& commandPool, VkQueue& graphicsQueue, VkCommandBuffer& commandBuffer, uint32_t imageIndex, VkRenderPass& renderPass, std::vector<VkFramebuffer>& swapChainFramebuffers, VkExtent2D& swapchainExtent, VkPipeline& graphicsPipeline, VkPipeline& computePipeline, VkBuffer& vertexBuffer, VkBuffer& indexBuffer, VkPipelineLayout& graphicsPipelineLayout, VkPipelineLayout& computePipelineLayout, std::vector<VkDescriptorSet>& graphicsDescriptorSets, std::vector<VkDescriptorSet>& computeDescriptorSets, uint32_t& currentFrame, Color clear_color, ModelBus& mdlBus, std::vector<VkBuffer>& modelBuffers, std::vector<VkBuffer> modelDataBuffers, VkBuffer& drawCommandsBuffer, VkDeviceMemory& drawCommandsBufferMemory, int MAX_FRAMES_IN_FLIGHT, bool& computeDirty, std::vector<void*>& atomicCounterBuffersMapped, std::vector<VkBuffer>& atomicCounterBuffers) {
         auto start = std::chrono::high_resolution_clock::now();
 
         VkCommandBufferBeginInfo beginInfo{};
@@ -827,28 +889,6 @@ struct Graphics {
 
         static size_t frame = 0;
 
-        if (mdlBus.dirtyCommands) {
-            uint32_t firstIndex = 0;
-            int32_t vertexOffset = 0;
-            uint32_t firstInstance = 0;
-
-            for (auto it = mdlBus.groups_map.begin(); it != mdlBus.groups_map.end(); it++) {
-                const auto& file = it->first;
-                size_t instanceCount = mdlBus.getInstanceCount(file);
-                uint32_t indexCount = mdlBus.getIndexCount(file);
-
-                mdlBus.addCommands(indexCount, instanceCount, firstIndex, vertexOffset, firstInstance);
-
-                firstIndex += indexCount;
-                vertexOffset += mdlBus.getVertexCount(file);
-                firstInstance += instanceCount;
-            }
-
-            //updateDrawCommandsBuffer(device, physicalDevice, commandPool, graphicsQueue, drawCommandsBuffer, mdlBus.drawCommands);
-
-            mdlBus.dirtyCommands = false;
-        }
-
         if (computeDirty) {
             frame++;
             if (frame == MAX_FRAMES_IN_FLIGHT) {
@@ -871,16 +911,28 @@ struct Graphics {
             bufBarrier.buffer = modelDataBuffers[currentFrame];
             bufBarrier.offset = 0;
             bufBarrier.size = VK_WHOLE_SIZE;
+        }
 
-            vkCmdPipelineBarrier(
-                commandBuffer,
-                VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-                VK_PIPELINE_STAGE_VERTEX_SHADER_BIT,
-                0,
-                0, nullptr,
-                1, &bufBarrier,
-                0, nullptr
-            );
+        if (mdlBus.dirtyCommands) {
+            uint32_t firstIndex = 0;
+            int32_t vertexOffset = 0;
+            uint32_t firstInstance = 0;
+
+            for (auto it = mdlBus.groups_map.begin(); it != mdlBus.groups_map.end(); it++) {
+                const auto& file = it->first;
+                size_t instanceCount = mdlBus.getInstanceCount(file);
+                uint32_t indexCount = mdlBus.getIndexCount(file);
+
+                mdlBus.addCommands(indexCount, instanceCount, firstIndex, vertexOffset, firstInstance);
+
+                firstIndex += indexCount;
+                vertexOffset += mdlBus.getVertexCount(file);
+                firstInstance += instanceCount;
+            }
+
+            //updateDrawCommandsBuffer(device, physicalDevice, commandPool, graphicsQueue, drawCommandsBuffer, mdlBus.drawCommands);
+
+            mdlBus.dirtyCommands = false;
         }
 
         vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);

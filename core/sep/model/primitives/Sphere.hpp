@@ -1,10 +1,12 @@
 #ifndef INC_2G43S_SHERE_H
 #define INC_2G43S_SHERE_H
-#include <glm/vec3.hpp>
+#include <glm/vec4.hpp>
 
 struct Sphere {
-    glm::vec3 center;
-    float radius;
+    glm::vec4 sphere;
+
+    Sphere() = default;
+    explicit Sphere(const glm::vec4& sphere) : sphere(sphere) {}
 };
 
 #endif //INC_2G43S_SHERE_H
