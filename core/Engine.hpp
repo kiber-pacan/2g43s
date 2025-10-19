@@ -26,64 +26,10 @@ inline int WIDTH = 1280;
 class Engine {
 public:
     // Method for initializing and running engine
-    #pragma region Public
-
+    #pragma region Basic
     void init(SDL_Window* window) {
         initialize(window);
     }
-
-    static void updateUniformBuffer(const uint32_t currentFrame, const VkExtent2D& swapchainExtent, const std::vector<void*>& uniformBuffersMapped, UniformBufferObject& ubo, const glm::vec3 pos, const Camera& camera) {
-        ubo.view = glm::lookAt(camera.pos + glm::vec3(0), camera.pos + camera.look, glm::vec3(0.0f, 0.0f, 1.0f));
-        ubo.proj = glm::perspective(camera.fov,  static_cast<float>(swapchainExtent.width) / static_cast<float>(swapchainExtent.height), 0.1f, 4096.0f);
-        ubo.proj[1][1] *= -1;
-        memcpy(uniformBuffersMapped[currentFrame], &ubo, sizeof(ubo));
-    }
-
-    static void updateModelDataBuffer(const uint32_t currentFrame, const std::vector<void*>& modelDataBuffersMapped, ModelDataBufferObject& mdbo, const ModelBus& mdlBus) {
-        if (mdlBus.dirtyCommands) {
-            mdbo.pos.clear();
-            mdbo.rot.clear();
-            mdbo.scl.clear();
-            mdbo.sphere.clear();
-            for (const auto& group : std::views::transform(std::views::values(mdlBus.groups_map), &ModelGroup::instances)) {
-                glm::vec4 sphere = !group.empty() ? group[0].mdl.lock()->sphere : glm::vec4();
-                for (const auto& instance : group) {
-                    mdbo.pos.emplace_back(instance.pos);
-                    mdbo.rot.emplace_back(instance.rot);
-                    mdbo.scl.emplace_back(instance.scl);
-                    mdbo.sphere.emplace_back(sphere + glm::vec4(instance.pos.x, instance.pos.y, instance.pos.z, 0));
-                }
-            }
-        }
-        
-        if (mdbo.dirty) {
-            mdbo.frame += 1;
-
-            auto* dst = static_cast<glm::vec4*>(modelDataBuffersMapped[currentFrame]);
-
-            for (size_t i = 0; i < mdbo.pos.size(); ++i) {
-                dst[i * 4 + 0] = mdbo.pos[i];
-                dst[i * 4 + 1] = mdbo.rot[i];
-                dst[i * 4 + 2] = mdbo.scl[i];
-                dst[i * 4 + 3] = mdbo.sphere[i];
-            }
-
-            if (mdbo.frame == MAX_FRAMES_IN_FLIGHT) {
-                mdbo.dirty = false;
-            }
-        }
-    }
-
-    static void updateAtomicCounterBuffer(const uint32_t currentFrame, const std::vector<void*>& atomicBuffersMapped, AtomicCounterObject& atomic_counter) {
-        atomic_counter.counter = 0;
-        memcpy(atomicBuffersMapped[currentFrame], &atomic_counter, sizeof(atomic_counter));
-    }
-
-    static void updateModelBuffer(const uint32_t currentFrame, const std::vector<void*>& modelBuffersMapped, ModelBufferObject& mbo) {
-        memcpy(modelBuffersMapped[currentFrame], mbo.mdls.data(), mbo.mdls.size() * sizeof(glm::mat4));
-    }
-
-
 
     // Draw
     void drawFrame() {
@@ -104,17 +50,17 @@ public:
         auto& fwf = *reinterpret_cast<ModelBufferObject*>(modelBuffersMapped[currentFrame]);
 
         uint32_t countValue = *(uint32_t*)atomicCounterBuffersMapped[currentFrame];
-        std::cout << "Count: " << countValue << std::endl;
+        // std::cout << "Count: " << countValue << std::endl;
 
         updateUniformBuffer(currentFrame, swapchainExtent, uniformBuffersMapped, ubo, glm::vec3(), camera);
-        updateModelDataBuffer(currentFrame, modelDataBuffersMapped, mdbo, mdlBus);
+        updateModelDataBuffer(currentFrame, modelDataBuffersMapped, mdlBus);
         //updateAtomicCounterBuffer(currentFrame, atomicCounterBuffersMapped, atomic_counter);
         updateModelBuffer(currentFrame, modelBuffersMapped, mbo);
 
         vkResetFences(device, 1, &inFlightFences[currentFrame]);
 
         vkResetCommandBuffer(commandBuffers[currentFrame], /*VkCommandBufferResetFlagBits*/ 0);
-        Graphics::recordCommandBuffer(device, physicalDevice, graphicsCommandPool, graphicsQueue, commandBuffers[currentFrame], imageIndex, renderPass, swapChainFramebuffers, swapchainExtent, graphicsPipeline, computePipeline, vertexBuffer, indexBuffer, graphicsPipelineLayout, computePipelineLayout, graphicsDescriptorSets, matrixComputeDescriptorSets, currentFrame, clear_color, mdlBus, modelBuffers, modelDataBuffers, drawCommandsBuffer, drawCommandsBufferMemory, MAX_FRAMES_IN_FLIGHT, computeDirty, atomicCounterBuffersMapped, atomicCounterBuffers);
+        Graphics::recordCommandBuffer(device, physicalDevice, graphicsCommandPool, graphicsQueue, commandBuffers[currentFrame], imageIndex, renderPass, swapChainFramebuffers, swapchainExtent, graphicsPipeline, matrixComputePipeline, vertexBuffer, indexBuffer, graphicsPipelineLayout, matrixComputePipelineLayout, graphicsDescriptorSets, matrixComputeDescriptorSets, currentFrame, clear_color, mdlBus, modelBuffers, modelDataBuffers, drawCommandsBuffer, drawCommandsBufferMemory, MAX_FRAMES_IN_FLIGHT, matrixDirty, atomicCounterBuffersMapped, atomicCounterBuffers);
 
         VkSubmitInfo submitInfo{};
         submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -206,7 +152,7 @@ public:
         vkDestroyDescriptorSetLayout(device, graphicsDescriptorSetLayout, nullptr);
 
         vkDestroyDescriptorPool(device, matrixComputeDescriptorPool, nullptr);
-        vkDestroyDescriptorSetLayout(device, computeDescriptorSetLayout, nullptr);
+        vkDestroyDescriptorSetLayout(device, matrixComputeDescriptorSetLayout, nullptr);
 
         vkDestroyBuffer(device, vertexBuffer, nullptr);
         vkFreeMemory(device, vertexBufferMemory, nullptr);
@@ -223,8 +169,8 @@ public:
         vkDestroyPipeline(device, graphicsPipeline, nullptr);
         vkDestroyPipelineLayout(device, graphicsPipelineLayout, nullptr);
 
-        vkDestroyPipeline(device, computePipeline, nullptr);
-        vkDestroyPipelineLayout(device, computePipelineLayout, nullptr);
+        vkDestroyPipeline(device, matrixComputePipeline, nullptr);
+        vkDestroyPipelineLayout(device, matrixComputePipelineLayout, nullptr);
 
 
         vkDestroyRenderPass(device, renderPass, nullptr);
@@ -246,8 +192,61 @@ public:
         vkDestroySurfaceKHR(instance, surface, nullptr);
         vkDestroyInstance(instance, nullptr);
     }
-
     #pragma endregion
+
+
+    #pragma region Buffers
+    // Generic
+    static void updateUniformBuffer(const uint32_t currentFrame, const VkExtent2D& swapchainExtent, const std::vector<void*>& uniformBuffersMapped, UniformBufferObject& ubo, const glm::vec3 pos, const Camera& camera) {
+        ubo.view = glm::lookAt(camera.pos + glm::vec3(0), camera.pos + camera.look, glm::vec3(0.0f, 0.0f, 1.0f));
+        ubo.proj = glm::perspective(camera.fov,  static_cast<float>(swapchainExtent.width) / static_cast<float>(swapchainExtent.height), 0.1f, 4096.0f);
+        ubo.proj[1][1] *= -1;
+        memcpy(uniformBuffersMapped[currentFrame], &ubo, sizeof(ubo));
+    }
+
+    static void updateAtomicCounterBuffer(const uint32_t currentFrame, const std::vector<void*>& atomicBuffersMapped, AtomicCounterObject& atomic_counter) {
+        atomic_counter.counter = 0;
+        memcpy(atomicBuffersMapped[currentFrame], &atomic_counter, sizeof(atomic_counter));
+    }
+
+    // Matrices
+    static void updateModelDataBuffer(const uint32_t currentFrame, const std::vector<void*>& modelDataBuffersMapped, const ModelBus& mdlBus) {
+        static bool dirtyMDBO = true;
+        static size_t frame = 0;
+        if (dirtyMDBO) {
+            auto* dst = static_cast<glm::vec4*>(modelDataBuffersMapped[currentFrame]);
+            size_t i = 0;
+            for (const auto& group : std::views::transform(std::views::values(mdlBus.groups_map), &ModelGroup::instances)) {
+                for (const auto& instance : group) {
+                    i++;
+                    dst[i * 3 + 0] = instance.pos;
+                    dst[i * 3 + 1] = instance.rot;
+                    dst[i * 3 + 2] = instance.scl;
+                }
+            }
+
+            frame++;
+            if (frame == MAX_FRAMES_IN_FLIGHT) dirtyMDBO = false;
+        }
+    }
+
+    static void updateModelBuffer(const uint32_t currentFrame, const std::vector<void*>& modelBuffersMapped, ModelBufferObject& mbo) {
+        mbo.mdls.clear();
+        memcpy(modelBuffersMapped[currentFrame], mbo.mdls.data(), mbo.mdls.size() * sizeof(glm::mat4));
+    }
+
+    // Culling
+    static void updateModelCullingBuffer(const uint32_t currentFrame, const std::vector<void*>& modelCullingBuffersMapped, const ModelBus& mdlBus) {
+
+    }
+
+    static void updateVisibleIndicesBuffer(const uint32_t currentFrame, const std::vector<void*>& visibleIndicesBuffersMapped, VisibleIndicesBufferObject& vio) {
+        vio.vi.clear();
+        memcpy(visibleIndicesBuffersMapped[currentFrame], vio.vi.data(), vio.vi.size() * sizeof(uint32_t));
+    }
+    #pragma endregion
+
+
 
     #pragma region PublicVars
     // Window
@@ -264,10 +263,18 @@ public:
     VkDevice device{};
 
     bool framebufferResized = false;
+
+    // Generic
     UniformBufferObject ubo{};
-    ModelBufferObject mbo{};
-    ModelDataBufferObject mdbo{};
     AtomicCounterObject atomic_counter{};
+
+    // Matrices
+    ModelDataBufferObject mdbo{};
+    ModelBufferObject mbo{};
+
+    // Culling
+    VisibleIndicesBufferObject vio{};
+    ModelCullingBufferObject mcbo{};
 
     // Controls
     Camera camera{};
@@ -315,14 +322,23 @@ private:
     VkCommandPool graphicsCommandPool{};
 
     // Compute
-    VkPipeline computePipeline{};
-    VkPipelineLayout computePipelineLayout{};
-    VkDescriptorSetLayout computeDescriptorSetLayout{};
-    bool computeDirty = true;
+    VkPipeline matrixComputePipeline{};
+    VkPipelineLayout matrixComputePipelineLayout{};
+    VkDescriptorSetLayout matrixComputeDescriptorSetLayout{};
+    bool matrixDirty = true;
 
     std::vector<VkDescriptorSet> matrixComputeDescriptorSets{};
     VkDescriptorPool matrixComputeDescriptorPool{};
     VkCommandPool matrixComputeCommandPool{};
+
+
+    VkPipeline cullingComputePipeline{};
+    VkPipelineLayout cullingComputePipelineLayout{};
+    VkDescriptorSetLayout cullingComputeDescriptorSetLayout{};
+
+    std::vector<VkDescriptorSet> cullingComputeDescriptorSets{};
+    VkDescriptorPool cullingComputeDescriptorPool{};
+    VkCommandPool cullingComputeCommandPool{};
 
 
     VkRenderPass renderPass{};
@@ -332,7 +348,8 @@ private:
     VkDeviceMemory depthImageMemory{};
     VkImageView depthImageView{};
 
-    // buffers
+    // Buffers
+    // Main
     std::vector<VkCommandBuffer> commandBuffers{};
 
     VkBuffer vertexBuffer{};
@@ -341,13 +358,23 @@ private:
     VkBuffer indexBuffer{};
     VkDeviceMemory indexBufferMemory{};
 
+    VkBuffer stagingBuffer{};
+    VkDeviceMemory stagingBufferMemory{};
+
+    VkBuffer drawCommandsBuffer{};
+    VkDeviceMemory drawCommandsBufferMemory{};
+
+    // Generic
     std::vector<VkBuffer> uniformBuffers{};
     std::vector<VkDeviceMemory> uniformBuffersMemory{};
     std::vector<void*> uniformBuffersMapped{};
 
-    VkBuffer stagingBuffer{};
-    VkDeviceMemory stagingBufferMemory{};
+    std::vector<VkBuffer> atomicCounterBuffers{};
+    std::vector<VkDeviceMemory> atomicCounterBuffersMemory{};
+    std::vector<void*> atomicCounterBuffersMapped{};
 
+
+    // Matrices
     std::vector<VkBuffer> modelBuffers{};
     std::vector<VkDeviceMemory> modelBuffersMemory{};
     std::vector<void*> modelBuffersMapped{};
@@ -356,12 +383,16 @@ private:
     std::vector<VkDeviceMemory> modelDataBuffersMemory{};
     std::vector<void*> modelDataBuffersMapped{};
 
-    std::vector<VkBuffer> atomicCounterBuffers{};
-    std::vector<VkDeviceMemory> atomicCounterBuffersMemory{};
-    std::vector<void*> atomicCounterBuffersMapped{};
 
-    VkBuffer drawCommandsBuffer{};
-    VkDeviceMemory drawCommandsBufferMemory{};
+    // Culling
+    std::vector<VkBuffer> visibleIndicesBuffers{};
+    std::vector<VkDeviceMemory> visibleIndicesMemory{};
+    std::vector<void*> visibleIndicesMapped{};
+
+    std::vector<VkBuffer> modelCullingBuffers{};
+    std::vector<VkDeviceMemory> modelCullingBuffersMemory{};
+    std::vector<void*> modelCullingBuffersMapped{};
+
 
     // Image
     VkImage textureImage{};
@@ -427,10 +458,10 @@ private:
         Graphics::createRenderPass(device, physicalDevice, swapchainImageFormat, renderPass);
 
         Graphics::createGraphicsDescriptorSetLayout(device, graphicsDescriptorSetLayout);
-        Graphics::createMatrixComputeDescriptorSetLayout(device, computeDescriptorSetLayout);
+        Graphics::createMatrixComputeDescriptorSetLayout(device, matrixComputeDescriptorSetLayout);
 
         Graphics::createGraphicsPipeline(device, graphicsPipelineLayout, renderPass, graphicsPipeline, graphicsDescriptorSetLayout);
-        Graphics::createMatrixComputePipeline(device, computeDescriptorSetLayout, computePipelineLayout, computePipeline);
+        Graphics::createMatrixComputePipeline(device, matrixComputeDescriptorSetLayout, matrixComputePipelineLayout, matrixComputePipeline);
 
         Graphics::createCommandPool(device, physicalDevice, graphicsCommandPool, surface);
 
@@ -444,17 +475,21 @@ private:
         Graphics::createVertexBuffer(device, physicalDevice, graphicsCommandPool, graphicsQueue, vertexBuffer, vertexBufferMemory, mdlBus);
         Graphics::createIndexBuffer(device, physicalDevice, graphicsCommandPool, graphicsQueue, indexBuffer, indexBufferMemory, mdlBus);
 
+        // Generic
         Graphics::createUniformBuffers(device, physicalDevice, uniformBuffers, uniformBuffersMemory, uniformBuffersMapped, MAX_FRAMES_IN_FLIGHT);
+        Graphics::createAtomicCounterBuffers(device, physicalDevice, atomicCounterBuffers, atomicCounterBuffersMemory, atomicCounterBuffersMapped, MAX_FRAMES_IN_FLIGHT);
+        // Matrices
         Graphics::createModelBuffers(device, physicalDevice, modelBuffers, modelBuffersMemory, modelBuffersMapped, MAX_FRAMES_IN_FLIGHT, mdlBus);
         Graphics::createModelDataBuffers(device, physicalDevice, modelDataBuffers, modelDataBuffersMemory, modelDataBuffersMapped, MAX_FRAMES_IN_FLIGHT, mdlBus);
-        Graphics::createAtomicCounterBuffers(device, physicalDevice, atomicCounterBuffers, atomicCounterBuffersMemory, atomicCounterBuffersMapped, MAX_FRAMES_IN_FLIGHT);
-
+        // Culling
+        Graphics::createVisibleIndicesBuffers(device, physicalDevice, visibleIndicesBuffers, visibleIndicesMemory, visibleIndicesMapped, MAX_FRAMES_IN_FLIGHT, mdlBus);
+        Graphics::createModelCullingBuffers(device, physicalDevice, modelCullingBuffers, modelCullingBuffersMemory, modelCullingBuffersMapped, MAX_FRAMES_IN_FLIGHT, mdlBus);
 
         Graphics::createGraphicsDescriptorPool(device, MAX_FRAMES_IN_FLIGHT, graphicsDescriptorPool);
         Graphics::createGraphicsDescriptorSets(device, MAX_FRAMES_IN_FLIGHT, graphicsDescriptorSetLayout, graphicsDescriptorPool, graphicsDescriptorSets, uniformBuffers, textureImageView, textureSampler, modelBuffers, mdlBus);
 
         Graphics::createMatrixComputeDescriptorPool(device, MAX_FRAMES_IN_FLIGHT, matrixComputeDescriptorPool);
-        Graphics::createMatrixComputeDescriptorSets(device, MAX_FRAMES_IN_FLIGHT, computeDescriptorSetLayout, matrixComputeDescriptorPool, matrixComputeDescriptorSets, modelBuffers, mdlBus, modelDataBuffers, uniformBuffers, atomicCounterBuffers);
+        Graphics::createMatrixComputeDescriptorSets(device, MAX_FRAMES_IN_FLIGHT, matrixComputeDescriptorSetLayout, matrixComputeDescriptorPool, matrixComputeDescriptorSets, modelBuffers, mdlBus, modelDataBuffers, uniformBuffers, atomicCounterBuffers);
 
         Graphics::createCommandBuffer(device, graphicsCommandPool, commandBuffers, MAX_FRAMES_IN_FLIGHT);
 

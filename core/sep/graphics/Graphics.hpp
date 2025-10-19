@@ -17,10 +17,17 @@
 #include "model/primitives/Vertex.hpp"
 #include "../util/Tools.hpp"
 
-#include "buffers/UniformBufferObject.hpp"
-#include "buffers/ModelBufferObject.hpp"
-#include "buffers/ModelDataBufferObject.hpp"
-#include "buffers/AtomicCounterObject.hpp"
+// Generic
+#include "buffers/generic/UniformBufferObject.hpp"
+#include "buffers/generic/AtomicCounterObject.hpp"
+// Matrices
+#include "buffers/matrices/ModelBufferObject.hpp"
+#include "buffers/matrices/ModelDataBufferObject.hpp"
+// Culling
+#include "buffers/culling/ModelCullingBufferObject.hpp"
+#include "buffers/culling/VisibleIndicesBufferObject.hpp"
+
+
 
 
 
@@ -272,7 +279,6 @@ struct Graphics {
     #pragma endregion
 
     // Sync
-
     static void createSyncObjects(const VkDevice& device, std::vector<VkSemaphore>& imageAvailableSemaphores, std::vector<VkSemaphore>& renderFinishedSemaphores, std::vector<VkFence>& inFlightFences, const int MAX_FRAMES_IN_FLIGHT) {
         imageAvailableSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
         renderFinishedSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
@@ -296,7 +302,6 @@ struct Graphics {
 
 
     // Depth
-
     static void createDepthResources(VkDevice device, VkPhysicalDevice& physicalDevice, VkCommandPool& commandPool, VkQueue& graphicsQueue, VkImage& depthImage, VkDeviceMemory& depthImageMemory, VkImageView& depthImageView, VkExtent2D swapchainExtent) {
         VkFormat depthFormat = findDepthFormat(physicalDevice);
 
@@ -396,7 +401,7 @@ struct Graphics {
     }
 
     // Creating various buffers
-
+    // Main
     static void createCommandBuffer(VkDevice& device, VkCommandPool& commandPool, std::vector<VkCommandBuffer>& commandBuffers, int MAX_FRAMES_IN_FLIGHT) {
         commandBuffers.resize(MAX_FRAMES_IN_FLIGHT);
 
@@ -478,6 +483,7 @@ struct Graphics {
         vkFreeMemory(device, stagingBufferMemory, nullptr);
     }
 
+    // Generic
     static void createUniformBuffers(VkDevice& device, VkPhysicalDevice& physicalDevice, std::vector<VkBuffer>& uniformBuffers, std::vector<VkDeviceMemory>& uniformBuffersMemory, std::vector<void*>& uniformBuffersMapped, const int& MAX_FRAMES_IN_FLIGHT) {
         VkDeviceSize bufferSize = sizeof(UniformBufferObject);
 
@@ -492,6 +498,21 @@ struct Graphics {
         }
     }
 
+    static void createAtomicCounterBuffers(VkDevice& device, VkPhysicalDevice& physicalDevice, std::vector<VkBuffer>& atomicCounterBuffers, std::vector<VkDeviceMemory>& atomicCounterBuffersMemory, std::vector<void*>& atomicCounterBuffersMapped, const int& MAX_FRAMES_IN_FLIGHT) {
+        const VkDeviceSize bufferSize = sizeof(uint32_t);
+
+        atomicCounterBuffers.resize(MAX_FRAMES_IN_FLIGHT);
+        atomicCounterBuffersMemory.resize(MAX_FRAMES_IN_FLIGHT);
+        atomicCounterBuffersMapped.resize(MAX_FRAMES_IN_FLIGHT);
+
+        for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+            createBuffer(device, physicalDevice, bufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, atomicCounterBuffers[i], atomicCounterBuffersMemory[i]);
+
+            vkMapMemory(device, atomicCounterBuffersMemory[i], 0, bufferSize, 0, &atomicCounterBuffersMapped[i]);
+        }
+    }
+
+    // Matrices
     static void createModelBuffers(VkDevice& device, VkPhysicalDevice& physicalDevice, std::vector<VkBuffer>& modelBuffers, std::vector<VkDeviceMemory>& modelBuffersMemory, std::vector<void*>& modelBuffersMapped, const int& MAX_FRAMES_IN_FLIGHT, const ModelBus& mdlBus) {
         const VkDeviceSize bufferSize = mdlBus.getModelBufferSize();
 
@@ -520,19 +541,35 @@ struct Graphics {
         }
     }
 
-    static void createAtomicCounterBuffers(VkDevice& device, VkPhysicalDevice& physicalDevice, std::vector<VkBuffer>& atomicCounterBuffers, std::vector<VkDeviceMemory>& atomicCounterBuffersMemory, std::vector<void*>& atomicCounterBuffersMapped, const int& MAX_FRAMES_IN_FLIGHT) {
-        const VkDeviceSize bufferSize = sizeof(uint32_t);
+    // Culling
+    static void createVisibleIndicesBuffers(VkDevice& device, VkPhysicalDevice& physicalDevice, std::vector<VkBuffer>& visibleIndicesBuffers, std::vector<VkDeviceMemory>& visibleIndicesBuffersMemory, std::vector<void*>& visibleIndicesBuffersMapped, const int& MAX_FRAMES_IN_FLIGHT, const ModelBus& mdlBus) {
+        const VkDeviceSize bufferSize = sizeof(uint32_t) * mdlBus.getTotalInstanceCount();
 
-        atomicCounterBuffers.resize(MAX_FRAMES_IN_FLIGHT);
-        atomicCounterBuffersMemory.resize(MAX_FRAMES_IN_FLIGHT);
-        atomicCounterBuffersMapped.resize(MAX_FRAMES_IN_FLIGHT);
+        visibleIndicesBuffers.resize(MAX_FRAMES_IN_FLIGHT);
+        visibleIndicesBuffersMemory.resize(MAX_FRAMES_IN_FLIGHT);
+        visibleIndicesBuffersMapped.resize(MAX_FRAMES_IN_FLIGHT);
 
         for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-            createBuffer(device, physicalDevice, bufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, atomicCounterBuffers[i], atomicCounterBuffersMemory[i]);
+            createBuffer(device, physicalDevice, bufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, visibleIndicesBuffers[i], visibleIndicesBuffersMemory[i]);
 
-            vkMapMemory(device, atomicCounterBuffersMemory[i], 0, bufferSize, 0, &atomicCounterBuffersMapped[i]);
+            vkMapMemory(device, visibleIndicesBuffersMemory[i], 0, bufferSize, 0, &visibleIndicesBuffersMapped[i]);
         }
     }
+
+    static void createModelCullingBuffers(VkDevice& device, VkPhysicalDevice& physicalDevice, std::vector<VkBuffer>& modelCullingBuffers, std::vector<VkDeviceMemory>& modelCullingBuffersMemory, std::vector<void*>& modelCullingBuffersMapped, const int& MAX_FRAMES_IN_FLIGHT, const ModelBus& mdlBus) {
+        const VkDeviceSize bufferSize = (sizeof(glm::mat4) + sizeof(glm::vec4)) * mdlBus.getTotalInstanceCount();
+
+        modelCullingBuffers.resize(MAX_FRAMES_IN_FLIGHT);
+        modelCullingBuffersMemory.resize(MAX_FRAMES_IN_FLIGHT);
+        modelCullingBuffersMapped.resize(MAX_FRAMES_IN_FLIGHT);
+
+        for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+            createBuffer(device, physicalDevice, bufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, modelCullingBuffers[i], modelCullingBuffersMemory[i]);
+
+            vkMapMemory(device, modelCullingBuffersMemory[i], 0, bufferSize, 0, &modelCullingBuffersMapped[i]);
+        }
+    }
+
 
     static void createDrawCommandsBuffer(VkDevice& device, VkPhysicalDevice& physicalDevice, VkCommandPool& commandPool, VkQueue& graphicsQueue, VkBuffer& drawCommandsBuffer, VkDeviceMemory& drawCommandsBufferMemory, const ModelBus& mdlBus) {
         const VkDeviceSize bufferSize = sizeof(mdlBus.drawCommands[0]) * mdlBus.drawCommands.size();
@@ -711,21 +748,7 @@ struct Graphics {
         mboLayoutBinding.pImmutableSamplers = nullptr;
         mboLayoutBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
 
-        VkDescriptorSetLayoutBinding uboLayoutBinding{};
-        uboLayoutBinding.binding = 2;
-        uboLayoutBinding.descriptorCount = 1;
-        uboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        uboLayoutBinding.pImmutableSamplers = nullptr;
-        uboLayoutBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
-
-        VkDescriptorSetLayoutBinding atomic_counterLayoutBinding{};
-        atomic_counterLayoutBinding.binding = 3;
-        atomic_counterLayoutBinding.descriptorCount = 1;
-        atomic_counterLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-        atomic_counterLayoutBinding.pImmutableSamplers = nullptr;
-        atomic_counterLayoutBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
-
-        std::array<VkDescriptorSetLayoutBinding, 4> bindings = {mdboLayoutBinding, mboLayoutBinding, uboLayoutBinding, atomic_counterLayoutBinding};
+        std::array<VkDescriptorSetLayoutBinding, 2> bindings = {mdboLayoutBinding, mboLayoutBinding};
 
         VkDescriptorSetLayoutCreateInfo layoutInfo{};
         layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
@@ -738,18 +761,12 @@ struct Graphics {
     }
 
     static void createMatrixComputeDescriptorPool(VkDevice& device, const int& MAX_FRAMES_IN_FLIGHT, VkDescriptorPool& matrixComputeDescriptorPool) {
-        std::array<VkDescriptorPoolSize, 4> poolSizes{};
+        std::array<VkDescriptorPoolSize, 2> poolSizes{};
         poolSizes[0].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
         poolSizes[0].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
 
         poolSizes[1].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
         poolSizes[1].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
-
-        poolSizes[2].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        poolSizes[2].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
-
-        poolSizes[3].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-        poolSizes[3].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
 
         VkDescriptorPoolCreateInfo poolInfo{};
         poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
@@ -786,17 +803,7 @@ struct Graphics {
             mboBufferInfo.offset = 0;
             mboBufferInfo.range = mdlBus.getModelBufferSize();
 
-            VkDescriptorBufferInfo uboBufferInfo{};
-            uboBufferInfo.buffer = uniformBuffers[i];
-            uboBufferInfo.offset = 0;
-            uboBufferInfo.range = sizeof(UniformBufferObject);
-
-            VkDescriptorBufferInfo atomic_counterBufferInfo{};
-            atomic_counterBufferInfo.buffer = atomicCounterBuffers[i];
-            atomic_counterBufferInfo.offset = 0;
-            atomic_counterBufferInfo.range = sizeof(uint32_t);
-
-            std::array<VkWriteDescriptorSet, 4> descriptorWrites{};
+            std::array<VkWriteDescriptorSet, 2> descriptorWrites{};
 
             descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
             descriptorWrites[0].dstSet = matrixComputeDescriptorSets[i];
@@ -814,21 +821,117 @@ struct Graphics {
             descriptorWrites[1].descriptorCount = 1;
             descriptorWrites[1].pBufferInfo = &mboBufferInfo;
 
-            descriptorWrites[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            descriptorWrites[2].dstSet = matrixComputeDescriptorSets[i];
-            descriptorWrites[2].dstBinding = 2;
-            descriptorWrites[2].dstArrayElement = 0;
-            descriptorWrites[2].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-            descriptorWrites[2].descriptorCount = 1;
-            descriptorWrites[2].pBufferInfo = &uboBufferInfo;
+            vkUpdateDescriptorSets(device, descriptorWrites.size(), descriptorWrites.data(), 0, nullptr);
+        }
+    }
 
-            descriptorWrites[3].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            descriptorWrites[3].dstSet = matrixComputeDescriptorSets[i];
-            descriptorWrites[3].dstBinding = 3;
-            descriptorWrites[3].dstArrayElement = 0;
-            descriptorWrites[3].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-            descriptorWrites[3].descriptorCount = 1;
-            descriptorWrites[3].pBufferInfo = &atomic_counterBufferInfo;
+
+    static void createCullingComputeDescriptorSetLayout(VkDevice& device, VkDescriptorSetLayout& cullingComputeDescriptorSetLayout) {
+        VkDescriptorSetLayoutBinding mbcLayoutBinding{};
+        mbcLayoutBinding.binding = 0;
+        mbcLayoutBinding.descriptorCount = 1;
+        mbcLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        mbcLayoutBinding.pImmutableSamplers = nullptr;
+        mbcLayoutBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+
+        VkDescriptorSetLayoutBinding viLayoutBinding{};
+        viLayoutBinding.binding = 1;
+        viLayoutBinding.descriptorCount = 1;
+        viLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        viLayoutBinding.pImmutableSamplers = nullptr;
+        viLayoutBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+
+        VkDescriptorSetLayoutBinding atomic_counterLayoutBinding{};
+        atomic_counterLayoutBinding.binding = 2;
+        atomic_counterLayoutBinding.descriptorCount = 1;
+        atomic_counterLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        atomic_counterLayoutBinding.pImmutableSamplers = nullptr;
+        atomic_counterLayoutBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+
+        VkDescriptorSetLayoutBinding uboLayoutBinding{};
+        uboLayoutBinding.binding = 3;
+        uboLayoutBinding.descriptorCount = 1;
+        uboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        uboLayoutBinding.pImmutableSamplers = nullptr;
+        uboLayoutBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+        std::array<VkDescriptorSetLayoutBinding, 4> bindings = {mbcLayoutBinding, viLayoutBinding, atomic_counterLayoutBinding, uboLayoutBinding};
+
+        VkDescriptorSetLayoutCreateInfo layoutInfo{};
+        layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+        layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
+        layoutInfo.pBindings = bindings.data();
+
+        if (vkCreateDescriptorSetLayout(device, &layoutInfo, nullptr, &cullingComputeDescriptorSetLayout) != VK_SUCCESS) {
+            throw std::runtime_error("failed to create descriptor set layout!");
+        }
+    }
+
+    static void createCullingComputeDescriptorPool(VkDevice& device, const int& MAX_FRAMES_IN_FLIGHT, VkDescriptorPool& cullingComputeDescriptorPool) {
+        std::array<VkDescriptorPoolSize, 4> poolSizes{};
+        poolSizes[0].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        poolSizes[0].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
+
+        poolSizes[1].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        poolSizes[1].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
+
+        poolSizes[2].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        poolSizes[2].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
+
+        poolSizes[3].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        poolSizes[3].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
+
+        VkDescriptorPoolCreateInfo poolInfo{};
+        poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+        poolInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
+        poolInfo.pPoolSizes = poolSizes.data();
+        poolInfo.maxSets = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
+
+        if (vkCreateDescriptorPool(device, &poolInfo, nullptr, &cullingComputeDescriptorPool) != VK_SUCCESS) {
+            throw std::runtime_error("failed to create descriptor pool!");
+        }
+    }
+
+    static void createCullingComputeDescriptorSets(const VkDevice& device, const int& MAX_FRAMES_IN_FLIGHT, const VkDescriptorSetLayout& cullingComputeDescriptorSetLayout, const VkDescriptorPool& cullingComputeDescriptorPool, std::vector<VkDescriptorSet>& cullingComputeDescriptorSets, const std::vector<VkBuffer>& modelBuffers, const ModelBus& mdlBus, const std::vector<VkBuffer>& modelDataBuffers, const std::vector<VkBuffer>& uniformBuffers, const std::vector<VkBuffer>&  atomicCounterBuffers) {
+        std::vector layouts(MAX_FRAMES_IN_FLIGHT, cullingComputeDescriptorSetLayout);
+        VkDescriptorSetAllocateInfo allocInfo{};
+        allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+        allocInfo.descriptorPool = cullingComputeDescriptorPool;
+        allocInfo.descriptorSetCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
+        allocInfo.pSetLayouts = layouts.data();
+
+        cullingComputeDescriptorSets.resize(MAX_FRAMES_IN_FLIGHT);
+        if (vkAllocateDescriptorSets(device, &allocInfo, cullingComputeDescriptorSets.data()) != VK_SUCCESS) {
+            throw std::runtime_error("failed to allocate descriptor sets!");
+        }
+
+        for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+            VkDescriptorBufferInfo mdboBufferInfo{};
+            mdboBufferInfo.buffer = modelDataBuffers[i];
+            mdboBufferInfo.offset = 0;
+            mdboBufferInfo.range = VK_WHOLE_SIZE;
+
+            VkDescriptorBufferInfo mboBufferInfo{};
+            mboBufferInfo.buffer = modelBuffers[i];
+            mboBufferInfo.offset = 0;
+            mboBufferInfo.range = mdlBus.getModelBufferSize();
+
+            std::array<VkWriteDescriptorSet, 2> descriptorWrites{};
+
+            descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            descriptorWrites[0].dstSet = cullingComputeDescriptorSets[i];
+            descriptorWrites[0].dstBinding = 0;
+            descriptorWrites[0].dstArrayElement = 0;
+            descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+            descriptorWrites[0].descriptorCount = 1;
+            descriptorWrites[0].pBufferInfo = &mdboBufferInfo;
+
+            descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            descriptorWrites[1].dstSet = cullingComputeDescriptorSets[i];
+            descriptorWrites[1].dstBinding = 1;
+            descriptorWrites[1].dstArrayElement = 0;
+            descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+            descriptorWrites[1].descriptorCount = 1;
+            descriptorWrites[1].pBufferInfo = &mboBufferInfo;
 
             vkUpdateDescriptorSets(device, descriptorWrites.size(), descriptorWrites.data(), 0, nullptr);
         }
@@ -896,11 +999,9 @@ struct Graphics {
                 frame = 0;
             }
 
-            const uint32_t workgroupSize = 256;
+            constexpr uint32_t workgroupSize = 1024;
             const size_t totalInstances = mdlBus.getTotalInstanceCount();
             uint32_t groupCount = (totalInstances + workgroupSize - 1) / workgroupSize;
-
-            vkCmdDispatch(commandBuffer, groupCount, 1, 1);
 
             VkBufferMemoryBarrier bufBarrier{};
             bufBarrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
@@ -911,6 +1012,9 @@ struct Graphics {
             bufBarrier.buffer = modelDataBuffers[currentFrame];
             bufBarrier.offset = 0;
             bufBarrier.size = VK_WHOLE_SIZE;
+
+            vkCmdDispatch(commandBuffer, groupCount, 1, 1);
+            vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0,  nullptr, 1, &bufBarrier, 0, nullptr);
         }
 
         if (mdlBus.dirtyCommands) {
@@ -918,7 +1022,7 @@ struct Graphics {
             int32_t vertexOffset = 0;
             uint32_t firstInstance = 0;
 
-            for (auto it = mdlBus.groups_map.begin(); it != mdlBus.groups_map.end(); it++) {
+            for (auto it = mdlBus.groups_map.begin(); it != mdlBus.groups_map.end(); ++it) {
                 const auto& file = it->first;
                 size_t instanceCount = mdlBus.getInstanceCount(file);
                 uint32_t indexCount = mdlBus.getIndexCount(file);
