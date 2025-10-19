@@ -87,7 +87,7 @@ VkDeviceSize ModelBus::getModelBufferSize() const {
 VkDeviceSize ModelBus::getModelDataBufferSize() const {
     VkDeviceSize bufferSize = 0;
     for (const auto& instance : std::views::transform(std::views::values(groups_map), &ModelGroup::instances)) {
-        bufferSize += sizeof(glm::vec4) * instance.size() * 4;
+        bufferSize += sizeof(glm::vec4) * instance.size() * 3;
     }
 
     return bufferSize;
