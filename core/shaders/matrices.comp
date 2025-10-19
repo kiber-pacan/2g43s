@@ -1,5 +1,5 @@
 #version 460
-layout (local_size_x = 256) in;
+layout (local_size_x = 1024) in;
 
 struct MBO {
     mat4 model;
@@ -9,8 +9,20 @@ struct MDBO {
     vec4 pos;
     vec4 rot;
     vec4 scl;
-    vec4 sphere; // xyz=center, w=radius
 };
+
+layout(std430, binding = 0) buffer MDB {
+    MDBO objects[];
+} mdb;
+
+layout(std430, binding = 1) buffer MB {
+    MBO objects[];
+} mb;
+
+layout(binding = 0) uniform UniformBufferObject {
+    mat4 view;
+    mat4 proj;
+} ubo;
 
 mat4 quaternionToMatrix(vec4 q) {
     float x = q.x;
@@ -24,49 +36,6 @@ mat4 quaternionToMatrix(vec4 q) {
         2.0*(x*z - w*y), 2.0*(y*z + w*x), 1.0 - 2.0*(x*x + y*y), 0.0,
         0.0, 0.0, 0.0, 1.0
     );
-}
-
-layout(std430, binding = 0) readonly buffer MDB {
-    MDBO objects[];
-} mdb;
-
-layout(std430, binding = 1) buffer MB {
-    MBO objects[];
-} mb;
-
-layout(binding = 2) uniform UniformBufferObject {
-    mat4 view;
-    mat4 proj;
-} ubo;
-
-layout(std430, binding = 3) buffer Counter {
-    uint count;
-};
-
-// --- Frustum
-struct Frustum {
-    vec4 planes[6]; // x,y,z=normal, w=d
-};
-
-Frustum getFrustumPlanes(mat4 vp) {
-    Frustum f;
-    f.planes[0] = vp[3] + vp[0]; // Left
-    f.planes[1] = vp[3] - vp[0]; // Right
-    f.planes[2] = vp[3] + vp[1]; // Bottom
-    f.planes[3] = vp[3] - vp[1]; // Top
-    f.planes[4] = vp[3] + vp[2]; // Near
-    f.planes[5] = vp[3] - vp[2]; // Far
-    for (int i = 0; i < 6; i++) f.planes[i] /= length(f.planes[i].xyz);
-    return f;
-}
-
-bool isSphereInFrustum(vec4 sphere, Frustum f) {
-    vec3 center = sphere.xyz;
-    float radius = sphere.w;
-    for (int i = 0; i < 6; i++) {
-        if (dot(f.planes[i].xyz, center) + f.planes[i].w < -radius) return false;
-    }
-    return true;
 }
 
 void main() {
@@ -85,15 +54,5 @@ void main() {
     scl[1][1] = mdb.objects[idx].scl.y;
     scl[2][2] = mdb.objects[idx].scl.z;
 
-    //mb.objects[idx].model = pos * rot * scl;
-
-    Frustum frustum = getFrustumPlanes(ubo.proj * ubo.view);
-    if (isSphereInFrustum(mdb.objects[idx].sphere, frustum)) {
-        uint outIdx = atomicAdd(count, 1);
-        mb.objects[outIdx].model = pos * rot * scl;
-    }
-
-    // memory barrier
-    memoryBarrierBuffer();
-    barrier();
+    mb.objects[idx].model = pos * rot * scl;
 }

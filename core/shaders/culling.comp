@@ -1,0 +1,77 @@
+#version 460
+layout (local_size_x = 1024) in;
+
+struct VIBO {
+    uint index;
+};
+
+struct MCBO {
+    mat4 model;
+    mat4 sphere;
+};
+
+layout(std430, binding = 0) buffer MCB {
+    MCBO objects[];
+} mcb;
+
+layout(std430, binding = 0) buffer VIB {
+    VIBO objects[];
+} vib;
+
+layout(std430, binding = 2) buffer ACB {
+    uint count;
+} acb;
+
+layout(binding = 3) uniform UBO {
+    mat4 view;
+    mat4 proj;
+} ubo;
+
+
+vec4 row(mat4 m, int i) {
+    return vec4(m[0][i], m[1][i], m[2][i], m[3][i]);
+}
+
+struct Frustum { vec4 planes[6]; };
+
+Frustum getFrustumPlanes(mat4 vp) {
+    vec4 r0 = row(vp, 0);
+    vec4 r1 = row(vp, 1);
+    vec4 r2 = row(vp, 2);
+    vec4 r3 = row(vp, 3);
+
+    Frustum f;
+    f.planes[0] = r3 + r0; // left
+    f.planes[1] = r3 - r0; // right
+    f.planes[2] = r3 + r1; // bottom
+    f.planes[3] = r3 - r1; // top
+    f.planes[4] = r3 + r2; // near
+    f.planes[5] = r3 - r2; // far
+
+    for (int i = 0; i < 6; ++i) {
+        float len = length(f.planes[i].xyz);
+        if (len > 0.0) f.planes[i] /= len;
+    }
+    return f;
+}
+
+bool isSphereInFrustum(vec4 sphere, Frustum f) {
+    vec3 center = sphere.xyz;
+    float radius = sphere.w;
+    for (int i = 0; i < 6; ++i) {
+        float dist = dot(f.planes[i].xyz, center) + f.planes[i].w;
+        if (dist < -radius) return false;
+    }
+    return true;
+}
+
+void main() {
+    uint idx = gl_GlobalInvocationID.x;
+    if (idx >= totalObjects) return;
+
+    Frustum frustum = getFrustumPlanes(ubo.proj * ubo.view);
+    if (isSphereInFrustum(mdb.objects[idx].sphere, frustum)) {
+        uint outIdx = atomicAdd(count, 1);
+        mb.objects[outIdx].model = pos * rot * scl;
+    }
+}
