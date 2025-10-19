@@ -47,10 +47,12 @@ add_executable(${EXECUTABLE_NAME}
         core/sep/entity/CameraEntity.hpp
         core/sep/util/Random.hpp
         core/sep/model/primitives/Sphere.hpp
-        core/sep/buffers/UniformBufferObject.hpp
-        core/sep/buffers/ModelBufferObject.hpp
-        core/sep/buffers/ModelDataBufferObject.hpp
+        core/sep/buffers/generic/UniformBufferObject.hpp
+        core/sep/buffers/matrices/ModelBufferObject.hpp
+        core/sep/buffers/matrices/ModelDataBufferObject.hpp
         core/sep/model/bus/ModelBus.cpp
+        core/sep/buffers/culling/VisibleIndicesBufferObject.hpp
+        core/sep/buffers/culling/ModelCullingBufferObject.hpp
 )
 
 target_include_directories(${EXECUTABLE_NAME} PRIVATE
