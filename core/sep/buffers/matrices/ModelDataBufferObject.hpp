@@ -10,7 +10,7 @@ struct ModelDataBufferObject {
     std::vector<glm::vec4> rot;
     std::vector<glm::vec4> scl;
     std::vector<glm::vec4> sphere;
-    bool dirty = true;
+    bool dirty2 = true;
     size_t frame = 0;
 };
 
