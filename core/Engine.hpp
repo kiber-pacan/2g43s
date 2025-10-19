@@ -148,6 +148,16 @@ public:
             vkFreeMemory(device, atomicCounterBuffersMemory[i], nullptr);
         }
 
+        for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+            vkDestroyBuffer(device, visibleIndicesBuffers[i], nullptr);
+            vkFreeMemory(device, visibleIndicesMemory[i], nullptr);
+        }
+
+        for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+            vkDestroyBuffer(device, modelCullingBuffers[i], nullptr);
+            vkFreeMemory(device, modelCullingBuffersMemory[i], nullptr);
+        }
+
         vkDestroyDescriptorPool(device, graphicsDescriptorPool, nullptr);
         vkDestroyDescriptorSetLayout(device, graphicsDescriptorSetLayout, nullptr);
 
