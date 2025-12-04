@@ -203,21 +203,22 @@ void ModelBus::addCommands(uint32_t indexCount, uint32_t instanceCount, uint32_t
 
 
 void ModelBus::test() {
-    loadModels("/home/down1/2g43s/core/models/", "cube.glb");
+    loadModels("/home/down1/2g43s/cmake-build-debug/", "cube.glb");
 
     const auto start = std::chrono::high_resolution_clock::now();
-    static constexpr size_t count = 1000000;
+    static constexpr size_t count = 100;
 
     auto& cubeGroup = groups_map["cube.glb"];
     cubeGroup.instances.resize(count);
 
-    #pragma omp parallel for schedule(static) default(none) shared(count, cubeGroup)
-    for (int i = 0; i < count; ++i) {
-        const glm::vec4 pos(Random::randomNum_T<float>(-1000.f, 1000.f), Random::randomNum_T<float>(-1000.f, 1000.f), Random::randomNum_T<float>(-1000.f, 1000.f), 0);
-        const glm::vec4 pos1(Random::randomNum_T<float>(-1.f, 1.f), Random::randomNum_T<float>(-1.f, 1.f), Random::randomNum_T<float>(-1.f, 1.f), 0);
-
-
-        cubeGroup.instances[i] = ModelInstance(groups_map["cube.glb"].model, pos, pos1);
+    #pragma omp parallel for schedule(static) default(shared) shared(count, cubeGroup)
+    for (int i = 0; i < 10; ++i) {
+        //const glm::vec4 pos(Random::randomNum_T<float>(-10.f, 10.f), Random::randomNum_T<float>(-10.f, 10.f), Random::randomNum_T<float>(-10.f, 10.f), 0);
+        //const glm::vec4 rot(Random::randomNum_T<float>(-1.f, 1.f), Random::randomNum_T<float>(-1.f, 1.f), Random::randomNum_T<float>(-1.f, 1.f), 0);
+        for (int i1 = 0; i1 < 10; ++i1) {
+            const glm::vec4 pos(i * 2, 0, i1 * 2, 0);
+            cubeGroup.instances[i * 10 + i1] = ModelInstance(groups_map["cube.glb"].model, pos);
+        }
     }
 
     const auto end = std::chrono::high_resolution_clock::now();

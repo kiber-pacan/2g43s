@@ -53,6 +53,7 @@ add_executable(${EXECUTABLE_NAME}
         core/sep/model/bus/ModelBus.cpp
         core/sep/buffers/culling/VisibleIndicesBufferObject.hpp
         core/sep/buffers/culling/ModelCullingBufferObject.hpp
+        core/sep/buffers/generic/UniformCullingBufferObject.hpp
 )
 
 target_include_directories(${EXECUTABLE_NAME} PRIVATE

@@ -8,7 +8,6 @@
 #include <glm/fwd.hpp>
 
 struct ModelCullingBufferObject {
-    std::vector<glm::mat4> models;
     std::vector<glm::vec4> spheres;
 };
 

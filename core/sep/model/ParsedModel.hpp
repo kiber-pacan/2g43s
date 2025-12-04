@@ -103,23 +103,22 @@ class ParsedModel {
     void calcOcclusionSphere() {
         std::vector<Vertex> vertices; vertices.append_range(std::views::join(meshes));
 
-        // Center
+        glm::vec3 modelCenter(0.0f);
         for (const Vertex& p : vertices) {
-            sphere.x += p.pos.x;
-            sphere.y += p.pos.y;
-            sphere.z += p.pos.z;
+            modelCenter += p.pos;
+        }
+        modelCenter /= static_cast<float>(vertices.size());
+
+        // Радиус сферы относительно центра модели
+        float radius = 0.0f;
+        for (const Vertex& p : vertices) {
+            radius = std::max(radius, glm::length(p.pos - modelCenter));
         }
 
-        sphere /= static_cast<float>(vertices.size());
+        sphere = glm::vec4(modelCenter, radius);
 
-        // Radius
-        for (const Vertex& p : vertices) {
-            glm::vec3 vec = glm::vec3(sphere.x, sphere.y, sphere.z);
-            sphere.w = std::max(sphere.w, glm::length(p.pos - vec));
-        }
-
-        std::cout << sphere.x << " " << sphere.y << " " << sphere.z << std::endl;
-        std::cout << sphere.w << std::endl;
+        std::cout << "Center: " << sphere.x << " " << sphere.y << " " << sphere.z << std::endl;
+        std::cout << "Radius: " << sphere.w << std::endl;
     }
 };
 

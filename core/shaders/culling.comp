@@ -1,77 +1,68 @@
 #version 460
-layout (local_size_x = 1024) in;
+layout (local_size_x = 128) in;
+
+struct MCBO {
+    vec4 sphere;
+};
 
 struct VIBO {
     uint index;
 };
 
-struct MCBO {
-    mat4 model;
-    mat4 sphere;
-};
-
-layout(std430, binding = 0) buffer MCB {
+layout(std430, binding = 0) readonly buffer MCB {
     MCBO objects[];
 } mcb;
 
-layout(std430, binding = 0) buffer VIB {
+layout(std430, binding = 1) writeonly buffer VIB {
     VIBO objects[];
 } vib;
 
-layout(std430, binding = 2) buffer ACB {
+layout(std430, binding = 2) writeonly buffer ACB {
     uint count;
 } acb;
 
-layout(binding = 3) uniform UBO {
-    mat4 view;
-    mat4 proj;
-} ubo;
+struct Frustum {
+    vec4 planes[6];
+};
+
+layout(binding = 3) uniform UCBO {
+    vec4 frustumPlanes[6];
+    uint totalObjects;
+} ucbo;
 
 
-vec4 row(mat4 m, int i) {
-    return vec4(m[0][i], m[1][i], m[2][i], m[3][i]);
-}
-
-struct Frustum { vec4 planes[6]; };
-
-Frustum getFrustumPlanes(mat4 vp) {
-    vec4 r0 = row(vp, 0);
-    vec4 r1 = row(vp, 1);
-    vec4 r2 = row(vp, 2);
-    vec4 r3 = row(vp, 3);
-
-    Frustum f;
-    f.planes[0] = r3 + r0; // left
-    f.planes[1] = r3 - r0; // right
-    f.planes[2] = r3 + r1; // bottom
-    f.planes[3] = r3 - r1; // top
-    f.planes[4] = r3 + r2; // near
-    f.planes[5] = r3 - r2; // far
-
-    for (int i = 0; i < 6; ++i) {
-        float len = length(f.planes[i].xyz);
-        if (len > 0.0) f.planes[i] /= len;
-    }
-    return f;
-}
-
-bool isSphereInFrustum(vec4 sphere, Frustum f) {
+bool isSphereInFrustum(vec4 sphere, vec4 f[6]) {
     vec3 center = sphere.xyz;
     float radius = sphere.w;
+
+    // Check sphere against all 6 frustum planes
     for (int i = 0; i < 6; ++i) {
-        float dist = dot(f.planes[i].xyz, center) + f.planes[i].w;
-        if (dist < -radius) return false;
+        // Distance from plane: Ax + By + Cz + D
+        // Since planes are normalized (length(normal)=1), this is the signed distance.
+        // If normal points OUTWARDS, negative distance means outside.
+        float dist = dot(f[i].xyz, center) + f[i].w;
+
+        // If the sphere is completely outside *any* plane, it's outside the frustum.
+        // If normal points OUTWARDS, dist < -radius means it's outside.
+        if (dist < -radius) {
+            return false;
+        }
     }
+    // If the sphere is not completely outside any plane, it's considered inside or intersecting.
     return true;
 }
 
 void main() {
     uint idx = gl_GlobalInvocationID.x;
-    if (idx >= totalObjects) return;
 
-    Frustum frustum = getFrustumPlanes(ubo.proj * ubo.view);
-    if (isSphereInFrustum(mdb.objects[idx].sphere, frustum)) {
-        uint outIdx = atomicAdd(count, 1);
-        mb.objects[outIdx].model = pos * rot * scl;
+    if (idx >= ucbo.totalObjects) return;
+
+    if (isSphereInFrustum(mcb.objects[idx].sphere, ucbo.frustumPlanes)) {
+        // Atomic operation (slow, but necessary for counting/indexing)
+        uint outIdx = atomicAdd(acb.count, 1);
+
+        if (outIdx < ucbo.totalObjects) {
+            vib.objects[outIdx].index = idx;
+        }
     }
 }
