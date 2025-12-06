@@ -182,10 +182,10 @@ struct Graphics {
         vkDestroyShaderModule(device, vertShaderModule, nullptr);
     }
 
-    static void createMatrixComputePipeline(VkDevice& device, VkDescriptorSetLayout& matrixComputeDescriptorSetLayout, VkPipelineLayout& matrixComputePipelineLayout, VkPipeline& matrixComputePipeline) {
-        auto matricesShaderCode = Tools::readFile("/home/down1/2g43s/core/shaders/matrices.spv");
+    static void createMatrixComputePipeline(const VkDevice& device, const VkDescriptorSetLayout& matrixComputeDescriptorSetLayout, VkPipelineLayout& matrixComputePipelineLayout, VkPipeline& matrixComputePipeline) {
+        const auto matricesShaderCode = Tools::readFile("/home/down1/2g43s/core/shaders/matrices.spv");
 
-        VkShaderModule compShaderModule = createShaderModule(matricesShaderCode, device);
+        const VkShaderModule compShaderModule = createShaderModule(matricesShaderCode, device);
 
         VkPipelineShaderStageCreateInfo compShaderStageInfo{};
         compShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
@@ -213,10 +213,10 @@ struct Graphics {
         vkDestroyShaderModule(device, compShaderModule, nullptr);
     }
 
-    static void createCullingComputePipeline(VkDevice& device, VkDescriptorSetLayout& cullingComputeDescriptorSetLayout, VkPipelineLayout& cullingComputePipelineLayout, VkPipeline& cullingComputePipeline) {
-        auto cullingShaderCode = Tools::readFile("/home/down1/2g43s/core/shaders/culling.spv");
+    static void createCullingComputePipeline(const VkDevice& device, const VkDescriptorSetLayout& cullingComputeDescriptorSetLayout, VkPipelineLayout& cullingComputePipelineLayout, VkPipeline& cullingComputePipeline) {
+        const auto cullingShaderCode = Tools::readFile("/home/down1/2g43s/core/shaders/culling.spv");
 
-        VkShaderModule compShaderModule = createShaderModule(cullingShaderCode, device);
+        const VkShaderModule compShaderModule = createShaderModule(cullingShaderCode, device);
 
         VkPipelineShaderStageCreateInfo compShaderStageInfo{};
         compShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
@@ -245,7 +245,7 @@ struct Graphics {
     }
 
 
-    static void createRenderPass(VkDevice& device, VkPhysicalDevice physicalDevice, VkFormat& swapchainImageFormat, VkRenderPass& renderPass) {
+    static void createRenderPass(const VkDevice& device, const VkPhysicalDevice physicalDevice, const VkFormat& swapchainImageFormat, VkRenderPass& renderPass) {
         VkAttachmentDescription colorAttachment{};
         colorAttachment.format = swapchainImageFormat;
         colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -294,7 +294,7 @@ struct Graphics {
         dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
 
 
-        std::array<VkAttachmentDescription, 2> attachments = {colorAttachment, depthAttachment};
+        const std::array attachments = {colorAttachment, depthAttachment};
 
         VkRenderPassCreateInfo renderPassInfo{};
         renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
@@ -336,8 +336,8 @@ struct Graphics {
 
 
     // Depth
-    static void createDepthResources(VkDevice device, VkPhysicalDevice& physicalDevice, VkCommandPool& commandPool, VkQueue& graphicsQueue, VkImage& depthImage, VkDeviceMemory& depthImageMemory, VkImageView& depthImageView, VkExtent2D swapchainExtent) {
-        VkFormat depthFormat = findDepthFormat(physicalDevice);
+    static void createDepthResources(const VkDevice device, const VkPhysicalDevice& physicalDevice, VkImage& depthImage, VkDeviceMemory& depthImageMemory, VkImageView& depthImageView, const VkExtent2D& swapchainExtent) {
+        const VkFormat depthFormat = findDepthFormat(physicalDevice);
 
         createImage(device, physicalDevice, swapchainExtent.width, swapchainExtent.height, depthFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, depthImage, depthImageMemory);
         depthImageView = createImageView(device, depthImage, depthFormat, VK_IMAGE_ASPECT_DEPTH_BIT);
@@ -350,12 +350,12 @@ struct Graphics {
     #pragma region Helper
 
     // Choosing suitable memory type
-    static uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties, VkPhysicalDevice& physicalDevice) {
+    static uint32_t findMemoryType( const uint32_t& typeFilter, const VkMemoryPropertyFlags properties, const VkPhysicalDevice& physicalDevice) {
         VkPhysicalDeviceMemoryProperties memProperties;
         vkGetPhysicalDeviceMemoryProperties(physicalDevice, &memProperties);
 
         for (uint32_t i = 0; i < memProperties.memoryTypeCount; i++) {
-            if ((typeFilter & (1 << i)) && (memProperties.memoryTypes[i].propertyFlags & properties) == properties) {
+            if (typeFilter & 1 << i && (memProperties.memoryTypes[i].propertyFlags & properties) == properties) {
                 return i;
             }
         }
@@ -364,14 +364,15 @@ struct Graphics {
     }
 
     // Finding supported image format
-    static VkFormat findSupportedFormat(const std::vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlags features, VkPhysicalDevice& physicalDevice) {
-        for (VkFormat format : candidates) {
+    static VkFormat findSupportedFormat(const std::vector<VkFormat>& candidates, const VkImageTiling tiling, const VkFormatFeatureFlags features, const VkPhysicalDevice& physicalDevice) {
+        for (const VkFormat format : candidates) {
             VkFormatProperties props;
             vkGetPhysicalDeviceFormatProperties(physicalDevice, format, &props);
 
             if (tiling == VK_IMAGE_TILING_LINEAR && (props.linearTilingFeatures & features) == features) {
                 return format;
-            } else if (tiling == VK_IMAGE_TILING_OPTIMAL && (props.optimalTilingFeatures & features) == features) {
+            }
+            if (tiling == VK_IMAGE_TILING_OPTIMAL && (props.optimalTilingFeatures & features) == features) {
                 return format;
             }
         }
@@ -379,7 +380,7 @@ struct Graphics {
         throw std::runtime_error("failed to find supported format!");
     }
 
-    static VkFormat findDepthFormat(VkPhysicalDevice& physicalDevice) {
+    static VkFormat findDepthFormat(const VkPhysicalDevice& physicalDevice) {
         return findSupportedFormat(
         {VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT},
             VK_IMAGE_TILING_OPTIMAL,
@@ -388,17 +389,17 @@ struct Graphics {
         );
     }
 
-    static bool hasStencilComponent(VkFormat format) {
+    static bool hasStencilComponent(const VkFormat format) {
         return format == VK_FORMAT_D32_SFLOAT_S8_UINT || format == VK_FORMAT_D24_UNORM_S8_UINT;
     }
 
-#pragma endregion
+    #pragma endregion
 
 
     // buffers and shit
     #pragma region Buffers
 
-    static void createBuffer(VkDevice& device, VkPhysicalDevice& physicalDevice, VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory) {
+    static void createBuffer(const VkDevice& device, const VkPhysicalDevice& physicalDevice, const VkDeviceSize size, const VkBufferUsageFlags usage, const VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory) {
         VkBufferCreateInfo bufferInfo{};
         bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
         bufferInfo.size = size;
@@ -415,7 +416,7 @@ struct Graphics {
         VkMemoryAllocateInfo allocInfo{};
         allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
         allocInfo.allocationSize = memRequirements.size;
-        allocInfo.memoryTypeIndex = Graphics::findMemoryType(memRequirements.memoryTypeBits, properties, physicalDevice);
+        allocInfo.memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits, properties, physicalDevice);
 
         if (vkAllocateMemory(device, &allocInfo, nullptr, &bufferMemory) != VK_SUCCESS) {
             throw std::runtime_error("failed to allocate buffer memory!");
@@ -424,8 +425,8 @@ struct Graphics {
         vkBindBufferMemory(device, buffer, bufferMemory, 0);
     }
 
-    static void copyBuffer(VkDevice& device, VkPhysicalDevice& physicalDevice, VkCommandPool& commandPool, VkQueue& graphicsQueue, VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size) {
-        VkCommandBuffer commandBuffer = beginSingleTimeCommands(device, commandPool);
+    static void copyBuffer(const VkDevice& device, const VkCommandPool& commandPool, const VkQueue& graphicsQueue, const VkBuffer& srcBuffer, const VkBuffer& dstBuffer, const VkDeviceSize& size) {
+        const VkCommandBuffer commandBuffer = beginSingleTimeCommands(device, commandPool);
 
         VkBufferCopy copyRegion{};
         copyRegion.size = size;
@@ -436,25 +437,25 @@ struct Graphics {
 
     // Creating various buffers
     // Main
-    static void createCommandBuffer(VkDevice& device, VkCommandPool& commandPool, std::vector<VkCommandBuffer>& commandBuffers, int MAX_FRAMES_IN_FLIGHT) {
+    static void createCommandBuffer(const VkDevice& device, const VkCommandPool& commandPool, std::vector<VkCommandBuffer>& commandBuffers, const int& MAX_FRAMES_IN_FLIGHT) {
         commandBuffers.resize(MAX_FRAMES_IN_FLIGHT);
 
         VkCommandBufferAllocateInfo allocInfo{};
         allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
         allocInfo.commandPool = commandPool;
         allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-        allocInfo.commandBufferCount = (uint32_t) commandBuffers.size();
+        allocInfo.commandBufferCount = static_cast<uint32_t>(commandBuffers.size());
 
         if (vkAllocateCommandBuffers(device, &allocInfo, commandBuffers.data()) != VK_SUCCESS) {
             throw std::runtime_error("failed to allocate command buffers!");
         }
     }
 
-    static void createFramebuffers(VkDevice& device, VkImageView& depthImageView, std::vector<VkFramebuffer>& swapChainFramebuffers, std::vector<VkImageView>& swapchainImageViews, VkRenderPass& renderPass, VkExtent2D& swapchainExtent) {
+    static void createFramebuffers(const VkDevice& device, const VkImageView& depthImageView, std::vector<VkFramebuffer>& swapChainFramebuffers, const std::vector<VkImageView>& swapchainImageViews, const VkRenderPass& renderPass, const VkExtent2D& swapchainExtent) {
         swapChainFramebuffers.resize(swapchainImageViews.size());
 
         for (size_t i = 0; i < swapchainImageViews.size(); i++) {
-            std::array<VkImageView, 2> attachments = {
+            std::array attachments = {
                 swapchainImageViews[i],
                 depthImageView
             };
@@ -474,86 +475,82 @@ struct Graphics {
         }
     }
 
-    static void createVertexBuffer(VkDevice& device, VkPhysicalDevice& physicalDevice, VkCommandPool& commandPool, VkQueue& graphicsQueue, VkBuffer& vertexBuffer, VkDeviceMemory& vertexBufferMemory, const ModelBus& mdlBus) {
-        VkDeviceSize bufferSize = mdlBus.getVertexBufferSize();
+    static void createVertexBuffer(const VkDevice& device, const VkPhysicalDevice& physicalDevice, const VkCommandPool& commandPool, const VkQueue& graphicsQueue, VkBuffer& vertexBuffer, VkDeviceMemory& vertexBufferMemory, const ModelBus& mdlBus) {
+        const VkDeviceSize bufferSize = mdlBus.getVertexBufferSize();
 
         VkBuffer stagingBuffer;
         VkDeviceMemory stagingBufferMemory;
         createBuffer(device, physicalDevice, bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
 
-        std::vector<Vertex> vertices = mdlBus.getAllVertices();
+        const std::vector<Vertex> vertices = mdlBus.getAllVertices();
         void* data;
         vkMapMemory(device, stagingBufferMemory, 0, bufferSize, 0, &data);
 
-        memcpy(data, vertices.data(), (size_t) bufferSize);
+        memcpy(data, vertices.data(), bufferSize);
         vkUnmapMemory(device, stagingBufferMemory);
 
         createBuffer(device, physicalDevice, bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, vertexBuffer, vertexBufferMemory);
 
-        copyBuffer(device, physicalDevice, commandPool, graphicsQueue, stagingBuffer, vertexBuffer, bufferSize);
+        copyBuffer(device, commandPool, graphicsQueue, stagingBuffer, vertexBuffer, bufferSize);
 
         vkDestroyBuffer(device, stagingBuffer, nullptr);
         vkFreeMemory(device, stagingBufferMemory, nullptr);
     }
 
-    static void createIndexBuffer(VkDevice& device, VkPhysicalDevice& physicalDevice, VkCommandPool& commandPool, VkQueue& graphicsQueue, VkBuffer &indexBuffer, VkDeviceMemory& indexBufferMemory, const ModelBus& mdlBus) {
-        VkDeviceSize bufferSize = mdlBus.getIndexBufferSize();
+    static void createIndexBuffer(const VkDevice& device, const VkPhysicalDevice& physicalDevice, const VkCommandPool& commandPool, const VkQueue& graphicsQueue, VkBuffer &indexBuffer, VkDeviceMemory& indexBufferMemory, const ModelBus& mdlBus) {
+        const VkDeviceSize bufferSize = mdlBus.getIndexBufferSize();
 
         VkBuffer stagingBuffer;
         VkDeviceMemory stagingBufferMemory;
         createBuffer(device, physicalDevice, bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
 
-        std::vector<u_int32_t> indices = mdlBus.getAllIndices();
+        const std::vector<u_int32_t> indices = mdlBus.getAllIndices();
         void* data;
         vkMapMemory(device, stagingBufferMemory, 0, bufferSize, 0, &data);
-        memcpy(data, indices.data(), (size_t) bufferSize);
+        memcpy(data, indices.data(), bufferSize);
         vkUnmapMemory(device, stagingBufferMemory);
 
         createBuffer(device, physicalDevice, bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, indexBuffer, indexBufferMemory);
-
-        copyBuffer(device, physicalDevice, commandPool, graphicsQueue, stagingBuffer, indexBuffer, bufferSize);
+        copyBuffer(device, commandPool, graphicsQueue, stagingBuffer, indexBuffer, bufferSize);
 
         vkDestroyBuffer(device, stagingBuffer, nullptr);
         vkFreeMemory(device, stagingBufferMemory, nullptr);
     }
 
     // Generic
-    static void createUniformBuffers(VkDevice& device, VkPhysicalDevice& physicalDevice, std::vector<VkBuffer>& uniformBuffers, std::vector<VkDeviceMemory>& uniformBuffersMemory, std::vector<void*>& uniformBuffersMapped, const int& MAX_FRAMES_IN_FLIGHT) {
-        VkDeviceSize bufferSize = sizeof(UniformBufferObject);
-
+    static void createUniformBuffers(const VkDevice& device, const VkPhysicalDevice& physicalDevice, std::vector<VkBuffer>& uniformBuffers, std::vector<VkDeviceMemory>& uniformBuffersMemory, std::vector<void*>& uniformBuffersMapped, const int& MAX_FRAMES_IN_FLIGHT) {
         uniformBuffers.resize(MAX_FRAMES_IN_FLIGHT);
         uniformBuffersMemory.resize(MAX_FRAMES_IN_FLIGHT);
         uniformBuffersMapped.resize(MAX_FRAMES_IN_FLIGHT);
 
         for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+            constexpr VkDeviceSize bufferSize = sizeof(UniformBufferObject);
             createBuffer(device, physicalDevice, bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, uniformBuffers[i], uniformBuffersMemory[i]);
 
             vkMapMemory(device, uniformBuffersMemory[i], 0, bufferSize, 0, &uniformBuffersMapped[i]);
         }
     }
 
-    static void createUniformCullingBuffers(VkDevice& device, VkPhysicalDevice& physicalDevice, std::vector<VkBuffer>& uniformCullingBuffers, std::vector<VkDeviceMemory>& uniformCullingBuffersMemory, std::vector<void*>& uniformCullingBuffersMapped, const int& MAX_FRAMES_IN_FLIGHT) {
-        VkDeviceSize bufferSize = sizeof(UniformCullingBufferObject);
-
+    static void createUniformCullingBuffers(const VkDevice& device, const VkPhysicalDevice& physicalDevice, std::vector<VkBuffer>& uniformCullingBuffers, std::vector<VkDeviceMemory>& uniformCullingBuffersMemory, std::vector<void*>& uniformCullingBuffersMapped, const int& MAX_FRAMES_IN_FLIGHT) {
         uniformCullingBuffers.resize(MAX_FRAMES_IN_FLIGHT);
         uniformCullingBuffersMemory.resize(MAX_FRAMES_IN_FLIGHT);
         uniformCullingBuffersMapped.resize(MAX_FRAMES_IN_FLIGHT);
 
         for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+            constexpr VkDeviceSize bufferSize = sizeof(UniformCullingBufferObject);
             createBuffer(device, physicalDevice, bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, uniformCullingBuffers[i], uniformCullingBuffersMemory[i]);
 
             vkMapMemory(device, uniformCullingBuffersMemory[i], 0, bufferSize, 0, &uniformCullingBuffersMapped[i]);
         }
     }
 
-    static void createAtomicCounterBuffers(VkDevice& device, VkPhysicalDevice& physicalDevice, std::vector<VkBuffer>& atomicCounterBuffers, std::vector<VkDeviceMemory>& atomicCounterBuffersMemory, std::vector<void*>& atomicCounterBuffersMapped, const int& MAX_FRAMES_IN_FLIGHT) {
-        const VkDeviceSize bufferSize = sizeof(uint32_t);
-
+    static void createAtomicCounterBuffers(const VkDevice& device, const VkPhysicalDevice& physicalDevice, std::vector<VkBuffer>& atomicCounterBuffers, std::vector<VkDeviceMemory>& atomicCounterBuffersMemory, std::vector<void*>& atomicCounterBuffersMapped, const int& MAX_FRAMES_IN_FLIGHT) {
         atomicCounterBuffers.resize(MAX_FRAMES_IN_FLIGHT);
         atomicCounterBuffersMemory.resize(MAX_FRAMES_IN_FLIGHT);
         atomicCounterBuffersMapped.resize(MAX_FRAMES_IN_FLIGHT);
 
         for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+            constexpr VkDeviceSize bufferSize = sizeof(uint32_t);
             createBuffer(device, physicalDevice, bufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, atomicCounterBuffers[i], atomicCounterBuffersMemory[i]);
 
             vkMapMemory(device, atomicCounterBuffersMemory[i], 0, bufferSize, 0, &atomicCounterBuffersMapped[i]);
@@ -561,7 +558,7 @@ struct Graphics {
     }
 
     // Matrices
-    static void createModelBuffers(VkDevice& device, VkPhysicalDevice& physicalDevice, std::vector<VkBuffer>& modelBuffers, std::vector<VkDeviceMemory>& modelBuffersMemory, std::vector<void*>& modelBuffersMapped, const int& MAX_FRAMES_IN_FLIGHT, const ModelBus& mdlBus) {
+    static void createModelBuffers(const VkDevice& device, const VkPhysicalDevice& physicalDevice, std::vector<VkBuffer>& modelBuffers, std::vector<VkDeviceMemory>& modelBuffersMemory, std::vector<void*>& modelBuffersMapped, const int& MAX_FRAMES_IN_FLIGHT, const ModelBus& mdlBus) {
         const VkDeviceSize bufferSize = mdlBus.getModelBufferSize();
 
         modelBuffers.resize(MAX_FRAMES_IN_FLIGHT);
@@ -575,7 +572,7 @@ struct Graphics {
         }
     }
 
-    static void createModelDataBuffers(VkDevice& device, VkPhysicalDevice& physicalDevice, std::vector<VkBuffer>& modelDataBuffers, std::vector<VkDeviceMemory>& modelDataBuffersMemory, std::vector<void*>& modelDataBuffersMapped, const int& MAX_FRAMES_IN_FLIGHT, const ModelBus& mdlBus) {
+    static void createModelDataBuffers(const VkDevice& device, const VkPhysicalDevice& physicalDevice, std::vector<VkBuffer>& modelDataBuffers, std::vector<VkDeviceMemory>& modelDataBuffersMemory, std::vector<void*>& modelDataBuffersMapped, const int& MAX_FRAMES_IN_FLIGHT, const ModelBus& mdlBus) {
         const VkDeviceSize bufferSize = mdlBus.getModelDataBufferSize();
 
         modelDataBuffers.resize(MAX_FRAMES_IN_FLIGHT);
@@ -590,7 +587,7 @@ struct Graphics {
     }
 
     // Culling
-    static void createVisibleIndicesBuffers(VkDevice& device, VkPhysicalDevice& physicalDevice, std::vector<VkBuffer>& visibleIndicesBuffers, std::vector<VkDeviceMemory>& visibleIndicesBuffersMemory, std::vector<void*>& visibleIndicesBuffersMapped, const int& MAX_FRAMES_IN_FLIGHT, const ModelBus& mdlBus) {
+    static void createVisibleIndicesBuffers(const VkDevice& device, const VkPhysicalDevice& physicalDevice, std::vector<VkBuffer>& visibleIndicesBuffers, std::vector<VkDeviceMemory>& visibleIndicesBuffersMemory, std::vector<void*>& visibleIndicesBuffersMapped, const int& MAX_FRAMES_IN_FLIGHT, const ModelBus& mdlBus) {
         const VkDeviceSize bufferSize = sizeof(uint32_t) * mdlBus.getTotalInstanceCount();
 
         visibleIndicesBuffers.resize(MAX_FRAMES_IN_FLIGHT);
@@ -604,29 +601,24 @@ struct Graphics {
         }
     }
 
-    static void createModelCullingBuffers(VkDevice& device, VkPhysicalDevice& physicalDevice, std::vector<VkBuffer>& modelCullingBuffers, std::vector<VkDeviceMemory>& modelCullingBuffersMemory, std::vector<void*>& modelCullingBuffersMapped, const int& MAX_FRAMES_IN_FLIGHT, const ModelBus& mdlBus) {
+    static void createModelCullingBuffer(const VkDevice& device, const VkPhysicalDevice& physicalDevice, VkBuffer& modelCullingBuffers, VkDeviceMemory& modelCullingBuffersMemory, void*& modelCullingBuffersMapped, const int& MAX_FRAMES_IN_FLIGHT, const ModelBus& mdlBus) {
         const VkDeviceSize bufferSize = sizeof(glm::vec4) * mdlBus.getTotalInstanceCount();
 
-        modelCullingBuffers.resize(MAX_FRAMES_IN_FLIGHT);
-        modelCullingBuffersMemory.resize(MAX_FRAMES_IN_FLIGHT);
-        modelCullingBuffersMapped.resize(MAX_FRAMES_IN_FLIGHT);
 
-        for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-            createBuffer(device, physicalDevice, bufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, modelCullingBuffers[i], modelCullingBuffersMemory[i]);
+        createBuffer(device, physicalDevice, bufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, modelCullingBuffers, modelCullingBuffersMemory);
 
-            vkMapMemory(device, modelCullingBuffersMemory[i], 0, bufferSize, 0, &modelCullingBuffersMapped[i]);
-        }
+        vkMapMemory(device, modelCullingBuffersMemory, 0, bufferSize, 0, &modelCullingBuffersMapped);
     }
 
-    static void updateOrCreateDrawCommandsBuffer(VkDevice& device, VkPhysicalDevice& physicalDevice, VkCommandPool& commandPool, VkQueue& graphicsQueue, VkBuffer& drawCommandsBuffer, VkDeviceMemory& drawCommandsBufferMemory, const ModelBus& mdlBus, void*& drawCommandsBufferMapped, const std::vector<VkDrawIndexedIndirectCommand>& drawCommands) {
+    static void updateOrCreateDrawCommandsBuffer(const VkDevice& device, const VkPhysicalDevice& physicalDevice, VkBuffer& drawCommandsBuffer, VkDeviceMemory& drawCommandsBufferMemory, const ModelBus& mdlBus, void*& drawCommandsBufferMapped, const std::vector<VkDrawIndexedIndirectCommand>& drawCommands) {
         if (drawCommandsBufferMapped == nullptr) {
-            createDrawCommandsBuffer(device, physicalDevice, commandPool, graphicsQueue, drawCommandsBuffer, drawCommandsBufferMemory, mdlBus, drawCommandsBufferMapped);
+            createDrawCommandsBuffer(device, physicalDevice, drawCommandsBuffer, drawCommandsBufferMemory, mdlBus, drawCommandsBufferMapped);
         } else {
             updateDrawCommandsBuffer(drawCommandsBuffer, drawCommandsBufferMapped, drawCommands);
         }
     }
 
-    static void createDrawCommandsBuffer(VkDevice& device, VkPhysicalDevice& physicalDevice, VkCommandPool& commandPool, VkQueue& graphicsQueue, VkBuffer& drawCommandsBuffer, VkDeviceMemory& drawCommandsBufferMemory, const ModelBus& mdlBus, void*& drawCommandsBufferMapped) {
+    static void createDrawCommandsBuffer(const VkDevice &device, const VkPhysicalDevice &physicalDevice, VkBuffer &drawCommandsBuffer, VkDeviceMemory &drawCommandsBufferMemory, const ModelBus &mdlBus, void *&drawCommandsBufferMapped) {
         const VkDeviceSize bufferSize = sizeof(mdlBus.drawCommands[0]) * mdlBus.drawCommands.size();
 
         if (drawCommandsBufferMapped != nullptr) {
@@ -649,7 +641,7 @@ struct Graphics {
 
         const VkDeviceSize bufferSize = sizeof(drawCommands[0]) * drawCommands.size();
 
-        memcpy(drawCommandsBufferMapped, drawCommands.data(), (size_t) bufferSize);
+        memcpy(drawCommandsBufferMapped, drawCommands.data(), bufferSize);
     }
 
 
@@ -659,7 +651,7 @@ struct Graphics {
     // Descriptor stuff
     #pragma region Descriptor
 
-    static void createGraphicsDescriptorSetLayout(VkDevice& device, VkDescriptorSetLayout& graphicsDescriptorSetLayout) {
+    static void createGraphicsDescriptorSetLayout(const VkDevice& device, VkDescriptorSetLayout& graphicsDescriptorSetLayout) {
         VkDescriptorSetLayoutBinding uboLayoutBinding{};
         uboLayoutBinding.binding = 0;
         uboLayoutBinding.descriptorCount = 1;
@@ -688,7 +680,7 @@ struct Graphics {
         viboLayoutBinding.pImmutableSamplers = nullptr;
         viboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 
-        std::array<VkDescriptorSetLayoutBinding, 4> bindings = {uboLayoutBinding, samplerLayoutBinding, mboLayoutBinding, viboLayoutBinding};
+        const std::array bindings = {uboLayoutBinding, samplerLayoutBinding, mboLayoutBinding, viboLayoutBinding};
 
         VkDescriptorSetLayoutCreateInfo layoutInfo{};
         layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
@@ -700,7 +692,7 @@ struct Graphics {
         }
     }
 
-    static void createGraphicsDescriptorPool(VkDevice& device, const int& MAX_FRAMES_IN_FLIGHT, VkDescriptorPool& graphicsDescriptorPool) {
+    static void createGraphicsDescriptorPool(const VkDevice& device, const int& MAX_FRAMES_IN_FLIGHT, VkDescriptorPool& graphicsDescriptorPool) {
         std::array<VkDescriptorPoolSize, 4> poolSizes{};
         poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
         poolSizes[0].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
@@ -726,8 +718,8 @@ struct Graphics {
         }
     }
 
-    static void createGraphicsDescriptorSets(VkDevice device, const int& MAX_FRAMES_IN_FLIGHT, VkDescriptorSetLayout& graphicsDescriptorSetLayout, VkDescriptorPool& graphicsDescriptorPool, std::vector<VkDescriptorSet>& graphicsDescriptorSets, std::vector<VkBuffer>& uniformBuffers, VkImageView& textureImageView, VkSampler& textureSampler, std::vector<VkBuffer>& modelBuffers, std::vector<VkBuffer>& visibleIndicesBuffers, ModelBus& mdlBus) {
-        std::vector<VkDescriptorSetLayout> layouts(MAX_FRAMES_IN_FLIGHT, graphicsDescriptorSetLayout);
+    static void createGraphicsDescriptorSets(const VkDevice& device, const int& MAX_FRAMES_IN_FLIGHT, const VkDescriptorSetLayout& graphicsDescriptorSetLayout, const VkDescriptorPool& graphicsDescriptorPool, std::vector<VkDescriptorSet>& graphicsDescriptorSets, const std::vector<VkBuffer>& uniformBuffers, const VkImageView& textureImageView, const VkSampler& textureSampler, const std::vector<VkBuffer>& modelBuffers, const std::vector<VkBuffer>& visibleIndicesBuffers, const ModelBus& mdlBus) {
+        const std::vector layouts(MAX_FRAMES_IN_FLIGHT, graphicsDescriptorSetLayout);
         VkDescriptorSetAllocateInfo allocInfo{};
         allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
         allocInfo.descriptorPool = graphicsDescriptorPool;
@@ -794,12 +786,12 @@ struct Graphics {
             descriptorWrites[3].descriptorCount = 1;
             descriptorWrites[3].pBufferInfo = &viboBufferInfo;
 
-            vkUpdateDescriptorSets(device, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
+            vkUpdateDescriptorSets(device, descriptorWrites.size(), descriptorWrites.data(), 0, nullptr);
         }
     }
 
 
-    static void createMatrixComputeDescriptorSetLayout(VkDevice& device, VkDescriptorSetLayout& matrixComputeDescriptorSetLayout) {
+    static void createMatrixComputeDescriptorSetLayout(const VkDevice& device, VkDescriptorSetLayout& matrixComputeDescriptorSetLayout) {
         VkDescriptorSetLayoutBinding mdboLayoutBinding{};
         mdboLayoutBinding.binding = 0;
         mdboLayoutBinding.descriptorCount = 1;
@@ -814,7 +806,7 @@ struct Graphics {
         mboLayoutBinding.pImmutableSamplers = nullptr;
         mboLayoutBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
 
-        std::array<VkDescriptorSetLayoutBinding, 2> bindings = {mdboLayoutBinding, mboLayoutBinding};
+        const std::array bindings = {mdboLayoutBinding, mboLayoutBinding};
 
         VkDescriptorSetLayoutCreateInfo layoutInfo{};
         layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
@@ -826,7 +818,7 @@ struct Graphics {
         }
     }
 
-    static void createMatrixComputeDescriptorPool(VkDevice& device, const int& MAX_FRAMES_IN_FLIGHT, VkDescriptorPool& matrixComputeDescriptorPool) {
+    static void createMatrixComputeDescriptorPool(const VkDevice& device, const int& MAX_FRAMES_IN_FLIGHT, VkDescriptorPool& matrixComputeDescriptorPool) {
         std::array<VkDescriptorPoolSize, 2> poolSizes{};
         poolSizes[0].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
         poolSizes[0].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
@@ -845,8 +837,8 @@ struct Graphics {
         }
     }
 
-    static void createMatrixComputeDescriptorSets(const VkDevice& device, const int& MAX_FRAMES_IN_FLIGHT, const VkDescriptorSetLayout& matrixComputeDescriptorSetLayout, const VkDescriptorPool& matrixComputeDescriptorPool, std::vector<VkDescriptorSet>& matrixComputeDescriptorSets, const std::vector<VkBuffer>& modelBuffers, const ModelBus& mdlBus, const std::vector<VkBuffer>& modelDataBuffers, const std::vector<VkBuffer>& uniformBuffers, const std::vector<VkBuffer>&  atomicCounterBuffers) {
-        std::vector layouts(MAX_FRAMES_IN_FLIGHT, matrixComputeDescriptorSetLayout);
+    static void createMatrixComputeDescriptorSets(const VkDevice &device, const int &MAX_FRAMES_IN_FLIGHT, const VkDescriptorSetLayout &matrixComputeDescriptorSetLayout, const VkDescriptorPool &matrixComputeDescriptorPool, std::vector<VkDescriptorSet> &matrixComputeDescriptorSets, const std::vector<VkBuffer> &modelBuffers, const ModelBus &mdlBus, const std::vector<VkBuffer> &modelDataBuffers) {
+        const std::vector layouts(MAX_FRAMES_IN_FLIGHT, matrixComputeDescriptorSetLayout);
         VkDescriptorSetAllocateInfo allocInfo{};
         allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
         allocInfo.descriptorPool = matrixComputeDescriptorPool;
@@ -892,7 +884,7 @@ struct Graphics {
     }
 
 
-    static void createCullingComputeDescriptorSetLayout(VkDevice& device, VkDescriptorSetLayout& cullingComputeDescriptorSetLayout) {
+    static void createCullingComputeDescriptorSetLayout(const VkDevice& device, VkDescriptorSetLayout& cullingComputeDescriptorSetLayout) {
         VkDescriptorSetLayoutBinding mbcLayoutBinding{};
         mbcLayoutBinding.binding = 0;
         mbcLayoutBinding.descriptorCount = 1;
@@ -920,7 +912,7 @@ struct Graphics {
         ucboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
         ucboLayoutBinding.pImmutableSamplers = nullptr;
         ucboLayoutBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
-        std::array<VkDescriptorSetLayoutBinding, 4> bindings = {mbcLayoutBinding, viLayoutBinding, atomic_counterLayoutBinding, ucboLayoutBinding};
+        const std::array bindings = {mbcLayoutBinding, viLayoutBinding, atomic_counterLayoutBinding, ucboLayoutBinding};
 
         VkDescriptorSetLayoutCreateInfo layoutInfo{};
         layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
@@ -932,7 +924,7 @@ struct Graphics {
         }
     }
 
-    static void createCullingComputeDescriptorPool(VkDevice& device, const int& MAX_FRAMES_IN_FLIGHT, VkDescriptorPool& cullingComputeDescriptorPool) {
+    static void createCullingComputeDescriptorPool(const VkDevice& device, const int& MAX_FRAMES_IN_FLIGHT, VkDescriptorPool& cullingComputeDescriptorPool) {
         std::array<VkDescriptorPoolSize, 4> poolSizes{};
         poolSizes[0].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
         poolSizes[0].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
@@ -957,8 +949,8 @@ struct Graphics {
         }
     }
 
-    static void createCullingComputeDescriptorSets(const VkDevice& device, const int& MAX_FRAMES_IN_FLIGHT, const VkDescriptorSetLayout& cullingComputeDescriptorSetLayout, const VkDescriptorPool& cullingComputeDescriptorPool, std::vector<VkDescriptorSet>& cullingComputeDescriptorSets, const ModelBus& mdlBus, const std::vector<VkBuffer>&  atomicCounterBuffers, std::vector<VkBuffer>& uniformCullingBuffers, std::vector<VkBuffer>& visibleIndicesBuffers, std::vector<VkBuffer>& modelCullingBuffers) {
-        std::vector layouts(MAX_FRAMES_IN_FLIGHT, cullingComputeDescriptorSetLayout);
+    static void createCullingComputeDescriptorSets(const VkDevice& device, const int& MAX_FRAMES_IN_FLIGHT, const VkDescriptorSetLayout& cullingComputeDescriptorSetLayout, const VkDescriptorPool& cullingComputeDescriptorPool, std::vector<VkDescriptorSet>& cullingComputeDescriptorSets, const ModelBus& mdlBus, const std::vector<VkBuffer>&  atomicCounterBuffers, const std::vector<VkBuffer>& uniformCullingBuffers, const std::vector<VkBuffer>& visibleIndicesBuffers, const VkBuffer& modelCullingBuffer) {
+        const std::vector layouts(MAX_FRAMES_IN_FLIGHT, cullingComputeDescriptorSetLayout);
         VkDescriptorSetAllocateInfo allocInfo{};
         allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
         allocInfo.descriptorPool = cullingComputeDescriptorPool;
@@ -972,7 +964,7 @@ struct Graphics {
 
         for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
             VkDescriptorBufferInfo mcbInfo{};
-            mcbInfo.buffer = modelCullingBuffers[i];
+            mcbInfo.buffer = modelCullingBuffer;
             mcbInfo.offset = 0;
             mcbInfo.range = VK_WHOLE_SIZE;
 
@@ -1035,13 +1027,13 @@ struct Graphics {
     // Command shi
     #pragma region Сommand
 
-    static void createCommandPool(VkDevice& device, VkPhysicalDevice& physicalDevice, VkCommandPool& commandPool, VkSurfaceKHR& surface) {
-        QueueFamilyIndices queueFamilyIndices = Queue::findQueueFamilies(physicalDevice, surface);
+    static void createCommandPool(const VkDevice& device, VkPhysicalDevice& physicalDevice, VkCommandPool& commandPool, VkSurfaceKHR& surface) {
+        auto [graphicsFamily, presentFamily] = Queue::findQueueFamilies(physicalDevice, surface);
 
         VkCommandPoolCreateInfo poolInfo{};
         poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
         poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-        poolInfo.queueFamilyIndex = queueFamilyIndices.graphicsFamily.value();
+        poolInfo.queueFamilyIndex = graphicsFamily.value();
 
         if (vkCreateCommandPool(device, &poolInfo, nullptr, &commandPool) != VK_SUCCESS) {
             throw std::runtime_error("failed to create command pool!");
@@ -1053,13 +1045,10 @@ struct Graphics {
     static void recordCommandBuffer(
         VkDevice& device,
         VkPhysicalDevice& physicalDevice,
-        VkCommandPool& commandPool,
-        VkQueue& graphicsQueue,
         VkCommandBuffer& commandBuffer,
         uint32_t imageIndex,
         VkRenderPass& renderPass,
-        std::vector<VkFramebuffer>&
-        swapChainFramebuffers,
+        std::vector<VkFramebuffer>& swapChainFramebuffers,
         VkExtent2D& swapchainExtent,
         VkBuffer& vertexBuffer,
         VkBuffer& indexBuffer,
@@ -1075,7 +1064,6 @@ struct Graphics {
         uint32_t& currentFrame,
         Color clear_color,
         ModelBus& mdlBus,
-        std::vector<VkBuffer>& modelBuffers,
         std::vector<VkBuffer>& modelDataBuffers,
         VkBuffer& drawCommandsBuffer,
         VkDeviceMemory& drawCommandsBufferMemory,
@@ -1085,6 +1073,7 @@ struct Graphics {
         std::vector<VkBuffer>& atomicCounterBuffers,
         std::vector<VkBuffer>& visibleIndicesBuffers,
         uint32_t& visible) {
+
         auto start = std::chrono::high_resolution_clock::now();
 
         VkCommandBufferBeginInfo beginInfo{};
@@ -1106,10 +1095,10 @@ struct Graphics {
         std::array<VkClearValue, 2> clearValues{};
         clearValues[0].color = {
             {
-                (float) clear_color.r / 255,
-                (float) clear_color.g / 255,
-                (float) clear_color.b / 255,
-                (float) clear_color.a / 255
+                static_cast<float>(clear_color.r) / 255,
+                static_cast<float>(clear_color.g) / 255,
+                static_cast<float>(clear_color.b) / 255,
+                static_cast<float>(clear_color.a) / 255
             }
         };
         clearValues[1].depthStencil = {1.0f, 0};
@@ -1117,12 +1106,11 @@ struct Graphics {
         renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
         renderPassInfo.pClearValues = clearValues.data();
 
-        constexpr uint32_t workgroupSize = 2048;
-
         // MATRICES
         static size_t frame = 0;
 
         if (matrixDirty) {
+            constexpr uint32_t workgroupSize = 2048;
             vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, matrixComputePipeline);
             vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, matrixComputePipelineLayout, 0, 1, &matrixComputeDescriptorSets[currentFrame], 0, nullptr);
 
@@ -1214,8 +1202,7 @@ struct Graphics {
                 vertexOffset += mdlBus.getVertexCount(file);
                 firstInstance += instanceCount;
             }
-
-            updateOrCreateDrawCommandsBuffer(device, physicalDevice, commandPool, graphicsQueue, drawCommandsBuffer, drawCommandsBufferMemory, mdlBus, drawCommandsBufferMapped, mdlBus.drawCommands);
+            updateOrCreateDrawCommandsBuffer(device, physicalDevice, drawCommandsBuffer, drawCommandsBufferMemory, mdlBus, drawCommandsBufferMapped, mdlBus.drawCommands);
 
             if (frame == MAX_FRAMES_IN_FLIGHT) {
                 //mdlBus.dirtyCommands = false;
@@ -1231,8 +1218,8 @@ struct Graphics {
             VkViewport viewport{};
             viewport.x = 0.0f;
             viewport.y = 0.0f;
-            viewport.width = (float) swapchainExtent.width;
-            viewport.height = (float) swapchainExtent.height;
+            viewport.width = static_cast<float>(swapchainExtent.width);
+            viewport.height = static_cast<float>(swapchainExtent.height);
             viewport.minDepth = 0.0f;
             viewport.maxDepth = 1.0f;
             vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
@@ -1268,7 +1255,7 @@ struct Graphics {
         }
     }
 
-    static VkCommandBuffer beginSingleTimeCommands(VkDevice& device, VkCommandPool& commandPool) {
+    static VkCommandBuffer beginSingleTimeCommands(const VkDevice& device, const VkCommandPool& commandPool) {
         VkCommandBufferAllocateInfo allocInfo{};
         allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
         allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
@@ -1287,7 +1274,7 @@ struct Graphics {
         return commandBuffer;
     }
 
-    static void endSingleTimeCommands(VkDevice& device, VkCommandBuffer& commandBuffer, VkCommandPool& commandPool, VkQueue& graphicsQueue) {
+    static void endSingleTimeCommands(const VkDevice& device, const VkCommandBuffer& commandBuffer, const VkCommandPool& commandPool, const VkQueue& graphicsQueue) {
         vkEndCommandBuffer(commandBuffer);
 
         VkSubmitInfo submitInfo{};
@@ -1307,7 +1294,7 @@ struct Graphics {
     // Images
     #pragma region Image
 
-    static void createImage(VkDevice& device, VkPhysicalDevice& physicalDevice, uint32_t width, uint32_t height, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage& image, VkDeviceMemory& imageMemory) {
+    static void createImage(const VkDevice& device, const VkPhysicalDevice& physicalDevice, const uint32_t width, const uint32_t height, const VkFormat format, const VkImageTiling tiling, const VkImageUsageFlags usage, const VkMemoryPropertyFlags properties, VkImage& image, VkDeviceMemory& imageMemory) {
         VkImageCreateInfo imageInfo{};
         imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
         imageInfo.imageType = VK_IMAGE_TYPE_2D;
@@ -1333,7 +1320,7 @@ struct Graphics {
         VkMemoryAllocateInfo allocInfo{};
         allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
         allocInfo.allocationSize = memRequirements.size;
-        allocInfo.memoryTypeIndex = Graphics::findMemoryType(memRequirements.memoryTypeBits, properties, physicalDevice);
+        allocInfo.memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits, properties, physicalDevice);
 
         if (vkAllocateMemory(device, &allocInfo, nullptr, &imageMemory) != VK_SUCCESS) {
             throw std::runtime_error("failed to allocate image memory!");
@@ -1342,7 +1329,7 @@ struct Graphics {
         vkBindImageMemory(device, image, imageMemory, 0);
     }
 
-    static VkImageView createImageView(VkDevice device, VkImage image, VkFormat format, VkImageAspectFlags aspectFlags) {
+    static VkImageView createImageView(const VkDevice& device, const VkImage& image, const VkFormat& format, const VkImageAspectFlags& aspectFlags) {
         VkImageViewCreateInfo viewInfo{};
         viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
         viewInfo.image = image;
@@ -1363,10 +1350,10 @@ struct Graphics {
     }
 
 
-    static void createTextureImage(VkDevice& device, VkCommandPool& commandPool, VkQueue& graphicsQueue, VkPhysicalDevice& physicalDevice, VkBuffer& stagingBuffer, VkDeviceMemory& stagingBufferMemory, VkImage& textureImage, VkDeviceMemory& textureImageMemory) {
+    static void createTextureImage(VkDevice& device, VkCommandPool& commandPool, VkQueue& graphicsQueue, const VkPhysicalDevice& physicalDevice, VkBuffer& stagingBuffer, VkDeviceMemory& stagingBufferMemory, VkImage& textureImage, VkDeviceMemory& textureImageMemory) {
         int texWidth, texHeight, texChannels;
         stbi_uc* pixels = stbi_load("/home/down1/2g43s/core/textures/odd-eyed-cat.jpg", &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
-        VkDeviceSize imageSize = texWidth * texHeight * 4;
+        const VkDeviceSize imageSize = texWidth * texHeight * 4;
 
         if (!pixels) {
             throw std::runtime_error("failed to load texture image!");
@@ -1376,27 +1363,27 @@ struct Graphics {
 
         void* data;
         vkMapMemory(device, stagingBufferMemory, 0, imageSize, 0, &data);
-        memcpy(data, pixels, static_cast<size_t>(imageSize));
+        memcpy(data, pixels, imageSize);
         vkUnmapMemory(device, stagingBufferMemory);
 
         stbi_image_free(pixels);
 
         createImage(device, physicalDevice,texWidth, texHeight, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, textureImage, textureImageMemory);
 
-        transitionImageLayout(device, commandPool, graphicsQueue, textureImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+        transitionImageLayout(device, commandPool, graphicsQueue, textureImage, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
         copyBufferToImage(device, commandPool, graphicsQueue, stagingBuffer, textureImage, static_cast<uint32_t>(texWidth), static_cast<uint32_t>(texHeight));
-        transitionImageLayout(device, commandPool, graphicsQueue, textureImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        transitionImageLayout(device, commandPool, graphicsQueue, textureImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
         vkDestroyBuffer(device, stagingBuffer, nullptr);
         vkFreeMemory(device, stagingBufferMemory, nullptr);
     }
 
-    static void createTextureImageView(VkDevice& device, VkImage& textureImage, VkImageView& textureImageView) {
+    static void createTextureImageView(const VkDevice& device, const VkImage& textureImage, VkImageView& textureImageView) {
         textureImageView = createImageView(device, textureImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_ASPECT_COLOR_BIT);
     }
 
 
-    static void createTextureSampler(VkDevice& device, VkPhysicalDevice& physicalDevice, VkSampler& textureSampler) {
+    static void createTextureSampler(const VkDevice& device, const VkPhysicalDevice& physicalDevice, VkSampler& textureSampler) {
         VkSamplerCreateInfo samplerInfo{};
         samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
         samplerInfo.magFilter = VK_FILTER_LINEAR;
@@ -1430,8 +1417,8 @@ struct Graphics {
         }
     }
 
-    static void copyBufferToImage(VkDevice& device, VkCommandPool& commandPool, VkQueue& graphicsQueue, VkBuffer buffer, VkImage image, uint32_t width, uint32_t height) {
-        VkCommandBuffer commandBuffer = beginSingleTimeCommands(device, commandPool);
+    static void copyBufferToImage(const VkDevice& device, const VkCommandPool& commandPool, const VkQueue& graphicsQueue, const VkBuffer& buffer, const VkImage& image, const uint32_t& width, const uint32_t& height) {
+        const VkCommandBuffer commandBuffer = beginSingleTimeCommands(device, commandPool);
 
         VkBufferImageCopy region{};
         region.bufferOffset = 0;
@@ -1462,7 +1449,7 @@ struct Graphics {
         endSingleTimeCommands(device, commandBuffer, commandPool, graphicsQueue);
     }
 
-    static void transitionImageLayout(VkDevice& device, VkCommandPool& commandPool, VkQueue& graphicsQueue, VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout) {
+    static void transitionImageLayout(const VkDevice& device, const VkCommandPool& commandPool, const VkQueue& graphicsQueue, const VkImage image, const VkImageLayout& oldLayout, const VkImageLayout& newLayout) {
         VkCommandBuffer commandBuffer = beginSingleTimeCommands(device, commandPool);
 
         VkImageMemoryBarrier barrier{};
