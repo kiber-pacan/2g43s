@@ -58,7 +58,6 @@ void main() {
     if (idx >= ucbo.totalObjects) return;
 
     if (isSphereInFrustum(mcb.objects[idx].sphere, ucbo.frustumPlanes)) {
-        // Atomic operation (slow, but necessary for counting/indexing)
         uint outIdx = atomicAdd(acb.count, 1);
 
         if (outIdx < ucbo.totalObjects) {

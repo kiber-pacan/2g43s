@@ -4,7 +4,7 @@
 #include <glm/mat4x4.hpp>
 
 struct UniformCullingBufferObject {
-    glm::vec4 frustumPlanes[6];
+    glm::vec4 planes[6];
     uint32_t totalObjects;
 };
 

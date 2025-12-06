@@ -13,7 +13,7 @@ layout(binding = 0) uniform UBO {
     mat4 proj;
 } ubo;
 
-layout(std140, binding = 2) readonly buffer MB{
+layout(std430, binding = 2) readonly buffer MB{
     MBO objects[];
 } mb;
 
