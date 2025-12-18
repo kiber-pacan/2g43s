@@ -22,6 +22,7 @@ struct KeyListener {
             KeyBinding::of(SDL_SCANCODE_R),
             KeyBinding::of(SDL_SCANCODE_MINUS),
             KeyBinding::of(SDL_SCANCODE_EQUALS),
+            KeyBinding::of(SDL_SCANCODE_F2),
         };
     }
 
@@ -105,6 +106,13 @@ struct KeyListener {
         if (keys[10]->down) {
             eng.camera.speed += 50.0f;
             if (eng.camera.speed > 100.0f) eng.camera.speed = 512.0f;
+        }
+        static bool wasDown = false;
+        if (keys[11]->down && wasDown != true) {
+            wasDown = true;
+            SDL_SetWindowRelativeMouseMode(eng.window, !SDL_GetWindowRelativeMouseMode(eng.window));
+        } else if (!keys[11]->down && wasDown == true) {
+            wasDown = false;
         }
     }
 };
