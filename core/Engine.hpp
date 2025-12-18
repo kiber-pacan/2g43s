@@ -19,6 +19,13 @@
 #include "sep/model/ParsedModel.hpp"
 #include <ranges>
 
+#include <imgui.h>
+#include <imconfig.h>
+#include <imgui_internal.h>
+#include <imgui_impl_sdl3.h>
+#include <imgui_impl_vulkan.h>
+#include <queue>
+
 // Parameters
 inline int HEIGHT = 720;
 inline int WIDTH = 1280;
@@ -58,16 +65,17 @@ public:
         }
         */
 
+
         updateUniformBuffer(currentFrame, swapchainExtent, uniformBuffersMapped, ubo, camera);
         updateCullingUniformBuffer(currentFrame, swapchainExtent, uniformCullingBuffersMapped, ucbo, camera, mdlBus);
         updateModelCullingBuffer(modelCullingBufferMapped, mcbo, mdlBus);
         updateModelDataBuffer(currentFrame, modelDataBuffersMapped, mdlBus);
         updateModelBuffer(modelBuffersMapped, mbo);
 
-        vkResetFences(device, 1, &inFlightFences[currentFrame]);
-
-        vkResetCommandBuffer(commandBuffers[currentFrame], /*VkCommandBufferResetFlagBits*/ 0);
         Graphics::recordCommandBuffer(device, physicalDevice, commandBuffers[currentFrame], imageIndex, renderPass, swapChainFramebuffers, swapchainExtent, vertexBuffer, indexBuffer, graphicsPipeline, matrixComputePipeline, cullingComputePipeline, graphicsPipelineLayout, matrixComputePipelineLayout, cullingComputePipelineLayout, graphicsDescriptorSets, matrixComputeDescriptorSets, cullingComputeDescriptorSets, currentFrame, clear_color, mdlBus, modelDataBuffers, drawCommandsBuffer, drawCommandsBufferMemory, drawCommandsBufferMapped, MAX_FRAMES_IN_FLIGHT, matrixDirty, atomicCounterBuffersMapped, atomicCounterBuffers, visibleIndicesBuffers, visible);
+
+        vkResetFences(device, 1, &inFlightFences[currentFrame]);
+        //vkResetCommandBuffer(commandBuffers[currentFrame], /*VkCommandBufferResetFlagBits*/ 0);
 
         VkSubmitInfo submitInfo{};
         submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -158,6 +166,8 @@ public:
             vkDestroyBuffer(device, uniformCullingBuffers[i], nullptr);
             vkFreeMemory(device, uniformCullingBuffersMemory[i], nullptr);
         }
+
+        ImGui_ImplVulkan_Shutdown();
 
         vkDestroyDescriptorPool(device, graphicsDescriptorPool, nullptr);
         vkDestroyDescriptorSetLayout(device, graphicsDescriptorSetLayout, nullptr);
@@ -332,7 +342,7 @@ public:
 
 
     #pragma region PublicVars
-    // Window
+    // SDL
     SDL_Window* window{};
 
     // Session ID
@@ -516,6 +526,7 @@ private:
         LOGGER = Logger::of("engine.hpp");
 
         initializeVulkan();
+        initializeImGui(window);
 
         auto end = std::chrono::high_resolution_clock::now();
         std::chrono::duration<double> duration = end - start;
@@ -527,6 +538,8 @@ private:
     // Vulkan related stuff
     void initializeVulkan();
 
+    // ImGui Stuff
+    void initializeImGui(SDL_Window* window);
 
     void cleanupSwapchain() const {
         vkDestroyImage(device, depthImage, nullptr);
@@ -639,6 +652,42 @@ private:
         return extensions;
     }
 };
+
+
+
+
+inline void Engine::initializeImGui(SDL_Window* window) {
+    ImGui::CreateContext();
+
+    ImGui_ImplSDL3_InitForVulkan(window);
+
+    QueueFamilyIndices indices = Queue::findQueueFamilies(physicalDevice, surface);
+
+    ImGui_ImplVulkan_InitInfo info{};
+
+    info.ApiVersion = VK_API_VERSION_1_4;
+    info.Instance = instance;
+    info.PhysicalDevice = physicalDevice;
+    info.Device = device;
+    info.Queue = graphicsQueue;
+    info.QueueFamily = indices.graphicsFamily.value();
+    info.DescriptorPool = graphicsDescriptorPool;
+    info.DescriptorPoolSize = 0;
+    info.MinImageCount = MAX_FRAMES_IN_FLIGHT;
+    info.ImageCount = MAX_FRAMES_IN_FLIGHT;
+
+    ImGui_ImplVulkan_PipelineInfo pipeline_info{};
+    pipeline_info.RenderPass = renderPass;
+
+    info.PipelineInfoMain = pipeline_info;
+
+    ImGui_ImplVulkan_Init(&info);
+
+    VkCommandBuffer commandBuffer = Graphics::beginSingleTimeCommands(device, graphicsCommandPool);
+    Graphics::endSingleTimeCommands(device, commandBuffer, graphicsCommandPool, graphicsQueue);
+
+    vkDeviceWaitIdle(device);
+}
 
 inline void Engine::initializeVulkan() {
     deltaT = new Delta();
