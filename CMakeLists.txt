@@ -79,6 +79,7 @@ if(${WIN32})
 else ()
     find_package(SDL3 REQUIRED CONFIG)
     find_package(glm REQUIRED CONFIG)
+    find_package(imgui REQUIRED CONFIG)
     add_subdirectory("libs/fastgltf")
     include_directories("/libs/stb")
     find_package(OpenMP REQUIRED)
@@ -102,6 +103,7 @@ target_link_libraries(${EXECUTABLE_NAME} PUBLIC
         SDL3::SDL3
         glm::glm
         fastgltf::fastgltf
+        imgui::imgui
 )
 target_compile_definitions(${EXECUTABLE_NAME} PUBLIC SDL_MAIN_USE_CALLBACKS)
 
