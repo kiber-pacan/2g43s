@@ -24,6 +24,10 @@
 #include "buffers/matrices/ModelBufferObject.hpp"
 #include "buffers/matrices/ModelDataBufferObject.hpp"
 // Culling
+#include <imgui.h>
+#include <imgui_impl_sdl3.h>
+#include <imgui_impl_vulkan.h>
+
 #include "buffers/culling/ModelCullingBufferObject.hpp"
 #include "buffers/culling/VisibleIndicesBufferObject.hpp"
 #include "buffers/generic/UniformCullingBufferObject.hpp"
@@ -698,7 +702,7 @@ struct Graphics {
         poolSizes[0].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
 
         poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        poolSizes[1].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
+        poolSizes[1].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT) * 2;
 
         poolSizes[2].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
         poolSizes[2].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
@@ -709,9 +713,10 @@ struct Graphics {
 
         VkDescriptorPoolCreateInfo poolInfo{};
         poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+        poolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
         poolInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
         poolInfo.pPoolSizes = poolSizes.data();
-        poolInfo.maxSets = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
+        poolInfo.maxSets = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT) * 2;
 
         if (vkCreateDescriptorPool(device, &poolInfo, nullptr, &graphicsDescriptorPool) != VK_SUCCESS) {
             throw std::runtime_error("failed to create descriptor pool!");
@@ -1040,6 +1045,19 @@ struct Graphics {
         }
     }
 
+    static void renderImGui(VkCommandBuffer& commandBuffer) {
+        ImGui_ImplSDL3_NewFrame();
+        ImGui_ImplVulkan_NewFrame();
+
+        ImGui::NewFrame();
+
+        ImGui::ShowDemoWindow();
+
+        ImGui::Render();
+
+        ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), commandBuffer);
+    }
+
     size_t i1 = 0;
 
     static void recordCommandBuffer(
@@ -1078,6 +1096,8 @@ struct Graphics {
 
         VkCommandBufferBeginInfo beginInfo{};
         beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+        beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+
 
         if (vkBeginCommandBuffer(commandBuffer, &beginInfo) != VK_SUCCESS) {
             throw std::runtime_error("failed to begin recording command buffer!");
@@ -1237,6 +1257,8 @@ struct Graphics {
             vkCmdBindIndexBuffer(commandBuffer, indexBuffer, 0, VK_INDEX_TYPE_UINT32);
 
             vkCmdDrawIndexedIndirectCount(commandBuffer, drawCommandsBuffer, 0, atomicCounterBuffers[currentFrame], 0, mdlBus.drawCommands.size(), sizeof(VkDrawIndexedIndirectCommand));
+
+            renderImGui(commandBuffer);
 
         vkCmdEndRenderPass(commandBuffer);
 
