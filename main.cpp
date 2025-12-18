@@ -29,19 +29,19 @@ SDL_AppResult SDL_Fail() {
 }
 
 SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
-    // init the library, here we make a window so we only need the Video capabilities.
+    // Init the library, here we make a window so we only need the Video capabilities.
     if (!SDL_Init(SDL_INIT_VIDEO)){
         return SDL_Fail();
     }
 
-    // create a window
+    // Create a window
     SDL_Window* window = SDL_CreateWindow("Window", WIDTH, HEIGHT, SDL_WINDOW_RESIZABLE | SDL_WINDOW_VULKAN);
     if (!window){
         return SDL_Fail();
     }
 
 
-    // print some information about the window
+    // Print some information about the window
     SDL_ShowWindow(window);
     {
         int width, height, bbwidth, bbheight;
@@ -55,7 +55,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
         LOGGER->info("Random number: ${} (between 1 and 100)", Random::randomNum<uint32_t>(1,100));
     }
 
-    //Set up Vulkan engine
+    // Set up Vulkan engine
     Engine vulkan_engine;
     vulkan_engine.init(window);
 
@@ -94,8 +94,14 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *e) {
         app->engine.framebufferResized = true;
     }
 
+
     app->kL->listen(e);
-    app->mL->listen(app->engine.camera);
+
+    if (SDL_GetWindowRelativeMouseMode(app->engine.window)) {
+        app->mL->listen(app->engine.camera);
+    } else {
+        ImGui_ImplSDL3_ProcessEvent(e);
+    }
 
     return SDL_APP_CONTINUE;
 }
