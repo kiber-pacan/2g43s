@@ -42,10 +42,10 @@ struct KeyListener {
     void iterateKeys(Engine& eng, bool& quit) const {
         // Movement
         if (keys[0]->down) {
-            eng.camera.pos += eng.camera.speed * eng.camera.look * eng.deltaT->d;
+            eng.camera.pos += eng.camera.speed * eng.camera.look * static_cast<float>(eng.deltaT->d);
         }
         if (keys[1]->down) {
-            eng.camera.pos -= eng.camera.speed * eng.camera.look * eng.deltaT->d;
+            eng.camera.pos -= eng.camera.speed * eng.camera.look * static_cast<float>(eng.deltaT->d);
         }
         if (keys[2]->down) {
             auto cos = glm::cos(glm::radians(90.0f));

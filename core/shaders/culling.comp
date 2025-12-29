@@ -9,6 +9,14 @@ struct VIBO {
     uint index;
 };
 
+struct DCO {
+    uint indexCount;
+    uint instanceCount;
+    uint firstIndex;
+    uint vertexOffset;
+    uint firstInstance;
+};
+
 layout(std430, binding = 0) readonly buffer MCB {
     MCBO objects[];
 } mcb;
@@ -17,9 +25,9 @@ layout(std430, binding = 1) writeonly buffer VIB {
     VIBO objects[];
 } vib;
 
-layout(std430, binding = 2) writeonly buffer ACB {
-    uint count;
-} acb;
+layout(std430, binding = 2) writeonly buffer DCB {
+    DCO objects[];
+} dcb;
 
 struct Frustum {
     vec4 planes[6];
@@ -53,15 +61,15 @@ bool isSphereInFrustum(vec4 sphere, vec4 f[6]) {
 }
 
 void main() {
-    uint idx = gl_GlobalInvocationID.x;
+    uint index = gl_GlobalInvocationID.x;
 
-    if (idx >= ucbo.totalObjects) return;
+    if (index >= ucbo.totalObjects) return;
 
-    if (isSphereInFrustum(mcb.objects[idx].sphere, ucbo.frustumPlanes)) {
-        uint outIdx = atomicAdd(acb.count, 1);
+    if (isSphereInFrustum(mcb.objects[index].sphere, ucbo.frustumPlanes)) {
+        uint outIdx = atomicAdd(dcb.objects[0].instanceCount, 1);
 
         if (outIdx < ucbo.totalObjects) {
-            vib.objects[outIdx].index = idx;
+            vib.objects[outIdx].index = index;
         }
     }
 }

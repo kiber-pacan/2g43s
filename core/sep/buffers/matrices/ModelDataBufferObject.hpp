@@ -1,6 +1,5 @@
 #ifndef INC_2G43S_MODELDATABUFFEROBJECT_H
 #define INC_2G43S_MODELDATABUFFEROBJECT_H
-#define INC_2G43S_MODELBUFFEROBJECT_H
 
 #include <vector>
 #include <glm/mat4x4.hpp>

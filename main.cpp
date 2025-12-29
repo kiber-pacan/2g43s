@@ -7,11 +7,18 @@
 #include "core/sep/util/Tools.hpp"
 
 #define GLM_FORCE_RADIANS
+#include <imgui_impl_sdl3.h>
 #include <glm/glm.hpp>
 
 #include "core/sep/control/KeyListener.hpp"
 #include "core/sep/control/MouseListener.hpp"
 #include "core/sep/util/Random.hpp"
+
+
+#include <omp.h>
+
+
+
 
 struct AppContext {
     Engine engine;
@@ -29,6 +36,11 @@ SDL_AppResult SDL_Fail() {
 }
 
 SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
+    #if defined(__linux__)
+        setenv("OMP_PROC_BIND", "true", 1);
+        setenv("OMP_PLACES", "cores", 1);
+    #endif
+
     // Init the library, here we make a window so we only need the Video capabilities.
     if (!SDL_Init(SDL_INIT_VIDEO)){
         return SDL_Fail();

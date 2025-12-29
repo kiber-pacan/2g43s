@@ -1,6 +1,7 @@
 #ifndef INC_2G43S_RANDOM_H
 #define INC_2G43S_RANDOM_H
 #include <random>
+#include <omp.h>
 
 struct Random {
     inline static std::random_device rD{};

@@ -7,8 +7,9 @@ layout(location = 1) in vec2 fragTexCoord;
 
 layout(location = 0) out vec4 outColor;
 
-float near = 0.1;
-float far = 100.0;
+
+float near = -1.0;
+float far = 1000.0;
 
 float linearizeDepth(float d) {
     return (near * far) / (far + d * (near - far));
@@ -16,11 +17,9 @@ float linearizeDepth(float d) {
 
 
 void main() {
-    float resolution = 64.0;
-    vec2 gridUV = floor(fragTexCoord * resolution) / resolution;
-    float depth = texture(texSampler, vec3(gridUV, 0)).r;
-
+    float depth = texture(texSampler, vec3(fragTexCoord, 0)).r;
 
     float linearD = linearizeDepth(depth) / far;
+
     outColor = vec4(vec3(linearD), 1.0);
 }

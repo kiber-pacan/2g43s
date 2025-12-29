@@ -4,5 +4,7 @@ glslc vertex.vert -o vertex.spv
 glslc fragment.frag -o fragment.spv
 glslc matrices.comp -o matrices.spv
 glslc culling.comp -o culling.spv
+glslc postprocessingFrag.frag -o culling.spv
+glslc postprocessingVert.vert -o culling.spv
 
 echo "Done!"

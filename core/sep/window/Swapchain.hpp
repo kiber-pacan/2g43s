@@ -7,8 +7,9 @@
 
 #include <vector>
 #include <vulkan/vulkan.h>
-#include "../graphics/Graphics.hpp"
 #include <SDL3/SDL.h>
+
+#include "Images.hpp"
 
 // Details about support of certain features by machine
 struct SwapchainSupportDetails {
@@ -101,11 +102,11 @@ struct Swapchain {
         return details;
     }
 
-    static void createImageViews(VkDevice& device, std::vector<VkImageView>& swapchainImageViews, std::vector<VkImage>& swapchainImages, VkFormat& swapchainImageFormat) {
+    static void createImageViews(const VkDevice& device, std::vector<VkImageView>& swapchainImageViews, std::vector<VkImage>& swapchainImages, VkFormat& swapchainImageFormat) {
         swapchainImageViews.resize(swapchainImages.size());
 
         for (uint32_t i = 0; i < swapchainImages.size(); i++) {
-            swapchainImageViews[i] = Graphics::createImageView(device, swapchainImages[i], swapchainImageFormat, VK_IMAGE_ASPECT_COLOR_BIT);
+            swapchainImageViews[i] = Images::createImageView(device, swapchainImages[i], swapchainImageFormat, VK_IMAGE_ASPECT_COLOR_BIT);
         }
     }
 

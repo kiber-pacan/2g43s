@@ -14,54 +14,149 @@ set(EXECUTABLE_NAME ${PROJECT_NAME})
 add_executable(${EXECUTABLE_NAME}
         main.cpp
 
+        core/Engine.cpp
         core/Engine.hpp
-        core/sep/util/Tools.hpp
-        core/sep/util/Logger.hpp
 
-        core/sep/camera/Camera.hpp
+        # Graphics
+        core/sep/graphics/Buffers.cpp
+        core/sep/graphics/Buffers.hpp
+        core/sep/graphics/Command.cpp
+        core/sep/graphics/Command.hpp
+        core/sep/graphics/Delta.hpp
+        core/sep/graphics/Graphics.hpp
 
+
+        # Pipeline
+        core/sep/graphics/pipeline/Shaders.cpp
+        core/sep/graphics/pipeline/Shaders.hpp
+        core/sep/graphics/pipeline/PipelineCreation.cpp
+        core/sep/graphics/pipeline/PipelineCreation.hpp
+        core/sep/graphics/pipeline/Descriptor.cpp
+        core/sep/graphics/pipeline/Descriptor.hpp
+
+        # Helper
+        core/sep/graphics/helper/Helper.cpp
+        core/sep/graphics/helper/Helper.hpp
+        core/sep/graphics/helper/Images.cpp
+        core/sep/graphics/helper/Images.hpp
+
+
+        # Entity
+        core/sep/entity/CameraEntity.hpp
+        core/sep/entity/Entity.hpp
+
+
+        # Device
+        core/sep/device/PhysDevice.hpp
+        core/sep/device/LogDevice.hpp
+
+
+        # Control
         core/sep/control/KeyBinding.hpp
         core/sep/control/KeyListener.hpp
         core/sep/control/MouseListener.hpp
 
-        core/sep/device/PhysDevice.hpp
-        core/sep/device/LogDevice.hpp
 
-        core/sep/graphics/Graphics.hpp
-        core/sep/graphics/Delta.hpp
+        # Camera
+        core/sep/camera/Camera.hpp
 
-        core/sep/model/ModelInstance.hpp
-        core/sep/model/ParsedModel.hpp
-        core/sep/model/bus/ModelBus.hpp
 
-        core/sep/util/Debug.hpp
-        core/sep/util/Queue.hpp
+        # Buffer
+        core/sep/buffers/culling/ModelCullingBufferObject.hpp
+        core/sep/buffers/culling/VisibleIndicesBufferObject.hpp
 
-        core/sep/window/Surface.hpp
-        core/sep/window/Swapchain.hpp
-
-        core/sep/entity/Entity.hpp
-
-        core/sep/util/Color.hpp
-        core/sep/model/primitives/Vertex.hpp
-        core/sep/entity/CameraEntity.hpp
-        core/sep/util/Random.hpp
-        core/sep/model/primitives/Sphere.hpp
+        core/sep/buffers/generic/AtomicCounterObject.hpp
+        core/sep/buffers/generic/DrawCommandsBufferObject.hpp
         core/sep/buffers/generic/UniformBufferObject.hpp
+        core/sep/buffers/generic/UniformCullingBufferObject.hpp
+
         core/sep/buffers/matrices/ModelBufferObject.hpp
         core/sep/buffers/matrices/ModelDataBufferObject.hpp
+
+        # Model
+        core/sep/model/ModelInstance.hpp
+        core/sep/model/ParsedModel.hpp
         core/sep/model/bus/ModelBus.cpp
-        core/sep/buffers/culling/VisibleIndicesBufferObject.hpp
-        core/sep/buffers/culling/ModelCullingBufferObject.hpp
-        core/sep/buffers/generic/UniformCullingBufferObject.hpp
+        core/sep/model/bus/ModelBus.hpp
+        core/sep/model/primitives/Sphere.hpp
+        core/sep/model/primitives/Vertex.hpp
+
+
+        # Util
+        core/sep/util/Color.hpp
+        core/sep/util/Debug.hpp
+        core/sep/util/Logger.hpp
+        core/sep/util/Queue.hpp
+        core/sep/util/Random.hpp
+        core/sep/util/stb_impl.cpp
+        core/sep/util/Tools.hpp
 )
 
 target_include_directories(${EXECUTABLE_NAME} PRIVATE
-        ${PROJECT_SOURCE_DIR}/core/sep
+        core/sep
+
+        core/sep/graphics
+        core/sep/graphics/pipeline
+        core/sep/graphics/helper
+
+        core/sep/entity
+
+        core/sep/device
+
+        core/sep/control
+
+        core/sep/camera
+
+        core/sep/buffers/culling
+        core/sep/buffers/generic
+        core/sep/buffers/matrices
+
+        core/sep/model/
+        core/sep/model/bus
+        core/sep/model/primitives
+
+        core/sep/util/
 )
 
-set(CMAKE_CXX_FLAGS_RELEASE "-Ofast -march=native -flto -funroll-loops -fomit-frame-pointer -ffast-math -fno-math-errno -DNDEBUG")
-set(CMAKE_EXE_LINKER_FLAGS_RELEASE "-flto")
+# Optimizations
+set(CMAKE_CXX_FLAGS_RELEASE " \
+    -O3 \
+    -march=native \
+    -mtune=native \
+    -ffast-math \
+    -fno-finite-math-only \
+    -fopenmp \
+    -flto=full \
+    -fstrict-aliasing \
+    -fstrict-vtable-pointers \
+    -fwhole-program-vtables \
+    -funroll-loops \
+    -fvectorize \
+    -fslp-vectorize \
+    -fno-stack-protector \
+    -fno-stack-check \
+    -fno-plt \
+    -fno-exceptions \
+    -fno-rtti \
+    -fomit-frame-pointer \
+    -fplugin=LLVMPolly.so \
+    -mllvm -polly \
+    -mllvm -polly-parallel \
+    -mllvm -polly-vectorizer=stripmine \
+    -mllvm -polly-invariant-load-hoisting \
+    -mllvm -polly-run-dce \
+    -mllvm -inline-threshold=1000 \
+    -DNDEBUG")
+
+# Оптимизация линковки (Максимальная агрессия)
+set(CMAKE_EXE_LINKER_FLAGS_RELEASE " \
+    -fopenmp \
+    -flto=full \
+    -fuse-ld=mold \
+    -Wl,-O3 \
+    -Wl,--gc-sections \
+    -Wl,--icf=all \
+    -Wl,--strip-all")
 
 #Adding sources to project
 target_sources(${EXECUTABLE_NAME} PRIVATE ${include})

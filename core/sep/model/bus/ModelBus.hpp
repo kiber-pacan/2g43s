@@ -5,11 +5,7 @@
 
 #include "../ModelInstance.hpp"
 #include "../ParsedModel.hpp"
-#include <omp.h>
-
-
 #include "../../util/Random.hpp"
-#include "model/primitives/Sphere.hpp"
 
 struct ModelGroup {
     std::shared_ptr<ParsedModel> model{};
@@ -83,6 +79,9 @@ struct ModelBus {
 
     size_t getTotalInstanceCount() const;
 
+    size_t getTotalModelCount() const;
+
+
 
     uint32_t getIndexCount(const std::string& name) const;
 
@@ -99,6 +98,9 @@ struct ModelBus {
     void addCommands(uint32_t indexCount, uint32_t instanceCount, uint32_t firstIndex, int32_t  vertexOffset, uint32_t firstInstance);
     #pragma endregion
 
+    void randomVolumeTest(size_t count, ModelGroup& group, const glm::vec3& min, const glm::vec3& max);
+
+    void squareTest(size_t count, ModelGroup& group, const double gap);
 
     void test();
 };

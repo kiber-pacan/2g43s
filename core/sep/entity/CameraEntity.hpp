@@ -1,5 +1,6 @@
 #ifndef CAMERAENTITY_H
 #define CAMERAENTITY_H
+#include <string>
 #include <utility>
 
 #include "glm/vec3.hpp"
@@ -14,9 +15,9 @@ struct CameraEntity {
     glm::vec3 size{};
 
     explicit CameraEntity(
-        const glm::vec3 p = glm::vec3(0.0f),
-        const glm::vec3 l = glm::vec3(0.0f),
-        const glm::vec3 s = glm::vec3(1.0f),
+        const glm::vec3 p = glm::vec3(0.0),
+        const glm::vec3 l = glm::vec3(0.0),
+        const glm::vec3 s = glm::vec3(1.0),
         std::string n = ""
         ) : name(std::move(n)), pos(p), look(l), size(s) {}
 

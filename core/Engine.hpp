@@ -1,30 +1,24 @@
 #ifndef ENGINE_HPP
 #define ENGINE_HPP
+#include <glm/fwd.hpp>
+#include <glm/vec4.hpp>
+#include <SDL3/SDL_video.h>
 
-#include <SDL3/SDL_vulkan.h>
+#include <vulkan/vulkan_core.h>
 
-#include "sep/util/Tools.hpp"
-#include "sep/util/Logger.hpp"
-#include "sep/util/Debug.hpp"
-#include "sep/device/LogDevice.hpp"
-#include "sep/device/PhysDevice.hpp"
-#include "sep/window/Surface.hpp"
-#include "sep/window/Swapchain.hpp"
-#include "sep/graphics/Graphics.hpp"
-#include "glm/glm.hpp"
-#include "sep/camera/Camera.hpp"
-#include "sep/graphics/Delta.hpp"
-#include "sep/model/bus/ModelBus.hpp"
-#include "sep/model/ModelInstance.hpp"
-#include "sep/model/ParsedModel.hpp"
-#include <ranges>
+#include "buffers/culling/ModelCullingBufferObject.hpp"
+#include "buffers/culling/VisibleIndicesBufferObject.hpp"
+#include "buffers/generic/AtomicCounterObject.hpp"
+#include "buffers/generic/DrawCommandsBufferObject.hpp"
+#include "buffers/generic/UniformBufferObject.hpp"
+#include "buffers/generic/UniformCullingBufferObject.hpp"
+#include "buffers/matrices/ModelDataBufferObject.hpp"
+#include "buffers/matrices/ModelBufferObject.hpp"
+#include "camera/Camera.hpp"
+#include "graphics/Delta.hpp"
+#include "model/bus/ModelBus.hpp"
+#include "util/Color.hpp"
 
-#include <imgui.h>
-#include <imconfig.h>
-#include <imgui_internal.h>
-#include <imgui_impl_sdl3.h>
-#include <imgui_impl_vulkan.h>
-#include <queue>
 
 // Parameters
 inline int HEIGHT = 720;
@@ -33,313 +27,43 @@ inline int WIDTH = 1280;
 class Engine {
 public:
     // Method for initializing and running engine
-    #pragma region Basic
-    void init(SDL_Window* window) {
-        initialize(window);
-    }
+    #pragma region Main
+    void init(SDL_Window* window);
 
+    void drawImGui(const VkCommandBuffer& commandBuffer) const;
 
     // Draw
-    void drawFrame() {
-        vkWaitForFences(device, 1, &inFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
-
-        uint32_t imageIndex;
-        VkResult result = vkAcquireNextImageKHR(device, swapchain, UINT64_MAX, imageAvailableSemaphores[currentFrame], VK_NULL_HANDLE, &imageIndex);
-
-        if (result == VK_ERROR_OUT_OF_DATE_KHR) {
-            recreateSwapchain();
-            return;
-        } else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
-            throw std::runtime_error("failed to acquire swap chain image!");
-        }
-
-        void* mappedData = atomicCounterBuffersMapped[currentFrame];
-        uint32_t visible = *(static_cast<uint32_t*>(mappedData));
-        /*
-        LOGGER->success("vib ${}", visible);
-
-        // Culling debug
-        auto* vibData = static_cast<uint32_t*>(visibleIndicesMapped[currentFrame]);
-        for (uint32_t i = 0; i < visible; i++) {
-            std::cout << vibData[i] << " ";
-        }
-        */
-
-
-        updateUniformBuffer(currentFrame, swapchainExtent, uniformBuffersMapped, ubo, camera);
-        updateCullingUniformBuffer(currentFrame, swapchainExtent, uniformCullingBuffersMapped, ucbo, camera, mdlBus);
-        updateModelCullingBuffer(modelCullingBufferMapped, mcbo, mdlBus);
-        updateModelDataBuffer(currentFrame, modelDataBuffersMapped, mdlBus);
-        updateModelBuffer(modelBuffersMapped, mbo);
-
-        Graphics::recordCommandBuffer(device, physicalDevice, commandBuffers[currentFrame], imageIndex, renderPass, swapChainFramebuffers, swapchainExtent, vertexBuffer, indexBuffer, graphicsPipeline, matrixComputePipeline, cullingComputePipeline, graphicsPipelineLayout, matrixComputePipelineLayout, cullingComputePipelineLayout, graphicsDescriptorSets, matrixComputeDescriptorSets, cullingComputeDescriptorSets, currentFrame, clear_color, mdlBus, modelDataBuffers, drawCommandsBuffer, drawCommandsBufferMemory, drawCommandsBufferMapped, MAX_FRAMES_IN_FLIGHT, matrixDirty, atomicCounterBuffersMapped, atomicCounterBuffers, visibleIndicesBuffers, visible);
-
-        vkResetFences(device, 1, &inFlightFences[currentFrame]);
-        //vkResetCommandBuffer(commandBuffers[currentFrame], /*VkCommandBufferResetFlagBits*/ 0);
-
-        VkSubmitInfo submitInfo{};
-        submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-
-        VkSemaphore waitSemaphores[] = {imageAvailableSemaphores[currentFrame]};
-        VkPipelineStageFlags waitStages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
-        submitInfo.waitSemaphoreCount = 1;
-        submitInfo.pWaitSemaphores = waitSemaphores;
-        submitInfo.pWaitDstStageMask = waitStages;
-
-        submitInfo.commandBufferCount = 1;
-        submitInfo.pCommandBuffers = &commandBuffers[currentFrame];
-
-        VkSemaphore signalSemaphores[] = {renderFinishedSemaphores[currentFrame]};
-        submitInfo.signalSemaphoreCount = 1;
-        submitInfo.pSignalSemaphores = signalSemaphores;
-
-        if (vkQueueSubmit(graphicsQueue, 1, &submitInfo, inFlightFences[currentFrame]) != VK_SUCCESS) {
-            throw std::runtime_error("failed to submit draw command buffer!");
-        }
-
-        VkPresentInfoKHR presentInfo{};
-        presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-
-        presentInfo.waitSemaphoreCount = 1;
-        presentInfo.pWaitSemaphores = signalSemaphores;
-
-        VkSwapchainKHR swapchains[] = { swapchain };
-        presentInfo.swapchainCount = 1;
-        presentInfo.pSwapchains = swapchains;
-
-        presentInfo.pImageIndices = &imageIndex;
-
-        result = vkQueuePresentKHR(presentQueue, &presentInfo);
-
-        if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || framebufferResized) {
-            framebufferResized = false;
-            recreateSwapchain();
-        } else if (result != VK_SUCCESS) {
-            throw std::runtime_error("failed to present swap chain image!");
-        }
-
-        currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
-    }
+    void drawFrame();
 
 
     // Clean trash before closing app
-    void cleanup() const {
-        vkDeviceWaitIdle(device);
-
-        cleanupSwapchain();
-
-        vkDestroySampler(device, textureSampler, nullptr);
-        vkDestroyImageView(device, textureImageView, nullptr);
-
-        vkDestroyImage(device, textureImage, nullptr);
-        vkFreeMemory(device, textureImageMemory, nullptr);
-
-        for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-            vkDestroyBuffer(device, uniformBuffers[i], nullptr);
-            vkFreeMemory(device, uniformBuffersMemory[i], nullptr);
-        }
-
-        for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-            vkDestroyBuffer(device, modelBuffers[i], nullptr);
-            vkFreeMemory(device, modelBuffersMemory[i], nullptr);
-        }
-
-        for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-            vkDestroyBuffer(device, modelDataBuffers[i], nullptr);
-            vkFreeMemory(device, modelDataBuffersMemory[i], nullptr);
-        }
-
-        for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-            vkDestroyBuffer(device, atomicCounterBuffers[i], nullptr);
-            vkFreeMemory(device, atomicCounterBuffersMemory[i], nullptr);
-        }
-
-        for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-            vkDestroyBuffer(device, visibleIndicesBuffers[i], nullptr);
-            vkFreeMemory(device, visibleIndicesMemory[i], nullptr);
-        }
-
-        vkDestroyBuffer(device, modelCullingBuffer, nullptr);
-        vkFreeMemory(device, modelCullingBufferMemory, nullptr);
-
-        for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-            vkDestroyBuffer(device, uniformCullingBuffers[i], nullptr);
-            vkFreeMemory(device, uniformCullingBuffersMemory[i], nullptr);
-        }
-
-        ImGui_ImplVulkan_Shutdown();
-
-        vkDestroyDescriptorPool(device, graphicsDescriptorPool, nullptr);
-        vkDestroyDescriptorSetLayout(device, graphicsDescriptorSetLayout, nullptr);
-
-        vkDestroyDescriptorPool(device, matrixComputeDescriptorPool, nullptr);
-        vkDestroyDescriptorSetLayout(device, matrixComputeDescriptorSetLayout, nullptr);
-
-        vkDestroyDescriptorPool(device, cullingComputeDescriptorPool, nullptr);
-        vkDestroyDescriptorSetLayout(device, cullingComputeDescriptorSetLayout, nullptr);
-
-        vkDestroyBuffer(device, vertexBuffer, nullptr);
-        vkFreeMemory(device, vertexBufferMemory, nullptr);
-
-        vkDestroyBuffer(device, indexBuffer, nullptr);
-        vkFreeMemory(device, indexBufferMemory, nullptr);
-
-        for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-            vkDestroySemaphore(device, renderFinishedSemaphores[i], nullptr);
-            vkDestroySemaphore(device, imageAvailableSemaphores[i], nullptr);
-            vkDestroyFence(device, inFlightFences[i], nullptr);
-        }
-
-        vkDestroyPipeline(device, graphicsPipeline, nullptr);
-        vkDestroyPipelineLayout(device, graphicsPipelineLayout, nullptr);
-
-        vkDestroyPipeline(device, matrixComputePipeline, nullptr);
-        vkDestroyPipelineLayout(device, matrixComputePipelineLayout, nullptr);
-
-        vkDestroyPipeline(device, cullingComputePipeline, nullptr);
-        vkDestroyPipelineLayout(device, cullingComputePipelineLayout, nullptr);
-
-        vkDestroyRenderPass(device, renderPass, nullptr);
-
-        vkDestroyCommandPool(device, graphicsCommandPool, nullptr);
-
-        vkDestroyCommandPool(device, matrixComputeCommandPool, nullptr);
-
-        vkDestroyCommandPool(device, cullingComputeCommandPool, nullptr);
-
-
-        vkDestroyBuffer(device, drawCommandsBuffer, nullptr);
-        vkFreeMemory(device, drawCommandsBufferMemory, nullptr);
-
-        vkDestroyDevice(device, nullptr);
-
-        if (enableValidationLayers) {
-            Debug::DestroyDebugUtilsMessengerEXT(instance, debugMessenger, nullptr);
-        }
-
-        vkDestroySurfaceKHR(instance, surface, nullptr);
-        vkDestroyInstance(instance, nullptr);
-    }
+    void cleanup() const;
     #pragma endregion
-
 
     #pragma region Buffers
     // Generic
-    static void updateUniformBuffer(const uint32_t currentFrame, const VkExtent2D& swapchainExtent, const std::vector<void*>& uniformBuffersMapped, UniformBufferObject& ubo, const Camera& camera) {
-        ubo.view = glm::lookAt(camera.pos + glm::vec3(0), camera.pos + camera.look, glm::vec3(0.0f, 0.0f, 1.0f));
-        ubo.proj = glm::perspective(camera.fov,  static_cast<float>(swapchainExtent.width) / static_cast<float>(swapchainExtent.height), 0.1f, 4096.0f);
-        ubo.proj[1][1] *= -1;
-        memcpy(uniformBuffersMapped[currentFrame], &ubo, sizeof(ubo));
-    }
+    static void updateUniformBuffer(const uint32_t currentFrame, const VkExtent2D& swapchainExtent, const std::vector<void*>& uniformBuffersMapped, UniformBufferObject& ubo, const Camera& camera);
 
-    static void normalizePlane(glm::vec4& plane) {
-        float length = glm::length(glm::vec3(plane));
-        if (length > 0.0f) {
-            plane /= length;
-        }
-    }
+    static void normalizePlane(glm::vec4& plane);
 
-    static glm::vec4 extractPlane(glm::mat4 viewProjection, int a, float sign) {
-        glm::vec4 plane(
-            viewProjection[0][3] - sign * viewProjection[0][a],
-            viewProjection[1][3] - sign * viewProjection[1][a],
-            viewProjection[2][3] - sign * viewProjection[2][a],
-            viewProjection[3][3] - sign * viewProjection[3][a]
-        );
+    static glm::vec4 extractPlane(glm::mat4 viewProjection, int a, float sign);
 
-        float length = glm::length(glm::vec3(plane));
-        if (length > 0.0f) plane /= length;
-
-        return plane;
-    }
-
-    static void updateCullingUniformBuffer(const uint32_t currentFrame, const VkExtent2D& swapchainExtent, const std::vector<void*>& uniformCullingBuffersMapped, UniformCullingBufferObject& ucbo, const Camera& camera, const ModelBus& mdlBus) {
-        ucbo.totalObjects = mdlBus.getTotalInstanceCount();
-
-        glm::mat4 view = glm::lookAt(camera.pos, camera.pos + camera.look, glm::vec3(0.0f, 0.0f, 1.0f)); // z-up
-        glm::mat4 proj = glm::perspective(camera.fov, static_cast<float>(swapchainExtent.width) / static_cast<float>(swapchainExtent.height), 0.1f, 4096.0f);
-        proj[1][1] *= -1;
-
-        glm::mat4 viewProjection = proj * view;
-
-        ucbo.planes[0] = extractPlane(viewProjection, 0, +1); // right
-        ucbo.planes[1] = extractPlane(viewProjection, 0, -1); // left
-        ucbo.planes[2] = extractPlane(viewProjection, 1, +1); // top
-        ucbo.planes[3] = extractPlane(viewProjection, 1, -1); // bottom
-        ucbo.planes[4] = extractPlane(viewProjection, 2, +1); // far
-        ucbo.planes[5] = extractPlane(viewProjection, 2, -1); // near
-
-        memcpy(uniformCullingBuffersMapped[currentFrame], &ucbo, sizeof(ucbo));
-    }
+    static void updateCullingUniformBuffer(const uint32_t currentFrame, const VkExtent2D& swapchainExtent, const std::vector<void*>& uniformCullingBuffersMapped, UniformCullingBufferObject& ucbo, const Camera& camera, const ModelBus& mdlBus);
 
 
     // Matrices
-    static void updateModelDataBuffer(const uint32_t currentFrame, const std::vector<void*>& modelDataBuffersMapped, const ModelBus& mdlBus) {
-        static bool dirtyMDBO = true;
-        static size_t frame = 0;
+    static void updateModelDataBuffer(const uint32_t currentFrame, const std::vector<void*>& modelDataBuffersMapped, const ModelBus& mdlBus);
 
-        if (dirtyMDBO) {
-            auto* dst = static_cast<glm::vec4*>(modelDataBuffersMapped[currentFrame]);
-            size_t i = 0;
-            for (const auto& group : std::views::transform(std::views::values(mdlBus.groups_map), &ModelGroup::instances)) {
-                for (const auto& instance : group) {
-                    dst[i * 3 + 0] = instance.pos;
-                    dst[i * 3 + 1] = instance.rot;
-                    dst[i * 3 + 2] = instance.scl;
-                    i++;
-                }
-            }
-
-            frame++;
-            if (frame == MAX_FRAMES_IN_FLIGHT) dirtyMDBO = false;
-        }
-    }
-
-    static void updateModelBuffer(const std::vector<void*>& modelBuffersMapped, ModelBufferObject& mbo) {
-        static bool initialized = false;
-
-        if (!initialized) {
-            mbo.mdls.clear();
-            for (auto& object : modelBuffersMapped) {
-                memcpy(object, mbo.mdls.data(), mbo.mdls.size() * sizeof(glm::mat4));
-            }
-        }
-    }
+    static void updateModelBuffer(const std::vector<void*>& modelBuffersMapped, ModelBufferObject& mbo);
 
 
     // Culling
-    static void updateModelCullingBuffer(void*& modelCullingBufferMapped, ModelCullingBufferObject& mcbo, const ModelBus& mdlBus) {
-        static bool initialized = false;
+    static void updateModelCullingBuffer(void*& modelCullingBufferMapped, ModelCullingBufferObject& mcbo, const ModelBus& mdlBus);
 
-        if (!initialized) {
-            mcbo.spheres.clear();
-            mcbo.spheres.reserve(mdlBus.getTotalInstanceCount());
+    static void updateVisibleIndicesBuffer(const std::vector<void*>& visibleIndicesBuffersMapped, VisibleIndicesBufferObject& vio);
 
-            for (const auto& group : std::views::transform(std::views::values(mdlBus.groups_map), &ModelGroup::instances)) {
-                for (const auto& instance : group) {
-                    mcbo.spheres.emplace_back(instance.sfr);
-                }
-            }
-
-            memcpy(modelCullingBufferMapped, mcbo.spheres.data(), mcbo.spheres.size() * sizeof(glm::vec4));
-
-            initialized = true;
-        }
-    }
-
-    static void updateVisibleIndicesBuffer(const std::vector<void*>& visibleIndicesBuffersMapped, VisibleIndicesBufferObject& vio) {
-        static bool initialized = false;
-
-        if (!initialized) {
-            vio.vi.clear();
-            for (auto& object : visibleIndicesBuffersMapped) {
-                memcpy(object, vio.vi.data(), vio.vi.size() * sizeof(uint32_t));
-            }
-        }
-
-    }
+    static void updateDrawCommands(void* drawCommandsBufferMapped, DrawCommandsBufferObject& dc, ModelBus& mdlBus);
     #pragma endregion
-
 
     #pragma region PublicVars
     // SDL
@@ -361,6 +85,7 @@ public:
     UniformBufferObject ubo{};
     UniformCullingBufferObject ucbo{};
     AtomicCounterObject atomic_counter{};
+    DrawCommandsBufferObject dc{};
 
     // Matrices
     ModelDataBufferObject mdbo{};
@@ -373,7 +98,7 @@ public:
     // Controls
     Camera camera{};
 
-    Delta *deltaT{};
+    Delta *deltaT;
 
     ModelBus mdlBus{};
     #pragma endregion PublicVars
@@ -404,7 +129,6 @@ private:
 
     std::vector<VkImage> swapchainImages{};
     std::vector<VkImageView> swapchainImageViews{};
-    std::vector<VkFramebuffer> swapChainFramebuffers{};
 
     // Graphics
     VkPipeline graphicsPipeline{};
@@ -415,7 +139,7 @@ private:
     VkDescriptorPool graphicsDescriptorPool{};
     VkCommandPool graphicsCommandPool{};
 
-    // Compute
+    // Matrix
     VkPipeline matrixComputePipeline{};
     VkPipelineLayout matrixComputePipelineLayout{};
     VkDescriptorSetLayout matrixComputeDescriptorSetLayout{};
@@ -425,7 +149,7 @@ private:
     VkDescriptorPool matrixComputeDescriptorPool{};
     VkCommandPool matrixComputeCommandPool{};
 
-
+    // Culling
     VkPipeline cullingComputePipeline{};
     VkPipelineLayout cullingComputePipelineLayout{};
     VkDescriptorSetLayout cullingComputeDescriptorSetLayout{};
@@ -434,8 +158,14 @@ private:
     VkDescriptorPool cullingComputeDescriptorPool{};
     VkCommandPool cullingComputeCommandPool{};
 
+    // Graphics
+    VkPipeline postprocessPipeline{};
+    VkPipelineLayout postprocessPipelineLayout{};
+    VkDescriptorSetLayout postprocessDescriptorSetLayout{};
 
-    VkRenderPass renderPass{};
+    std::vector<VkDescriptorSet> postprocessDescriptorSets{};
+    VkDescriptorPool postprocessDescriptorPool{};
+    VkCommandPool postprocessCommandPool{};
 
     // Depth
     VkImage depthImage{};
@@ -492,7 +222,6 @@ private:
     VkDeviceMemory modelCullingBufferMemory{};
     void* modelCullingBufferMapped{};
 
-
     // Image
     VkImage textureImage{};
     VkDeviceMemory textureImageMemory{};
@@ -513,27 +242,12 @@ private:
 
     #pragma endregion
 
+    #pragma region Initialization
     // Initialization of engine and its counterparts
-    void initialize(SDL_Window* window) {
-        const auto start = std::chrono::high_resolution_clock::now();
+    void initialize(SDL_Window* window);
 
-        this->window = window;
-
-        mdlBus.test();
-
-        // Engine related stuff
-        sid = Random::randomNum<uint64_t>(1000000000,9999999999);
-        LOGGER = Logger::of("engine.hpp");
-
-        initializeVulkan();
-        initializeImGui(window);
-
-        auto end = std::chrono::high_resolution_clock::now();
-        std::chrono::duration<double> duration = end - start;
-
-        // Success!?
-        LOGGER->success("2g43s engine started successfully in ${} seconds!", duration.count());
-    }
+    // Creating Vulkan instance
+    void createInstance();
 
     // Vulkan related stuff
     void initializeVulkan();
@@ -541,222 +255,21 @@ private:
     // ImGui Stuff
     void initializeImGui(SDL_Window* window);
 
-    void cleanupSwapchain() const {
-        vkDestroyImage(device, depthImage, nullptr);
-        vkFreeMemory(device, depthImageMemory, nullptr);
-        vkDestroyImageView(device, depthImageView, nullptr);
+    #pragma endregion
 
-        for (auto & swapChainFramebuffer : swapChainFramebuffers) {
-            vkDestroyFramebuffer(device, swapChainFramebuffer, nullptr);
-        }
+    #pragma region Swapchain
+    // Swapchain
+    void recreateSwapchain();
 
-        for (auto & swapchainImageView : swapchainImageViews) {
-            vkDestroyImageView(device, swapchainImageView, nullptr);
-        }
+    void cleanupSwapchain() const;
+    #pragma endregion
 
-        vkDestroySwapchainKHR(device, swapchain, nullptr);
-    }
-
-    void recreateSwapchain() {
-        vkDeviceWaitIdle(device);
-
-        cleanupSwapchain();
-
-        // Swapchain
-        Swapchain::createSwapchain(device, physicalDevice, surface, window, swapchain, swapchainImages, swapchainImageFormat, swapchainExtent);
-        Swapchain::createImageViews(device, swapchainImageViews, swapchainImages, swapchainImageFormat);
-
-        Graphics::createDepthResources(device, physicalDevice, depthImage, depthImageMemory, depthImageView, swapchainExtent);
-        Graphics::createFramebuffers(device, depthImageView, swapChainFramebuffers, swapchainImageViews, renderPass, swapchainExtent);
-    }
-
-
-    // Creating Vulkan instance
-    void createInstance() {
-        // Check if validation layers available when requested
-        if (enableValidationLayers && !Debug::checkValidationLayerSupport()) {
-            throw std::runtime_error("validation layers requested, but not available!");
-        }
-        // App info
-        VkApplicationInfo appInfo{};
-        appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
-        appInfo.pApplicationName = "Hello Triangle";
-        appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
-        appInfo.pEngineName = "No Engine";
-        appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
-        appInfo.apiVersion = VK_API_VERSION_1_3;
-
-        // Instance info
-        VkInstanceCreateInfo createInfo{};
-        createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
-        createInfo.pApplicationInfo = &appInfo;
-
-        // Vulkan extensions
-        auto extensions = getRequiredExtensions();
-        createInfo.enabledExtensionCount = static_cast<uint32_t>(extensions.size());
-        createInfo.ppEnabledExtensionNames = extensions.data();
-
-        // Validation layers initialization
-        VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo{};
-        if (enableValidationLayers) {
-            VkValidationFeaturesEXT validationFeatures = {};
-            VkValidationFeatureEnableEXT enables[] = {};
-            validationFeatures.pEnabledValidationFeatures = enables;
-            validationFeatures.pNext = &debugCreateInfo;
-
-            createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
-            createInfo.ppEnabledLayerNames = validationLayers.data();
-
-            Debug::populateDebugMessengerCreateInfo(debugCreateInfo);
-            debugCreateInfo.pNext = nullptr;
-
-            createInfo.pNext = &debugCreateInfo;
-
-        } else {
-            createInfo.enabledLayerCount = 0;
-            createInfo.pNext = nullptr;
-        }
-
-        // Trying to create VK_KHR_xlib_surfacevulkan instance
-        if (vkCreateInstance(&createInfo, nullptr, &instance) != VK_SUCCESS) {
-            throw std::runtime_error("failed to create instance!");
-        }
-    }
-
-
+    #pragma region Helper
     // Setup debug messenger
-    void setupDebugMessenger() {
-        if (!enableValidationLayers) return;
-
-        VkDebugUtilsMessengerCreateInfoEXT createInfo;
-        Debug::populateDebugMessengerCreateInfo(createInfo);
-
-        if (Debug::CreateDebugUtilsMessengerEXT(instance, &createInfo, nullptr, &debugMessenger) != VK_SUCCESS) {
-            throw std::runtime_error("failed to set up debug messenger!");
-        }
-    }
+    void setupDebugMessenger();
 
     // Get SDL extensions
-    static std::vector<const char*> getRequiredExtensions() {
-        uint32_t extensionCount = 0;
-        auto SDLextensions = SDL_Vulkan_GetInstanceExtensions(&extensionCount);
-
-        std::vector extensions(SDLextensions, SDLextensions + extensionCount);
-
-        // If validation layers enabled when add them to extensions vector
-        if (enableValidationLayers) {
-            extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
-        }
-        //extensions.push_back(VK_KHR_SURFACE_EXTENSION_NAME);
-
-        return extensions;
-    }
+    static std::vector<const char*> getRequiredExtensions();
+    #pragma endregion
 };
-
-
-
-
-inline void Engine::initializeImGui(SDL_Window* window) {
-    ImGui::CreateContext();
-
-    ImGui_ImplSDL3_InitForVulkan(window);
-
-    QueueFamilyIndices indices = Queue::findQueueFamilies(physicalDevice, surface);
-
-    ImGui_ImplVulkan_InitInfo info{};
-
-    info.ApiVersion = VK_API_VERSION_1_4;
-    info.Instance = instance;
-    info.PhysicalDevice = physicalDevice;
-    info.Device = device;
-    info.Queue = graphicsQueue;
-    info.QueueFamily = indices.graphicsFamily.value();
-    info.DescriptorPool = graphicsDescriptorPool;
-    info.DescriptorPoolSize = 0;
-    info.MinImageCount = MAX_FRAMES_IN_FLIGHT;
-    info.ImageCount = MAX_FRAMES_IN_FLIGHT;
-
-    ImGui_ImplVulkan_PipelineInfo pipeline_info{};
-    pipeline_info.RenderPass = renderPass;
-
-    info.PipelineInfoMain = pipeline_info;
-
-    ImGui_ImplVulkan_Init(&info);
-
-    VkCommandBuffer commandBuffer = Graphics::beginSingleTimeCommands(device, graphicsCommandPool);
-    Graphics::endSingleTimeCommands(device, commandBuffer, graphicsCommandPool, graphicsQueue);
-
-    vkDeviceWaitIdle(device);
-}
-
-inline void Engine::initializeVulkan() {
-    deltaT = new Delta();
-
-    // Basic things
-    createInstance();
-    setupDebugMessenger();
-
-    // SDL3 surface
-    Surface::createSurface(surface, window, instance);
-
-    // Devices
-    PhysDevice::pickPhysicalDevice(physicalDevice, instance, surface);
-    LogDevice::createLogicalDevice(device, physicalDevice, graphicsQueue, presentQueue, surface);
-
-    // Swapchain
-    Swapchain::createSwapchain(device, physicalDevice, surface, window, swapchain, swapchainImages, swapchainImageFormat, swapchainExtent);
-    Swapchain::createImageViews(device, swapchainImageViews, swapchainImages, swapchainImageFormat);
-
-    // Graphics
-    Graphics::createRenderPass(device, physicalDevice, swapchainImageFormat, renderPass);
-
-    Graphics::createGraphicsDescriptorSetLayout(device, graphicsDescriptorSetLayout);
-    Graphics::createMatrixComputeDescriptorSetLayout(device, matrixComputeDescriptorSetLayout);
-    Graphics::createCullingComputeDescriptorSetLayout(device, cullingComputeDescriptorSetLayout);
-
-    Graphics::createGraphicsPipeline(device, graphicsPipelineLayout, renderPass, graphicsPipeline, graphicsDescriptorSetLayout);
-    Graphics::createMatrixComputePipeline(device, matrixComputeDescriptorSetLayout, matrixComputePipelineLayout, matrixComputePipeline);
-    Graphics::createCullingComputePipeline(device, cullingComputeDescriptorSetLayout, cullingComputePipelineLayout, cullingComputePipeline);
-
-
-    Graphics::createCommandPool(device, physicalDevice, graphicsCommandPool, surface);
-
-    Graphics::createDepthResources(device, physicalDevice, depthImage, depthImageMemory, depthImageView, swapchainExtent);
-    Graphics::createFramebuffers(device, depthImageView, swapChainFramebuffers, swapchainImageViews, renderPass, swapchainExtent);
-
-    Graphics::createTextureImage(device, graphicsCommandPool, graphicsQueue, physicalDevice, stagingBuffer, stagingBufferMemory, textureImage, textureImageMemory);
-    Graphics::createTextureImageView(device, textureImage, textureImageView);
-    Graphics::createTextureSampler(device, physicalDevice, textureSampler);
-
-    Graphics::createVertexBuffer(device, physicalDevice, graphicsCommandPool, graphicsQueue, vertexBuffer, vertexBufferMemory, mdlBus);
-    Graphics::createIndexBuffer(device, physicalDevice, graphicsCommandPool, graphicsQueue, indexBuffer, indexBufferMemory, mdlBus);
-
-    // Generic
-    Graphics::createUniformBuffers(device, physicalDevice, uniformBuffers, uniformBuffersMemory, uniformBuffersMapped, MAX_FRAMES_IN_FLIGHT);
-    Graphics::createAtomicCounterBuffers(device, physicalDevice, atomicCounterBuffers, atomicCounterBuffersMemory, atomicCounterBuffersMapped, MAX_FRAMES_IN_FLIGHT);
-
-    // Matrices
-    Graphics::createModelBuffers(device, physicalDevice, modelBuffers, modelBuffersMemory, modelBuffersMapped, MAX_FRAMES_IN_FLIGHT, mdlBus);
-    Graphics::createModelDataBuffers(device, physicalDevice, modelDataBuffers, modelDataBuffersMemory, modelDataBuffersMapped, MAX_FRAMES_IN_FLIGHT, mdlBus);
-
-    // Culling
-    Graphics::createUniformCullingBuffers(device, physicalDevice, uniformCullingBuffers, uniformCullingBuffersMemory, uniformCullingBuffersMapped, MAX_FRAMES_IN_FLIGHT);
-    Graphics::createVisibleIndicesBuffers(device, physicalDevice, visibleIndicesBuffers, visibleIndicesMemory, visibleIndicesMapped, MAX_FRAMES_IN_FLIGHT, mdlBus);
-    Graphics::createModelCullingBuffer(device, physicalDevice, modelCullingBuffer, modelCullingBufferMemory, modelCullingBufferMapped, MAX_FRAMES_IN_FLIGHT, mdlBus);
-
-    Graphics::createGraphicsDescriptorPool(device, MAX_FRAMES_IN_FLIGHT, graphicsDescriptorPool);
-    Graphics::createGraphicsDescriptorSets(device, MAX_FRAMES_IN_FLIGHT, graphicsDescriptorSetLayout, graphicsDescriptorPool, graphicsDescriptorSets, uniformBuffers, textureImageView, textureSampler, modelBuffers, visibleIndicesBuffers, mdlBus);
-
-    Graphics::createMatrixComputeDescriptorPool(device, MAX_FRAMES_IN_FLIGHT, matrixComputeDescriptorPool);
-    Graphics::createMatrixComputeDescriptorSets(device, MAX_FRAMES_IN_FLIGHT, matrixComputeDescriptorSetLayout, matrixComputeDescriptorPool, matrixComputeDescriptorSets, modelBuffers, mdlBus, modelDataBuffers);
-
-    Graphics::createCullingComputeDescriptorPool(device, MAX_FRAMES_IN_FLIGHT, cullingComputeDescriptorPool);
-    Graphics::createCullingComputeDescriptorSets(device, MAX_FRAMES_IN_FLIGHT, cullingComputeDescriptorSetLayout, cullingComputeDescriptorPool, cullingComputeDescriptorSets, mdlBus, atomicCounterBuffers, uniformCullingBuffers, visibleIndicesBuffers, modelCullingBuffer);
-
-    Graphics::createCommandBuffer(device, graphicsCommandPool, commandBuffers, MAX_FRAMES_IN_FLIGHT);
-
-    //Graphics::createDrawCommandsBuffer(device, physicalDevice, graphicsCommandPool, graphicsQueue, drawCommandsBuffer, drawCommandsBufferMemory, mdlBus);
-
-    Graphics::createSyncObjects(device, imageAvailableSemaphores, renderFinishedSemaphores, inFlightFences, MAX_FRAMES_IN_FLIGHT);
-}
 #endif //ENGINE_HPP

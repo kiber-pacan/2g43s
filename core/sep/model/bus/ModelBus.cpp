@@ -1,14 +1,7 @@
 #include <memory>
 #include <vector>
 
-#include "../ModelInstance.hpp"
-#include "../ParsedModel.hpp"
-#include <omp.h>
 #include "ModelBus.hpp"
-
-#include <ranges>
-
-#include "../../util/Random.hpp"
 
 ModelBus::ModelBus() {
     LOGGER = Logger::of("ModelBus");
@@ -162,6 +155,10 @@ size_t ModelBus::getTotalInstanceCount() const {
     });
 }
 
+size_t ModelBus::getTotalModelCount() const {
+    return groups_map.size();
+}
+
 
 uint32_t ModelBus::getIndexCount(const std::string& name) const {
     return groups_map.at(name).model->indices.size();
@@ -202,6 +199,31 @@ void ModelBus::addCommands(uint32_t indexCount, uint32_t instanceCount, uint32_t
 #pragma endregion
 
 
+void ModelBus::randomVolumeTest(size_t count, ModelGroup& group, const glm::vec3& min, const glm::vec3& max) {
+    group.instances.resize(count);
+
+    #pragma omp parallel for schedule(static) default(none) shared(count, group, min, max)
+    for (int x = 0; x < count; ++x) {
+        const glm::vec4 pos(Random::randomNum_T(min.x, max.x), Random::randomNum_T(min.y, max.y), Random::randomNum_T(min.y, max.z), 0);
+
+        group.instances[x] = ModelInstance(groups_map["cube.glb"].model, pos);
+
+    }
+}
+
+void ModelBus::squareTest(size_t count, ModelGroup& group, const double gap) {
+    group.instances.resize(count * count);
+
+    #pragma omp parallel for schedule(static) default(none) shared(count, group, gap)
+    for (int x = 0; x < count; ++x) {
+        for (int y = 0; y < count; ++y) {
+            const glm::vec4 pos(x * gap, y * gap, 0, 0);
+
+            group.instances[x * count + y] = ModelInstance(groups_map["cube.glb"].model, pos);
+        }
+    }
+}
+
 void ModelBus::test() {
     loadModels("/home/down1/2g43s/core/models/", "cube.glb");
 
@@ -209,19 +231,8 @@ void ModelBus::test() {
     static constexpr size_t count = 1000000;
 
     auto& cubeGroup = groups_map["cube.glb"];
-    cubeGroup.instances.resize(count);
 
-    #pragma omp parallel for schedule(static) default(shared) shared(count, cubeGroup)
-    for (int i = 0; i < count; ++i) {
-        const glm::vec4 pos(
-            Random::randomNum_T<float>(-500.f, 500.f),
-            Random::randomNum_T<float>(-500.f, 500.f),
-            Random::randomNum_T<float>(-500.f, 500.f),
-            0);
-        const glm::vec4 rot(Random::randomNum_T<float>(-1.f, 1.f), Random::randomNum_T<float>(-1.f, 1.f), Random::randomNum_T<float>(-1.f, 1.f), 0);
-        //const glm::vec4 pos(i, 0, 0, 0);
-        cubeGroup.instances[i] = ModelInstance(groups_map["cube.glb"].model, pos, rot);
-    }
+    randomVolumeTest(count, cubeGroup, glm::vec3(-1000, -1000, -1000), glm::vec3(1000, 1000, 1000));
 
     const auto end = std::chrono::high_resolution_clock::now();
     const std::chrono::duration<double> duration = end - start;
