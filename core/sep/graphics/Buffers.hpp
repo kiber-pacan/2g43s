@@ -25,6 +25,10 @@ struct Buffers {
     static void createIndexBuffer(const VkDevice& device, const VkPhysicalDevice& physicalDevice, const VkCommandPool& commandPool, const VkQueue& graphicsQueue, VkBuffer &indexBuffer, VkDeviceMemory& indexBufferMemory, const ModelBus& mdlBus);
 
     // Generic
+    static void createGenericBuffers(const VkDevice& device, const VkPhysicalDevice& physicalDevice, std::vector<VkBuffer>& Buffers, std::vector<VkDeviceMemory>& BuffersMemory, std::vector<void*>& BuffersMapped, const int& MAX_FRAMES_IN_FLIGHT, VkDeviceSize bufferSize, int usageFlags, int memoryFlags);
+
+    static void createGenericBuffer(const VkDevice& device, const VkPhysicalDevice& physicalDevice, VkBuffer& buffer, VkDeviceMemory& bufferMemory, void*& bufferMapped, VkDeviceSize bufferSize, int usageFlags, int memoryFlags);
+
     static void createUniformBuffers(const VkDevice& device, const VkPhysicalDevice& physicalDevice, std::vector<VkBuffer>& uniformBuffers, std::vector<VkDeviceMemory>& uniformBuffersMemory, std::vector<void*>& uniformBuffersMapped, const int& MAX_FRAMES_IN_FLIGHT);
 
     static void createUniformCullingBuffers(const VkDevice& device, const VkPhysicalDevice& physicalDevice, std::vector<VkBuffer>& uniformCullingBuffers, std::vector<VkDeviceMemory>& uniformCullingBuffersMemory, std::vector<void*>& uniformCullingBuffersMapped, const int& MAX_FRAMES_IN_FLIGHT);

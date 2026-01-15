@@ -9,7 +9,7 @@
 // Just look at names of class and file...
 class Logger {
 public:
-    const char* name;
+    const char* name{};
 
     // Color for severity of log
     struct severity {
@@ -19,10 +19,13 @@ public:
         static constexpr Color SUCCESS = Color::CONSTEXPR_HEX(0x76ff00);
     };
 
-    // I just want to create object what way because it is prettier for me
-    static Logger* of(const char* name) {
-        return new Logger(name);
+    Logger() = default;
+
+    explicit Logger(const char* name) {
+        this->name = name;
     }
+
+
 
     #pragma region info
     // Main method for logging
@@ -150,13 +153,6 @@ private:
             }
             std::cout << *str;
         }
-    }
-
-
-
-    // Private constructor so ppl gonna use logger::of(name)
-    Logger(const char* name) {
-        this->name = name;
     }
 
     // Start of log (Color and name)

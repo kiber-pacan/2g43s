@@ -3,8 +3,11 @@
 
 #include "ModelBus.hpp"
 
-ModelBus::ModelBus() {
-    LOGGER = Logger::of("ModelBus");
+#include <ranges>
+
+#include "Images.hpp"
+
+ModelBus::ModelBus() : LOGGER(Logger("ModelBus")) {
 }
 
 
@@ -12,8 +15,21 @@ ModelBus::ModelBus() {
 template<std::convertible_to<std::string>... T>
 void ModelBus::loadModels(const std::string& location, const T&... files) {
     static_assert(sizeof...(files) > 0, "You must provide at least one file to load!");
+    ((std::cout << files << std::endl), ...);
+    (groups_map.insert({files, ModelGroup(std::make_shared<ParsedModel>(location + files))}),...);
+}
 
-    (groups_map.insert({files, ModelGroup(std::make_shared<ParsedModel>(location + files))}), ...);
+void ModelBus::loadModelTextures(const VkDevice& device, const VkCommandPool& commandPool, const VkQueue& graphicsQueue, const VkPhysicalDevice& physicalDevice, VkBuffer& stagingBuffer, VkDeviceMemory& stagingBufferMemory) {
+    int globalIndex = 0;
+    for (const auto& model : std::views::transform(groups_map | std::views::values, &ModelGroup::model)) {
+        for (auto & texture : model->textures) {
+            Images::createTextureImage(device, commandPool, graphicsQueue, physicalDevice, stagingBuffer, stagingBufferMemory, texture);
+            Images::createTextureImageView(device, texture.textureImage, texture.textureImageView);
+
+            texture.index = globalIndex;
+            globalIndex++;
+        }
+    }
 }
 
 template<std::convertible_to<std::string>... T>
@@ -41,7 +57,7 @@ void ModelBus::createModelInstance(const std::string& file, const auto&... args)
     if (groups_map.contains(file)) {
         groups_map[file].instances.emplace_back(groups_map[file].model, args...);
     } else {
-        LOGGER->error("File ${} does not exist", file);
+        LOGGER.error("File ${} does not exist", file);
     }
 }
 #pragma endregion
@@ -198,20 +214,25 @@ void ModelBus::addCommands(uint32_t indexCount, uint32_t instanceCount, uint32_t
 }
 #pragma endregion
 
+void ModelBus::randomVolume(size_t count, const std::string& file, const float min, const float max) {
+    randomVolume(count, file, glm::vec3(min), glm::vec3(max));
+}
 
-void ModelBus::randomVolumeTest(size_t count, ModelGroup& group, const glm::vec3& min, const glm::vec3& max) {
+void ModelBus::randomVolume(size_t count, const std::string& file, const glm::vec3& min, const glm::vec3& max) {
+    auto& group = groups_map[file];
     group.instances.resize(count);
 
     #pragma omp parallel for schedule(static) default(none) shared(count, group, min, max)
     for (int x = 0; x < count; ++x) {
         const glm::vec4 pos(Random::randomNum_T(min.x, max.x), Random::randomNum_T(min.y, max.y), Random::randomNum_T(min.y, max.z), 0);
 
-        group.instances[x] = ModelInstance(groups_map["cube.glb"].model, pos);
+        group.instances[x] = ModelInstance(group.model, pos);
 
     }
 }
 
-void ModelBus::squareTest(size_t count, ModelGroup& group, const double gap) {
+void ModelBus::square(size_t count, const std::string& file, const double gap) {
+    auto& group = groups_map[file];
     group.instances.resize(count * count);
 
     #pragma omp parallel for schedule(static) default(none) shared(count, group, gap)
@@ -219,23 +240,29 @@ void ModelBus::squareTest(size_t count, ModelGroup& group, const double gap) {
         for (int y = 0; y < count; ++y) {
             const glm::vec4 pos(x * gap, y * gap, 0, 0);
 
-            group.instances[x * count + y] = ModelInstance(groups_map["cube.glb"].model, pos);
+            group.instances[x * count + y] = ModelInstance(group.model, pos);
         }
     }
 }
 
-void ModelBus::test() {
-    loadModels("/home/down1/2g43s/core/models/", "cube.glb");
+void ModelBus::loadModels() {
+    const auto start1 = std::chrono::high_resolution_clock::now();
+    loadModels("/home/down1/2g43s/core/models/", "BoxTextured.glb");
+    const auto end1 = std::chrono::high_resolution_clock::now();
+    const std::chrono::duration<double> duration1 = end1 - start1;
+
+    LOGGER.success("Loaded ${} models in ${} seconds!", getTotalModelCount(), duration1.count());
 
     const auto start = std::chrono::high_resolution_clock::now();
-    static constexpr size_t count = 1000000;
 
-    auto& cubeGroup = groups_map["cube.glb"];
+    randomVolume(10000000, "BoxTextured.glb", -100, 100);
 
-    randomVolumeTest(count, cubeGroup, glm::vec3(-1000, -1000, -1000), glm::vec3(1000, 1000, 1000));
+
+    //createModelInstance("AntiqueCamera.glb");
+
 
     const auto end = std::chrono::high_resolution_clock::now();
     const std::chrono::duration<double> duration = end - start;
 
-    LOGGER->success("Loaded ${} instances in ${} seconds!", getTotalInstanceCount(), duration.count());
+    LOGGER.success("Loaded ${} instances in ${} seconds!", getTotalInstanceCount(), duration.count());
 }

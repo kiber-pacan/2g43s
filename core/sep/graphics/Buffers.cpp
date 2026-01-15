@@ -4,12 +4,13 @@
 
 #include "Buffers.hpp"
 
+#include <ranges>
 #include <stdexcept>
 
-#include "Command.hpp"
+#include "command/Command.hpp"
 #include "DrawCommandsBufferObject.hpp"
 #include "Helper.hpp"
-#include "UniformBufferObject.hpp"
+#include "../buffers/main/uniform/UniformBufferObject.hpp"
 #include "UniformCullingBufferObject.hpp"
 
 
@@ -108,6 +109,25 @@ void Buffers::createIndexBuffer(const VkDevice& device, const VkPhysicalDevice& 
 }
 
 // Generic
+void Buffers::createGenericBuffers(const VkDevice& device, const VkPhysicalDevice& physicalDevice, std::vector<VkBuffer>& Buffers, std::vector<VkDeviceMemory>& BuffersMemory, std::vector<void*>& BuffersMapped, const int& MAX_FRAMES_IN_FLIGHT, VkDeviceSize bufferSize, int usageFlags, int memoryFlags) {
+    Buffers.resize(MAX_FRAMES_IN_FLIGHT);
+    BuffersMemory.resize(MAX_FRAMES_IN_FLIGHT);
+    BuffersMapped.resize(MAX_FRAMES_IN_FLIGHT);
+
+    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+        createBuffer(device, physicalDevice, bufferSize, usageFlags, memoryFlags, Buffers[i], BuffersMemory[i]);
+
+        vkMapMemory(device, BuffersMemory[i], 0, bufferSize, 0, &BuffersMapped[i]);
+    }
+}
+
+void Buffers::createGenericBuffer(const VkDevice& device, const VkPhysicalDevice& physicalDevice, VkBuffer& buffer, VkDeviceMemory& bufferMemory, void*& bufferMapped, VkDeviceSize bufferSize, int usageFlags, int memoryFlags) {
+    createBuffer(device, physicalDevice, bufferSize, usageFlags, memoryFlags, buffer, bufferMemory);
+
+    vkMapMemory(device, bufferMemory, 0, bufferSize, 0, &bufferMapped);
+
+}
+
 void Buffers::createUniformBuffers(const VkDevice& device, const VkPhysicalDevice& physicalDevice, std::vector<VkBuffer>& uniformBuffers, std::vector<VkDeviceMemory>& uniformBuffersMemory, std::vector<void*>& uniformBuffersMapped, const int& MAX_FRAMES_IN_FLIGHT) {
     uniformBuffers.resize(MAX_FRAMES_IN_FLIGHT);
     uniformBuffersMemory.resize(MAX_FRAMES_IN_FLIGHT);
@@ -192,7 +212,7 @@ void Buffers::createVisibleIndicesBuffers(const VkDevice& device, const VkPhysic
 }
 
 void Buffers::createModelCullingBuffer(const VkDevice& device, const VkPhysicalDevice& physicalDevice, VkBuffer& modelCullingBuffers, VkDeviceMemory& modelCullingBuffersMemory, void*& modelCullingBuffersMapped, const int& MAX_FRAMES_IN_FLIGHT, const ModelBus& mdlBus) {
-    const VkDeviceSize bufferSize = sizeof(glm::vec4) * mdlBus.getTotalInstanceCount();
+    const VkDeviceSize bufferSize = sizeof(CullingData) * mdlBus.getTotalInstanceCount();
 
 
     createBuffer(device, physicalDevice, bufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, modelCullingBuffers, modelCullingBuffersMemory);
@@ -222,7 +242,7 @@ void Buffers::createDrawCommandsBuffer(const VkDevice &device, const VkPhysicalD
         const uint32_t indexCount = ModelBus::getIndexCount(group.model);
 
         command.firstInstance = firstInstance;
-        command.instanceCount = group.instances.size();
+        command.instanceCount = instanceCount;
 
         command.firstIndex = firstIndex;
         command.indexCount = indexCount;
@@ -234,9 +254,9 @@ void Buffers::createDrawCommandsBuffer(const VkDevice &device, const VkPhysicalD
         dc.commands.emplace_back(command);
     }
 
-    mdlBus.dirtyCommands = true;
+    //mdlBus.dirtyCommands = false;
 
-    const VkDeviceSize bufferSize = sizeof(VkDrawIndexedIndirectCommand) * mdlBus.getTotalModelCount();
+    const VkDeviceSize bufferSize = sizeof(VkDrawIndexedIndirectCommand) * dc.commands.size();
 
     if (drawCommandsBufferMapped != nullptr) {
         vkUnmapMemory(device, drawCommandsBufferMemory);

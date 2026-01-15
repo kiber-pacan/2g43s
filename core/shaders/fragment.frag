@@ -1,9 +1,15 @@
 #version 450
+#extension GL_EXT_nonuniform_qualifier : enable
 
-layout(binding = 1) uniform sampler2DArray texSampler;
+
+
+layout(binding = 1) uniform sampler2D texSampler[];
+
+
 
 layout(location = 0) in vec3 fragColor;
 layout(location = 1) in vec2 fragTexCoord;
+layout(location = 2) in flat uint textureIndex;
 
 layout(location = 0) out vec4 outColor;
 
@@ -16,11 +22,5 @@ float linearizeDepth(float d) {
 
 
 void main() {
-    float resolution = 64.0;
-    vec2 gridUV = floor(fragTexCoord * resolution) / resolution;
-    float depth = texture(texSampler, vec3(gridUV, 0)).r;
-
-
-    float linearD = linearizeDepth(depth) / far;
-    outColor = vec4(vec3(linearD), 1.0);
+    outColor = texture(texSampler[nonuniformEXT(textureIndex)], fragTexCoord);
 }

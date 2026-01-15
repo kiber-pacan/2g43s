@@ -18,7 +18,7 @@ struct Camera final : CameraEntity {
         fov = 90.0f;
         sens = 0.42f;
         speed = 15.7f;
-        bonus = 10.62f;
+        bonus = speed;
 
         pos = glm::vec3(-16, 0, 0);
         look = glm::vec3(1, 0, 0);

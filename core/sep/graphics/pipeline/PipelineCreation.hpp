@@ -6,6 +6,7 @@
 #define INC_2G43S_PIPELINE_H
 
 #include <vulkan/vulkan_core.h>
+#include <string>
 
 struct PipelineCreation {
     static void createGraphicsPipeline(VkDevice& device, VkPhysicalDevice& physicalDevice, VkPipelineLayout& pipelineLayout, VkPipeline& graphicsPipeline, VkDescriptorSetLayout& descriptorSetLayout, VkFormat& swapchainImageFormat);
@@ -14,7 +15,9 @@ struct PipelineCreation {
 
     static void createCullingComputePipeline(const VkDevice& device, const VkDescriptorSetLayout& cullingComputeDescriptorSetLayout, VkPipelineLayout& cullingComputePipelineLayout, VkPipeline& cullingComputePipeline);
 
-    static void createPostprocessPipeline(VkDevice& device, VkPhysicalDevice& physicalDevice, VkPipelineLayout& pipelineLayout, VkPipeline& graphicsPipeline, VkDescriptorSetLayout& descriptorSetLayout, VkFormat& swapchainImageFormat);
+    static void createPostprocessPipelineLayout(const VkDevice &device, VkPipelineLayout &pipelineLayout, const VkDescriptorSetLayout &descriptorSetLayout);
+
+    static void createPostprocessPipeline(VkDevice& device, VkPhysicalDevice& physicalDevice, VkPipelineLayout& pipelineLayout, VkPipeline& postprocessPipeline, VkDescriptorSetLayout& descriptorSetLayout, VkFormat& swapchainImageFormat, const std::string filename);
 };
 
 

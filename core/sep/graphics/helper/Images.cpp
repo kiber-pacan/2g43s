@@ -8,7 +8,7 @@
 #include <stb/stb_image.h>
 
 #include "Buffers.hpp"
-#include "Command.hpp"
+#include "../command/Command.hpp"
 #include "Helper.hpp"
 
 void Images::createImage(const VkDevice& device, const VkPhysicalDevice& physicalDevice, const uint32_t width, const uint32_t height, const VkFormat format, const VkImageTiling tiling, const VkImageUsageFlags usage, const VkMemoryPropertyFlags properties, VkImage& image, VkDeviceMemory& imageMemory) {
@@ -50,7 +50,7 @@ VkImageView Images::createImageView(const VkDevice& device, const VkImage& image
     VkImageViewCreateInfo viewInfo{};
     viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
     viewInfo.image = image;
-    viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D_ARRAY;
+    viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
     viewInfo.format = format;
     viewInfo.subresourceRange.aspectMask = aspectFlags;
     viewInfo.subresourceRange.baseMipLevel = 0;
@@ -69,7 +69,7 @@ VkImageView Images::createImageView(const VkDevice& device, const VkImage& image
 
 void Images::createTextureImage(const VkDevice& device, const VkCommandPool& commandPool, const VkQueue& graphicsQueue, const VkPhysicalDevice& physicalDevice, VkBuffer& stagingBuffer, VkDeviceMemory& stagingBufferMemory, VkImage& textureImage, VkDeviceMemory& textureImageMemory) {
     int texWidth, texHeight, texChannels;
-    stbi_uc* pixels = stbi_load("/home/down1/2g43s/core/textures/odd-eyed-cat.jpg", &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
+    stbi_uc* pixels = stbi_load("/home/down1/2g43s/core/textures/missingno.png", &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
     const VkDeviceSize imageSize = texWidth * texHeight * 4;
 
     if (!pixels) {
@@ -95,6 +95,32 @@ void Images::createTextureImage(const VkDevice& device, const VkCommandPool& com
     vkFreeMemory(device, stagingBufferMemory, nullptr);
 }
 
+void Images::createTextureImage(const VkDevice& device, const VkCommandPool& commandPool, const VkQueue& graphicsQueue, const VkPhysicalDevice& physicalDevice, VkBuffer& stagingBuffer, VkDeviceMemory& stagingBufferMemory, Texture& texture) {
+    const VkDeviceSize imageSize = texture.texWidth * texture.texHeight * 4;
+
+    if (!texture.pixels) {
+        throw std::runtime_error("failed to load texture image!");
+    }
+
+    Buffers::createBuffer(device, physicalDevice, imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
+
+    void* data;
+    vkMapMemory(device, stagingBufferMemory, 0, imageSize, 0, &data);
+    memcpy(data, texture.pixels, imageSize);
+    vkUnmapMemory(device, stagingBufferMemory);
+
+    stbi_image_free(texture.pixels);
+
+    createImage(device, physicalDevice, texture.texWidth, texture.texHeight, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, texture.textureImage, texture.textureImageMemory);
+
+    transitionImageLayout(device, commandPool, graphicsQueue, texture.textureImage, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+    copyBufferToImage(device, commandPool, graphicsQueue, stagingBuffer, texture.textureImage, static_cast<uint32_t>(texture.texWidth), static_cast<uint32_t>(texture.texHeight));
+    transitionImageLayout(device, commandPool, graphicsQueue, texture.textureImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+
+    vkDestroyBuffer(device, stagingBuffer, nullptr);
+    vkFreeMemory(device, stagingBufferMemory, nullptr);
+}
+
 void Images::createTextureImageView(const VkDevice& device, const VkImage& textureImage, VkImageView& textureImageView) {
     textureImageView = createImageView(device, textureImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_ASPECT_COLOR_BIT);
 }
@@ -109,6 +135,7 @@ void Images::createTextureSampler(const VkDevice& device, const VkPhysicalDevice
     samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
     samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
     samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    samplerInfo.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_BLACK;
 
     VkPhysicalDeviceFeatures supportedFeatures;
     vkGetPhysicalDeviceFeatures(physicalDevice, &supportedFeatures);

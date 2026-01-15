@@ -20,11 +20,12 @@ add_executable(${EXECUTABLE_NAME}
         # Graphics
         core/sep/graphics/Buffers.cpp
         core/sep/graphics/Buffers.hpp
-        core/sep/graphics/Command.cpp
-        core/sep/graphics/Command.hpp
-        core/sep/graphics/Delta.hpp
-        core/sep/graphics/Graphics.hpp
-
+        core/sep/graphics/command/Command.cpp
+        core/sep/graphics/command/Command.hpp
+        core/sep/graphics/command/Barrier.cpp
+        core/sep/graphics/command/Barrier.h
+        core/sep/graphics/DeltaManager.hpp
+        core/sep/graphics/DeltaManager.cpp
 
         # Pipeline
         core/sep/graphics/pipeline/Shaders.cpp
@@ -47,14 +48,14 @@ add_executable(${EXECUTABLE_NAME}
 
 
         # Device
-        core/sep/device/PhysDevice.hpp
-        core/sep/device/LogDevice.hpp
+        core/sep/device/PhysicalDevice.hpp
+        core/sep/device/LogicalDevice.hpp
 
 
-        # Control
-        core/sep/control/KeyBinding.hpp
-        core/sep/control/KeyListener.hpp
-        core/sep/control/MouseListener.hpp
+        # Controls
+        core/sep/controls/KeyBinding.hpp
+        core/sep/controls/KeyListener.hpp
+        core/sep/controls/MouseListener.hpp
 
 
         # Camera
@@ -65,10 +66,13 @@ add_executable(${EXECUTABLE_NAME}
         core/sep/buffers/culling/ModelCullingBufferObject.hpp
         core/sep/buffers/culling/VisibleIndicesBufferObject.hpp
 
-        core/sep/buffers/generic/AtomicCounterObject.hpp
-        core/sep/buffers/generic/DrawCommandsBufferObject.hpp
-        core/sep/buffers/generic/UniformBufferObject.hpp
-        core/sep/buffers/generic/UniformCullingBufferObject.hpp
+        core/sep/buffers/main/AtomicCounterObject.hpp
+        core/sep/buffers/main/DrawCommandsBufferObject.hpp
+        core/sep/buffers/main/uniform/UniformBufferObject.hpp
+        core/sep/buffers/main/uniform/UniformPostprocessingBufferObject.hpp
+        core/sep/buffers/main/uniform/UniformCullingBufferObject.hpp
+        core/sep/buffers/main/indices/TextureIndexOffsetObject.hpp
+        core/sep/buffers/main/indices/TextureIndexObject.h
 
         core/sep/buffers/matrices/ModelBufferObject.hpp
         core/sep/buffers/matrices/ModelDataBufferObject.hpp
@@ -76,6 +80,7 @@ add_executable(${EXECUTABLE_NAME}
         # Model
         core/sep/model/ModelInstance.hpp
         core/sep/model/ParsedModel.hpp
+        core/sep/model/ParsedModel.cpp
         core/sep/model/bus/ModelBus.cpp
         core/sep/model/bus/ModelBus.hpp
         core/sep/model/primitives/Sphere.hpp
@@ -90,9 +95,20 @@ add_executable(${EXECUTABLE_NAME}
         core/sep/util/Random.hpp
         core/sep/util/stb_impl.cpp
         core/sep/util/Tools.hpp
+
+        # Window
+        core/sep/window/Swapchain.hpp
+        core/sep/window/Swapchain.cpp
+        core/sep/entity/PlayerEntity.cpp
+        core/sep/entity/PlayerEntity.h
+
+        core/sep/model/Texture.hpp
 )
 
+
 target_include_directories(${EXECUTABLE_NAME} PRIVATE
+        libs/
+        core/
         core/sep
 
         core/sep/graphics
@@ -103,12 +119,14 @@ target_include_directories(${EXECUTABLE_NAME} PRIVATE
 
         core/sep/device
 
-        core/sep/control
+        core/sep/controls
 
         core/sep/camera
 
         core/sep/buffers/culling
-        core/sep/buffers/generic
+        core/sep/buffers/main
+        core/sep/buffers/main/uniform
+        core/sep/buffers/main/indices
         core/sep/buffers/matrices
 
         core/sep/model/
@@ -116,50 +134,55 @@ target_include_directories(${EXECUTABLE_NAME} PRIVATE
         core/sep/model/primitives
 
         core/sep/util/
+
+        core/sep/window/
+)
+
+target_compile_definitions(${EXECUTABLE_NAME} PRIVATE
+        PROJECT_ROOT="${CMAKE_CURRENT_SOURCE_DIR}/"
 )
 
 # Optimizations
 set(CMAKE_CXX_FLAGS_RELEASE " \
-    -O3 \
-    -march=native \
-    -mtune=native \
-    -ffast-math \
-    -fno-finite-math-only \
-    -fopenmp \
-    -flto=full \
-    -fstrict-aliasing \
-    -fstrict-vtable-pointers \
-    -fwhole-program-vtables \
-    -funroll-loops \
-    -fvectorize \
-    -fslp-vectorize \
-    -fno-stack-protector \
-    -fno-stack-check \
-    -fno-plt \
-    -fno-exceptions \
-    -fno-rtti \
-    -fomit-frame-pointer \
+    -O3 -march=native -mtune=native \
+    -ffast-math -fno-math-errno -fno-trapping-math -fassociative-math -freciprocal-math \
+    -fno-signed-zeros -fno-rounding-math \
+    -fopenmp -flto=full -fsplit-lto-unit \
+    -fstrict-aliasing -fstrict-vtable-pointers -fwhole-program-vtables \
+    -fno-semantic-interposition -fvisibility=hidden -fvisibility-inlines-hidden \
+    -funroll-loops -fvectorize -fslp-vectorize \
+    -fno-stack-protector -fno-stack-check -fno-plt \
+    -fno-exceptions -fno-rtti -fno-ident \
+    -fomit-frame-pointer -fmerge-all-constants \
     -fplugin=LLVMPolly.so \
     -mllvm -polly \
     -mllvm -polly-parallel \
     -mllvm -polly-vectorizer=stripmine \
     -mllvm -polly-invariant-load-hoisting \
     -mllvm -polly-run-dce \
-    -mllvm -inline-threshold=1000 \
+    -mllvm -polly-check-parallel \
+    -mllvm --polly-on-isl-error-abort=false \
+    -mllvm -inline-threshold=2000 \
+    -mllvm -unroll-threshold=1000 \
     -DNDEBUG")
 
-# Оптимизация линковки (Максимальная агрессия)
 set(CMAKE_EXE_LINKER_FLAGS_RELEASE " \
-    -fopenmp \
-    -flto=full \
-    -fuse-ld=mold \
-    -Wl,-O3 \
-    -Wl,--gc-sections \
-    -Wl,--icf=all \
-    -Wl,--strip-all")
+    -fopenmp -flto=full -fuse-ld=mold \
+    -Wl,-O3 -Wl,--gc-sections -Wl,--icf=all \
+    -Wl,-Bsymbolic -Wl,-Bsymbolic-functions \
+    -Wl,--strip-all -Wl,--as-needed")
 
 #Adding sources to project
 target_sources(${EXECUTABLE_NAME} PRIVATE ${include})
+
+if(NOT DEFINED ENV{VULKAN_SDK})
+    message("VULKAN_SDK environment variable not set!")
+endif()
+
+set(VULKAN_SDK_PATH $ENV{VULKAN_SDK})
+
+# Добавляем пути к заголовкам
+target_include_directories(${PROJECT_NAME} PRIVATE "${VULKAN_SDK_PATH}/include")
 
 #Adding SDL3 and glm
 if(${WIN32})
@@ -175,9 +198,15 @@ else ()
     find_package(SDL3 REQUIRED CONFIG)
     find_package(glm REQUIRED CONFIG)
     find_package(imgui REQUIRED CONFIG)
-    add_subdirectory("libs/fastgltf")
-    include_directories("/libs/stb")
     find_package(OpenMP REQUIRED)
+    find_library(SPIRV_TOOLS_LIB NAMES SPIRV-Tools)
+    find_library(SPIRV_TOOLS_OPT_LIB NAMES SPIRV-Tools-opt)
+    find_library(GLSLANG_LIB NAMES glslang)
+
+    find_package(nlohmann_json REQUIRED CONFIG)
+
+    add_subdirectory("libs/fastgltf")
+    include_directories("libs/stb")
     if(OpenMP_CXX_FOUND)
         target_link_libraries(${EXECUTABLE_NAME} PRIVATE OpenMP::OpenMP_CXX)
     endif()
@@ -192,13 +221,24 @@ if(Vulkan_FOUND)
     link_directories(${Vulkan_LIBRARY_DIRS})
 endif()
 
-#Linking libraries to project
 target_link_libraries(${EXECUTABLE_NAME} PUBLIC
         ${Vulkan_LIBRARIES}
         SDL3::SDL3
         glm::glm
         fastgltf::fastgltf
         imgui::imgui
+        nlohmann_json::nlohmann_json
+)
+
+target_link_libraries(${EXECUTABLE_NAME} PRIVATE
+        shaderc_combined
+        ${GLSLANG_LIB}
+        ${SPIRV_TOOLS_OPT_LIB}
+        ${SPIRV_TOOLS_LIB}
+        OSDependent
+        MachineIndependent
+        GenericCodeGen
+        pthread
 )
 target_compile_definitions(${EXECUTABLE_NAME} PUBLIC SDL_MAIN_USE_CALLBACKS)
 

@@ -5,7 +5,7 @@
 #include <glm/mat4x4.hpp>
 
 struct ModelBufferObject {
-    std::vector<glm::mat4> mdls;
+    std::vector<glm::mat4> models;
 };
 
 #endif //INC_2G43S_MODELBUFFEROBJECT_HPP

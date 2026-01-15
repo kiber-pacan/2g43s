@@ -3,18 +3,6 @@
 
 #include "Engine.hpp"
 
-#include <imgui_impl_sdl3.h>
-#include <imgui_impl_vulkan.h>
-
-
-#include "Command.hpp"
-#include "Descriptor.hpp"
-#include "Helper.hpp"
-#include "PipelineCreation.hpp"
-#include "device/LogDevice.hpp"
-#include "device/PhysDevice.hpp"
-#include "graphics/Buffers.hpp"
-#include "window/Surface.hpp"
 
 
 #pragma region Main
@@ -23,25 +11,84 @@ void Engine::init(SDL_Window* window) {
     initialize(window);
 }
 
-void Engine::drawImGui(const VkCommandBuffer& commandBuffer) const {
+void Engine::drawImGui(const VkCommandBuffer& commandBuffer) {
     ImGui_ImplSDL3_NewFrame();
     ImGui_ImplVulkan_NewFrame();
 
     ImGui::NewFrame();
 
+    ImGuiID dockspace_id = ImGui::GetID("My Dockspace");
+    ImGuiViewport* viewport = ImGui::GetMainViewport();
+
+    ImGui::SetNextWindowSizeConstraints(ImVec2(0, 0), viewport->Size);
+
     ImGui::Begin("Stats");
+
+    ImVec2 pos = ImGui::GetWindowPos();
+    ImVec2 size = ImGui::GetWindowSize();
+
+    // 2. Считаем границы, гарантируя, что max всегда >= min
+    float minX = viewport->Pos.x;
+    float minY = viewport->Pos.y;
+    float maxX = std::max(minX, viewport->Pos.x + viewport->Size.x - size.x);
+    float maxY = std::max(minY, viewport->Pos.y + viewport->Size.y - size.y);
+
+    // 3. Теперь зажимаем безопасно
+    float clampedX = std::clamp(pos.x, minX, maxX);
+    float clampedY = std::clamp(pos.y, minY, maxY);
+
+    if (pos.x != clampedX || pos.y != clampedY) {
+        ImGui::SetWindowPos(ImVec2(clampedX, clampedY));
+    }
+
     ImGui::SetNextWindowSize(ImVec2(200,160), ImGuiCond_Appearing);
 
     // FPS
-    const std::string fps = "fps: " + std::to_string(deltaT->fps);
-    ImGui::TextUnformatted(fps.c_str());
+    ImGui::Value("Framerate", static_cast<int>(delta.frameRate));
+    ImGui::Value("Total models", static_cast<int>(mdlBus.modelsCount()));
+    ImGui::Value("Total instances", static_cast<int>(mdlBus.getTotalInstanceCount()));
 
-    // MDL BUS
-    const std::string totalModels = "Total models: " + std::to_string(mdlBus.modelsCount());
-    const std::string totalInstances = "Total instances: " + std::to_string(mdlBus.getTotalInstanceCount());
+    int desiredFps = desiredFrameRate;
 
-    ImGui::TextUnformatted(totalModels.c_str());
-    ImGui::TextUnformatted(totalInstances.c_str());
+    if (ImGui::BeginTable("fps_table", 2)) { // Таблица на 2 колонки
+        ImGui::TableNextRow();
+
+        const auto label = "Desired FPS";
+        const float textWidth = ImGui::CalcTextSize(label).x;
+        const float fpsWidth = ImGui::CalcTextSize(std::to_string(desiredFrameRate).c_str()).x + ImGui::GetStyle().FramePadding.x * 2.0f;
+
+        ImGui::TableSetColumnIndex(0);
+        ImGui::SetNextItemWidth(textWidth);
+        ImGui::AlignTextToFramePadding();
+        ImGui::Text(label);
+
+        ImGui::TableSetColumnIndex(1);
+        ImGui::SetNextItemWidth(fpsWidth);
+        if (ImGui::InputInt("##desiredFps", &desiredFps, 0)) {
+            desiredFrameRate = desiredFps;
+            sleepTimeTotalSeconds = 1.0 / std::clamp(desiredFrameRate, 5.0, std::numeric_limits<double>::max());
+        }
+
+        ImGui::EndTable();
+    }
+
+    std::string selectedShader1 = selectedShader;
+    if (ImGui::BeginCombo("shaders", selectedShader1.c_str())) {
+        for (const std::string& shader : postprocessPipelines | std::views::keys) {
+
+            bool is_selected = shader == selectedShader;
+
+            if (ImGui::Selectable(shader.c_str(), is_selected)) {
+                selectedShader = shader;
+            }
+
+            if (is_selected) {
+                ImGui::SetItemDefaultFocus();
+            }
+        }
+
+        ImGui::EndCombo();
+    }
 
     ImGui::End();
 
@@ -64,26 +111,29 @@ void Engine::drawFrame() {
         throw std::runtime_error("failed to acquire swap chain image!");
     }
 
-    updateUniformBuffer(currentFrame, swapchainExtent, uniformBuffersMapped, ubo, camera);
+    updateUniformBuffer(currentFrame, swapchainExtent, uniformBuffersMapped, ubo, camera, mdlBus);
+    updateUniformPostprocessingBuffer(currentFrame, uniformPostprocessingBuffersMapped, upbo, delta, swapchainExtent);
     updateCullingUniformBuffer(currentFrame, swapchainExtent, uniformCullingBuffersMapped, ucbo, camera, mdlBus);
     updateModelCullingBuffer(modelCullingBufferMapped, mcbo, mdlBus);
     updateModelDataBuffer(currentFrame, modelDataBuffersMapped, mdlBus);
-    updateModelBuffer(modelBuffersMapped, mbo);
+    updateModelBuffer(modelBuffersMapped, mbo, mdlBus);
+    updateTextureIndexBuffer(textureIndexMapped, textureIndexOffsetMapped, tio, tioo, mdlBus);
+    //updateDrawCommands(drawCommandsBufferMapped, dc, mdlBus);
 
     std::function<void(VkCommandBuffer&)> imGui = [this](const VkCommandBuffer& commandBuffer) { drawImGui(commandBuffer); };
 
     Command::recordCommandBuffer(
         device, physicalDevice, commandBuffers[currentFrame], imageIndex,
         swapchainExtent, vertexBuffer,
-        indexBuffer, graphicsPipeline, matrixComputePipeline,
-        cullingComputePipeline, graphicsPipelineLayout,
-        matrixComputePipelineLayout, cullingComputePipelineLayout,
-        graphicsDescriptorSets, matrixComputeDescriptorSets,
-        cullingComputeDescriptorSets, currentFrame, clear_color, mdlBus,
+        indexBuffer,
+        graphicsPipeline, matrixComputePipeline, cullingComputePipeline, postprocessPipelines[selectedShader],
+        graphicsPipelineLayout, matrixComputePipelineLayout, cullingComputePipelineLayout, postprocessPipelineLayout,
+        graphicsDescriptorSets, matrixComputeDescriptorSets, cullingComputeDescriptorSets, postprocessDescriptorSets,
+        currentFrame, clear_color, mdlBus,
         modelDataBuffers, drawCommandsBuffer, MAX_FRAMES_IN_FLIGHT,
         matrixDirty, atomicCounterBuffers, visibleIndicesBuffers,
         imGui,
-        swapchainImageViews, depthImageView, depthImage, swapchainImages
+        swapchainImageViews, depthImageView, depthImage, swapchainImages, offscreenImageViews, offscreenImages, depth
     );
 
     vkResetFences(device, 1, &inFlightFences[currentFrame]);
@@ -134,17 +184,32 @@ void Engine::drawFrame() {
 }
 
 
+
+
 // Clean trash before closing app
 void Engine::cleanup() const {
     vkDeviceWaitIdle(device);
 
     cleanupSwapchain();
+    cleanupOffscreenImages();
 
     vkDestroySampler(device, textureSampler, nullptr);
     vkDestroyImageView(device, textureImageView, nullptr);
 
     vkDestroyImage(device, textureImage, nullptr);
     vkFreeMemory(device, textureImageMemory, nullptr);
+
+    for (auto& textures : mdlBus.groups_map
+    | std::views::values
+    | std::views::transform(&ModelGroup::model)
+    | std::views::transform(&ParsedModel::textures)
+    ) {
+        for (const auto& texture : textures) {
+            vkDestroyImageView(device, texture.textureImageView, nullptr);
+            vkDestroyImage(device, texture.textureImage, nullptr);
+            vkFreeMemory(device, texture.textureImageMemory, nullptr);
+        }
+    }
 
     for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
         vkDestroyBuffer(device, uniformBuffers[i], nullptr);
@@ -179,6 +244,11 @@ void Engine::cleanup() const {
         vkFreeMemory(device, uniformCullingBuffersMemory[i], nullptr);
     }
 
+    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+        vkDestroyBuffer(device, uniformPostprocessingBuffers[i], nullptr);
+        vkFreeMemory(device, uniformPostprocessingBuffersMemory[i], nullptr);
+    }
+
     ImGui_ImplVulkan_Shutdown();
 
     vkDestroyDescriptorPool(device, graphicsDescriptorPool, nullptr);
@@ -190,11 +260,20 @@ void Engine::cleanup() const {
     vkDestroyDescriptorPool(device, cullingComputeDescriptorPool, nullptr);
     vkDestroyDescriptorSetLayout(device, cullingComputeDescriptorSetLayout, nullptr);
 
+    vkDestroyDescriptorPool(device, postprocessDescriptorPool, nullptr);
+    vkDestroyDescriptorSetLayout(device, postprocessDescriptorSetLayout, nullptr);
+
     vkDestroyBuffer(device, vertexBuffer, nullptr);
     vkFreeMemory(device, vertexBufferMemory, nullptr);
 
     vkDestroyBuffer(device, indexBuffer, nullptr);
     vkFreeMemory(device, indexBufferMemory, nullptr);
+
+    vkDestroyBuffer(device, textureIndexBuffer, nullptr);
+    vkFreeMemory(device, textureIndexMemory, nullptr);
+
+    vkDestroyBuffer(device, textureIndexOffsetBuffer, nullptr);
+    vkFreeMemory(device, textureIndexOffsetMemory, nullptr);
 
     for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
         vkDestroySemaphore(device, renderFinishedSemaphores[i], nullptr);
@@ -211,11 +290,19 @@ void Engine::cleanup() const {
     vkDestroyPipeline(device, cullingComputePipeline, nullptr);
     vkDestroyPipelineLayout(device, cullingComputePipelineLayout, nullptr);
 
+    for (const auto &val: postprocessPipelines | std::views::values) {
+        vkDestroyPipeline(device, val, nullptr);
+    }
+
+    vkDestroyPipelineLayout(device, postprocessPipelineLayout, nullptr);
+
     vkDestroyCommandPool(device, graphicsCommandPool, nullptr);
 
     vkDestroyCommandPool(device, matrixComputeCommandPool, nullptr);
 
     vkDestroyCommandPool(device, cullingComputeCommandPool, nullptr);
+
+    vkDestroyCommandPool(device, postprocessCommandPool, nullptr);
 
 
     vkDestroyBuffer(device, drawCommandsBuffer, nullptr);
@@ -235,11 +322,18 @@ void Engine::cleanup() const {
 
 #pragma region Buffers
 // Generic
-void Engine::updateUniformBuffer(const uint32_t currentFrame, const VkExtent2D& swapchainExtent, const std::vector<void*>& uniformBuffersMapped, UniformBufferObject& ubo, const Camera& camera) {
+void Engine::updateUniformBuffer(const uint32_t currentFrame, const VkExtent2D& swapchainExtent, const std::vector<void*>& uniformBuffersMapped, UniformBufferObject& ubo, const Camera& camera, const ModelBus& mdlBus) {
     ubo.view = glm::lookAt(camera.pos + glm::vec3(0), camera.pos + camera.look, glm::vec3(0.0f, 0.0f, 1.0f));
     ubo.proj = glm::perspective(camera.fov,  static_cast<float>(swapchainExtent.width) / static_cast<float>(swapchainExtent.height), 0.1f, 4096.0f);
     ubo.proj[1][1] *= -1;
+    ubo.modelCount = mdlBus.getTotalModelCount();
     memcpy(uniformBuffersMapped[currentFrame], &ubo, sizeof(ubo));
+}
+
+void Engine::updateUniformPostprocessingBuffer(const uint32_t currentFrame, const std::vector<void*>& uniformBuffersMapped, UniformPostprocessingBufferObject& upbo, DeltaManager& delta, const VkExtent2D& swapchainExtent) {
+    upbo.time += delta.deltaTime;
+    upbo.resolution = glm::vec2(swapchainExtent.width, swapchainExtent.height);
+    memcpy(uniformBuffersMapped[currentFrame], &upbo, sizeof(upbo));
 }
 
 void Engine::normalizePlane(glm::vec4& plane) {
@@ -305,16 +399,19 @@ void Engine::updateModelDataBuffer(const uint32_t currentFrame, const std::vecto
     }
 }
 
-void Engine::updateModelBuffer(const std::vector<void*>& modelBuffersMapped, ModelBufferObject& mbo) {
-        static bool initialized = false;
+void Engine::updateModelBuffer(const std::vector<void*>& modelBuffersMapped, ModelBufferObject& mbo, ModelBus& mdlBus) {
+    static bool initialized = false;
 
-        if (!initialized) {
-            mbo.mdls.clear();
-            for (auto& object : modelBuffersMapped) {
-                memcpy(object, mbo.mdls.data(), mbo.mdls.size() * sizeof(glm::mat4));
-            }
+    if (!initialized) {
+        mbo.models.clear();
+        mbo.models.resize(mdlBus.getTotalInstanceCount());
+        for (auto& object : modelBuffersMapped) {
+            memcpy(object, mbo.models.data(), sizeof(glm::mat4) * mbo.models.size());
         }
+
+        initialized = true;
     }
+}
 
 
 // Culling
@@ -322,16 +419,19 @@ void Engine::updateModelCullingBuffer(void*& modelCullingBufferMapped, ModelCull
     static bool initialized = false;
 
     if (!initialized) {
-        mcbo.spheres.clear();
-        mcbo.spheres.reserve(mdlBus.getTotalInstanceCount());
+        mcbo.cullingDatas.clear();
+        mcbo.cullingDatas.reserve(mdlBus.getTotalInstanceCount());
 
+        uint16_t index = 0;
         for (const auto& group : std::views::transform(std::views::values(mdlBus.groups_map), &ModelGroup::instances)) {
             for (const auto& instance : group) {
-                mcbo.spheres.emplace_back(instance.sfr);
+                mcbo.cullingDatas.emplace_back(instance.sfr, index);
             }
+
+            index++;
         }
 
-        memcpy(modelCullingBufferMapped, mcbo.spheres.data(), mcbo.spheres.size() * sizeof(glm::vec4));
+        memcpy(modelCullingBufferMapped, mcbo.cullingDatas.data(), mcbo.cullingDatas.size() * sizeof(CullingData));
 
         initialized = true;
     }
@@ -356,6 +456,7 @@ void Engine::updateDrawCommands(void* drawCommandsBufferMapped, DrawCommandsBuff
         int32_t vertexOffset = 0;
         uint32_t firstInstance = 0;
 
+
         for (const auto& group : std::views::values(mdlBus.groups_map)) {
             const auto& model = group.model;
             VkDrawIndexedIndirectCommand command{};
@@ -379,37 +480,108 @@ void Engine::updateDrawCommands(void* drawCommandsBufferMapped, DrawCommandsBuff
             dc.commands.emplace_back(command);
         }
 
-        mdlBus.dirtyCommands = true;
+        mdlBus.dirtyCommands = false;
         static bool initialized = true;
 
 
         memcpy(drawCommandsBufferMapped, dc.commands.data(), dc.commands.size() * sizeof(VkDrawIndexedIndirectCommand));
     }
 }
+
+void Engine::updateTextureIndexOffsetBuffer(const void* TextureIndexBufferMapped, TextureIndexOffsetObject& tio, ModelBus& mdlBus) {
+    static bool initialized = false;
+
+    if (!initialized) {
+
+        initialized = true;
+    }
+}
+
+void Engine::updateTextureIndexBuffer(void* TextureIndexBufferMapped, void* TextureIndexOffsetBufferMapped, TextureIndexObject& tio, TextureIndexOffsetObject& tioo, ModelBus& mdlBus) {
+    static bool initialized = false;
+
+    if (!initialized) {
+        size_t i = 0;
+        size_t count = mdlBus.getTotalModelCount();
+        uint32_t currentGlobalVertexOffset = 0;
+
+        tio.indices.resize(count);
+
+        for (auto& model : mdlBus.groups_map | std::views::values | std::views::transform(&ModelGroup::model)) {
+            auto& textures = model->textures;
+
+            if (textures.empty()) {
+                tio.indices[i].firstIndex = 0;
+                tio.indices[i].indexCount = 0;
+            } else {
+                tio.indices[i].firstIndex = textures[0].index;
+                tio.indices[i].indexCount = textures.size();
+                tio.indices[i].pad1 = currentGlobalVertexOffset;
+
+                //std::cout << "==================" << std::endl;
+                //std::cout << "First index: " << textures[0].index << std::endl;
+                //std::cout << "Tex count: " << tio.indices[i].indexCount << std::endl;
+                //std::cout << "Padding index: " << tio.indices[i].pad1 << std::endl;
+                //std::cout << "==================" << std::endl;
+                for (size_t i1 = 0; i1 < textures.size(); i1++) {
+                    const uint32_t offset = textures[i1].indexOffset;
+                    tioo.indexOffsets.emplace_back(offset);
+                    //std::cout << "Tex offset: " << offset << std::endl;
+                }
+            }
+
+            uint32_t modelTotalVertices = 0;
+            for (const auto& mesh : model->meshes) {
+                modelTotalVertices += static_cast<uint32_t>(mesh.size());
+            }
+            currentGlobalVertexOffset += modelTotalVertices;
+
+            i++;
+        }
+
+        //std::cout << "Index offsets count: " << tioo.indexOffsets.size() << std::endl;
+        //std::cout << "Index offsets2 count: " << tio.indices.size() << std::endl;
+
+        memcpy(TextureIndexBufferMapped, tio.indices.data(), sizeof(Index) * tio.indices.size());
+        memcpy(TextureIndexOffsetBufferMapped, tioo.indexOffsets.data(), tioo.indexOffsets.size() * sizeof(uint32_t));
+
+        initialized = true;
+    }
+}
 #pragma endregion
 
+void Engine::recreatePostprocessingPipeline(const std::string& filename) {
+    PipelineCreation::createPostprocessPipeline(device, physicalDevice, postprocessPipelineLayout, postprocessPipelines[filename], postprocessDescriptorSetLayout, swapchainImageFormat, filename);
+}
 
 #pragma region Initialization
 // Initialization of engine and its counterparts
 void Engine::initialize(SDL_Window* window) {
     const auto start = std::chrono::high_resolution_clock::now();
 
-    this->window = window;
+    std::vector<std::filesystem::path> dirtyShaders = Shaders::getShadersToCompile();
+    for (auto& dirtyShader : dirtyShaders) {
+        auto shader = Shaders::compileShader(dirtyShader);
+        Shaders::saveShaderToFile(Tools::getShaderPath() + "compiled/" + dirtyShader.lexically_relative(Tools::getShaderPath()).replace_extension(".spv").string(), shader);
+    }
 
-    mdlBus.test();
+    this->window = window;
 
     // Engine related stuff
     sid = Random::randomNum<uint64_t>(1000000000,9999999999);
-    LOGGER = Logger::of("engine.hpp");
+    LOGGER = Logger("engine.hpp");
 
     initializeVulkan();
     initializeImGui(window);
 
-    auto end = std::chrono::high_resolution_clock::now();
-    std::chrono::duration<double> duration = end - start;
+    const auto end = std::chrono::high_resolution_clock::now();
+    const std::chrono::duration<double> duration = end - start;
+
+    desiredFrameRate = 200.0;
+    sleepTimeTotalSeconds = 1.0 / desiredFrameRate;
 
     // Success!?
-    LOGGER->success("2g43s engine started successfully in ${} seconds!", duration.count());
+    LOGGER.success("2g43s engine started successfully in ${} seconds!", duration.count());
 }
 
 // Creating Vulkan instance
@@ -421,9 +593,9 @@ void Engine::createInstance() {
     // App info
     VkApplicationInfo appInfo{};
     appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
-    appInfo.pApplicationName = "Hello Triangle";
+    appInfo.pApplicationName = "2g43s";
     appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
-    appInfo.pEngineName = "No Engine";
+    appInfo.pEngineName = "2g43s Engine";
     appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
     appInfo.apiVersion = VK_API_VERSION_1_3;
 
@@ -441,8 +613,9 @@ void Engine::createInstance() {
     VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo{};
     if (enableValidationLayers) {
         VkValidationFeaturesEXT validationFeatures = {};
-        VkValidationFeatureEnableEXT enables[] = {};
+        VkValidationFeatureEnableEXT enables[] = {VK_VALIDATION_FEATURE_ENABLE_DEBUG_PRINTF_EXT};
         validationFeatures.pEnabledValidationFeatures = enables;
+        validationFeatures.enabledValidationFeatureCount = 1;
         validationFeatures.pNext = &debugCreateInfo;
 
         createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
@@ -502,8 +675,34 @@ void Engine::initializeImGui(SDL_Window* window) {
     vkDeviceWaitIdle(device);
 }
 
+void Engine::initializeOffscreenImages(const int width, const int height) {
+    offscreenImages.resize(MAX_FRAMES_IN_FLIGHT);
+    offscreenImageViews.resize(MAX_FRAMES_IN_FLIGHT);
+    offscreenImagesMemory.resize(MAX_FRAMES_IN_FLIGHT);
+
+    for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i) {
+        Images::createImage(device, physicalDevice, width, height, VK_FORMAT_R16G16B16A16_SFLOAT , VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, offscreenImages[i], offscreenImagesMemory[i]);
+        offscreenImageViews[i] = Images::createImageView(device, offscreenImages[i], VK_FORMAT_R16G16B16A16_SFLOAT, VK_IMAGE_ASPECT_COLOR_BIT);
+    }
+}
+
+void Engine::initializePostprocessPipelines() {
+    const std::string path = Tools::getCompiledShaderPath() + "postprocessing/";
+
+    if (!std::filesystem::exists(path) || !std::filesystem::is_directory(path)) return;
+
+    PipelineCreation::createPostprocessPipelineLayout(device, postprocessPipelineLayout, postprocessDescriptorSetLayout);
+
+    for (const auto& entry : std::filesystem::directory_iterator(path)) {
+        if (entry.is_regular_file()) {
+            const std::string filename = entry.path().filename().string();
+            PipelineCreation::createPostprocessPipeline(device, physicalDevice, postprocessPipelineLayout, postprocessPipelines[filename], postprocessDescriptorSetLayout, swapchainImageFormat, filename);
+        }
+    }
+}
+
 void Engine::initializeVulkan() {
-    deltaT = new Delta();
+    delta = DeltaManager();
 
     // Basic things
     createInstance();
@@ -513,12 +712,18 @@ void Engine::initializeVulkan() {
     Surface::createSurface(Engine::surface, window, instance);
 
     // Devices
-    PhysDevice::pickPhysicalDevice(physicalDevice, instance, surface);
-    LogDevice::createLogicalDevice(device, physicalDevice, graphicsQueue, presentQueue, surface);
+    PhysicalDevice::pickPhysicalDevice(physicalDevice, instance, surface);
+    PhysicalDevice::getSubgroupProperties(physicalDevice, subgroupProperties);
+    LogicalDevice::createLogicalDevice(device, physicalDevice, graphicsQueue, presentQueue, surface);
+
+
+    LOGGER.info("Subgroup size: ${}", subgroupProperties.subgroupSize);
 
     // Swapchain
     Swapchain::createSwapchain(device, physicalDevice, surface, window, swapchain, swapchainImages, swapchainImageFormat, swapchainExtent);
     Swapchain::createImageViews(device, swapchainImageViews, swapchainImages, swapchainImageFormat);
+
+    initializeOffscreenImages(swapchainExtent.width, swapchainExtent.height);
 
     // Desccriptor
     Descriptor::createGraphicsDescriptorSetLayout(device, graphicsDescriptorSetLayout);
@@ -530,13 +735,18 @@ void Engine::initializeVulkan() {
     PipelineCreation::createMatrixComputePipeline(device, matrixComputeDescriptorSetLayout, matrixComputePipelineLayout, matrixComputePipeline);
     PipelineCreation::createCullingComputePipeline(device, cullingComputeDescriptorSetLayout, cullingComputePipelineLayout, cullingComputePipeline);
 
-    Command::createCommandPool(device, physicalDevice, graphicsCommandPool, surface);
+    initializePostprocessPipelines();
+    Buffers::createUniformBuffers(device, physicalDevice, uniformPostprocessingBuffers, uniformPostprocessingBuffersMemory, uniformPostprocessingBuffersMapped, MAX_FRAMES_IN_FLIGHT);
 
+    Command::createCommandPool(device, physicalDevice, graphicsCommandPool, surface);
     Helper::createDepthResources(device, physicalDevice, depthImage, depthImageMemory, depthImageView, swapchainExtent);
 
     Images::createTextureImage(device, graphicsCommandPool, graphicsQueue, physicalDevice, stagingBuffer, stagingBufferMemory, textureImage, textureImageMemory);
     Images::createTextureImageView(device, textureImage, textureImageView);
     Images::createTextureSampler(device, physicalDevice, textureSampler);
+
+    mdlBus.loadModels();
+    mdlBus.loadModelTextures(device, graphicsCommandPool, graphicsQueue, physicalDevice, stagingBuffer, stagingBufferMemory);
 
     Buffers::createVertexBuffer(device, physicalDevice, graphicsCommandPool, graphicsQueue, vertexBuffer, vertexBufferMemory, mdlBus);
     Buffers::createIndexBuffer(device, physicalDevice, graphicsCommandPool, graphicsQueue, indexBuffer, indexBufferMemory, mdlBus);
@@ -550,24 +760,28 @@ void Engine::initializeVulkan() {
     Buffers::createModelDataBuffers(device, physicalDevice, modelDataBuffers, modelDataBuffersMemory, modelDataBuffersMapped, MAX_FRAMES_IN_FLIGHT, mdlBus);
 
     // Culling
-    Buffers::createUniformCullingBuffers(device, physicalDevice, uniformCullingBuffers, uniformCullingBuffersMemory, uniformCullingBuffersMapped, MAX_FRAMES_IN_FLIGHT);
+    Buffers::createUniformBuffers(device, physicalDevice, uniformCullingBuffers, uniformCullingBuffersMemory, uniformCullingBuffersMapped, MAX_FRAMES_IN_FLIGHT);
     Buffers::createVisibleIndicesBuffers(device, physicalDevice, visibleIndicesBuffers, visibleIndicesMemory, visibleIndicesMapped, MAX_FRAMES_IN_FLIGHT, mdlBus);
 
     Buffers::createModelCullingBuffer(device, physicalDevice, modelCullingBuffer, modelCullingBufferMemory, modelCullingBufferMapped, MAX_FRAMES_IN_FLIGHT, mdlBus);
     Buffers::createDrawCommandsBuffer(device, physicalDevice, drawCommandsBuffer, drawCommandsBufferMemory, mdlBus, drawCommandsBufferMapped, dc);
 
+    Buffers::createGenericBuffer(device, physicalDevice, textureIndexBuffer, textureIndexMemory, textureIndexMapped, sizeof(uint32_t) * 4 * 128, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
+    Buffers::createGenericBuffer(device, physicalDevice, textureIndexOffsetBuffer, textureIndexOffsetMemory, textureIndexOffsetMapped, sizeof(uint32_t) * 128, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
+
+
     // Descriptor
     Descriptor::createGraphicsDescriptorPool(device, MAX_FRAMES_IN_FLIGHT, graphicsDescriptorPool);
-    Descriptor::createGraphicsDescriptorSets(device, MAX_FRAMES_IN_FLIGHT, graphicsDescriptorSetLayout, graphicsDescriptorPool, graphicsDescriptorSets, uniformBuffers, textureImageView, textureSampler, modelBuffers, visibleIndicesBuffers, mdlBus);
+    Descriptor::createGraphicsDescriptorSets(device, MAX_FRAMES_IN_FLIGHT, graphicsDescriptorSetLayout, graphicsDescriptorPool, graphicsDescriptorSets, uniformBuffers, textureSampler, modelBuffers, visibleIndicesBuffers, mdlBus, textureImageView, textureIndexBuffer, textureIndexOffsetBuffer);
 
     Descriptor::createMatrixComputeDescriptorPool(device, MAX_FRAMES_IN_FLIGHT, matrixComputeDescriptorPool);
     Descriptor::createMatrixComputeDescriptorSets(device, MAX_FRAMES_IN_FLIGHT, matrixComputeDescriptorSetLayout, matrixComputeDescriptorPool, matrixComputeDescriptorSets, modelBuffers, mdlBus, modelDataBuffers);
 
     Descriptor::createCullingComputeDescriptorPool(device, MAX_FRAMES_IN_FLIGHT, cullingComputeDescriptorPool);
-    Descriptor::createCullingComputeDescriptorSets(device, MAX_FRAMES_IN_FLIGHT, cullingComputeDescriptorSetLayout, cullingComputeDescriptorPool, cullingComputeDescriptorSets, mdlBus, drawCommandsBuffer, uniformCullingBuffers, visibleIndicesBuffers, modelCullingBuffer);
+    Descriptor::createCullingComputeDescriptorSets(device, MAX_FRAMES_IN_FLIGHT, cullingComputeDescriptorSetLayout, cullingComputeDescriptorPool, cullingComputeDescriptorSets, mdlBus, drawCommandsBuffer, uniformCullingBuffers, visibleIndicesBuffers, modelCullingBuffer, atomicCounterBuffers);
 
     Descriptor::createPostprocessDescriptorPool(device, MAX_FRAMES_IN_FLIGHT, postprocessDescriptorPool);
-    Descriptor::createPostprocessComputeDescriptorSets(device, MAX_FRAMES_IN_FLIGHT, postprocessDescriptorSetLayout, postprocessDescriptorPool, postprocessDescriptorSets, uniformCullingBuffers, textureImageView, textureSampler);
+    Descriptor::createPostprocessDescriptorSets(device, MAX_FRAMES_IN_FLIGHT, postprocessDescriptorSetLayout, postprocessDescriptorPool, postprocessDescriptorSets, offscreenImageViews, depthImageView, textureSampler, uniformPostprocessingBuffers);
 
     Buffers::createCommandBuffer(device, graphicsCommandPool, commandBuffers, MAX_FRAMES_IN_FLIGHT);
     Helper::createSyncObjects(device, imageAvailableSemaphores, renderFinishedSemaphores, inFlightFences, MAX_FRAMES_IN_FLIGHT);
@@ -576,6 +790,15 @@ void Engine::initializeVulkan() {
 
 
 #pragma region Swapchain
+
+void Engine::cleanupOffscreenImages() const {
+    for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i) {
+        vkDestroyImageView(device, offscreenImageViews[i], nullptr);
+        vkDestroyImage(device, offscreenImages[i], nullptr);
+        vkFreeMemory(device, offscreenImagesMemory[i], nullptr);
+    }
+}
+
 void Engine::cleanupSwapchain() const {
     vkDestroyImage(device, depthImage, nullptr);
     vkFreeMemory(device, depthImageMemory, nullptr);
@@ -591,13 +814,19 @@ void Engine::cleanupSwapchain() const {
 void Engine::recreateSwapchain() {
     vkDeviceWaitIdle(device);
 
+    int width, height;
+    SDL_GetWindowSize(window, &width, &height);
+
+    cleanupOffscreenImages();
     cleanupSwapchain();
 
-    // Swapchain
+    initializeOffscreenImages(width, height);
     Swapchain::createSwapchain(device, physicalDevice, surface, window, swapchain, swapchainImages, swapchainImageFormat, swapchainExtent);
     Swapchain::createImageViews(device, swapchainImageViews, swapchainImages, swapchainImageFormat);
 
     Helper::createDepthResources(device, physicalDevice, depthImage, depthImageMemory, depthImageView, swapchainExtent);
+
+    Descriptor::updatePostprocessDescriptorSets(device, MAX_FRAMES_IN_FLIGHT, postprocessDescriptorSets, offscreenImageViews, depthImageView, textureSampler);
 }
 #pragma endregion
 
@@ -617,20 +846,19 @@ void Engine::setupDebugMessenger() {
 
 // Get SDL extensions
 std::vector<const char*> Engine::getRequiredExtensions() {
-        uint32_t extensionCount = 0;
-        auto SDLextensions = SDL_Vulkan_GetInstanceExtensions(&extensionCount);
+    uint32_t extensionCount = 0;
+    auto SDLextensions = SDL_Vulkan_GetInstanceExtensions(&extensionCount);
 
-        std::vector extensions(SDLextensions, SDLextensions + extensionCount);
+    std::vector extensions(SDLextensions, SDLextensions + extensionCount);
 
-        // If validation layers enabled when add them to extensions vector
-        if (enableValidationLayers) {
-            extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
-        }
-        //extensions.push_back(VK_KHR_SURFACE_EXTENSION_NAME);
-
-        return extensions;
+    // If validation layers enabled when add them to extensions vector
+    if (enableValidationLayers) {
+        extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
     }
-#pragma endregion
+    //extensions.push_back(VK_KHR_SURFACE_EXTENSION_NAME);
 
+    return extensions;
+}
+#pragma endregion
 
 #endif //ENGINE_CPP

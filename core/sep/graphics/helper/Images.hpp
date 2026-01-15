@@ -5,7 +5,10 @@
 #ifndef INC_2G43S_IMAGE_H
 #define INC_2G43S_IMAGE_H
 
+#include <cstddef>
 #include <vulkan/vulkan_core.h>
+
+#include "Texture.hpp"
 
 struct Images {
     // Image
@@ -15,6 +18,8 @@ struct Images {
 
     // Texture
     static void createTextureImage(const VkDevice& device, const VkCommandPool& commandPool, const VkQueue& graphicsQueue, const VkPhysicalDevice& physicalDevice, VkBuffer& stagingBuffer, VkDeviceMemory& stagingBufferMemory, VkImage& textureImage, VkDeviceMemory& textureImageMemory);
+
+    static void createTextureImage(const VkDevice& device, const VkCommandPool& commandPool, const VkQueue& graphicsQueue, const VkPhysicalDevice& physicalDevice, VkBuffer& stagingBuffer, VkDeviceMemory& stagingBufferMemory, Texture& texture);
 
     static void createTextureImageView(const VkDevice& device, const VkImage& textureImage, VkImageView& textureImageView);
 

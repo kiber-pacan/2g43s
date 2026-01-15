@@ -1,8 +1,15 @@
 #version 460
+
+#extension GL_KHR_shader_subgroup_basic : enable
+#extension GL_KHR_shader_subgroup_ballot : enable
+#extension GL_KHR_shader_subgroup_arithmetic : enable
+#extension GL_KHR_shader_subgroup_vote : enable
+
 layout (local_size_x = 128) in;
 
 struct MCBO {
     vec4 sphere;
+    uint index;
 };
 
 struct VIBO {
@@ -25,7 +32,7 @@ layout(std430, binding = 1) writeonly buffer VIB {
     VIBO objects[];
 } vib;
 
-layout(std430, binding = 2) writeonly buffer DCB {
+layout(std430, binding = 2) buffer DCB {
     DCO objects[];
 } dcb;
 
@@ -38,38 +45,80 @@ layout(binding = 3) uniform UCBO {
     uint totalObjects;
 } ucbo;
 
+layout(std430, binding = 4) buffer COUNTER {
+    uint count;
+} counter;
 
 bool isSphereInFrustum(vec4 sphere, vec4 f[6]) {
     vec3 center = sphere.xyz;
     float radius = sphere.w;
 
-    // Check sphere against all 6 frustum planes
     for (int i = 0; i < 6; ++i) {
-        // Distance from plane: Ax + By + Cz + D
-        // Since planes are normalized (length(normal)=1), this is the signed distance.
-        // If normal points OUTWARDS, negative distance means outside.
         float dist = dot(f[i].xyz, center) + f[i].w;
-
-        // If the sphere is completely outside *any* plane, it's outside the frustum.
-        // If normal points OUTWARDS, dist < -radius means it's outside.
         if (dist < -radius) {
             return false;
         }
     }
-    // If the sphere is not completely outside any plane, it's considered inside or intersecting.
     return true;
 }
 
 void main() {
     uint index = gl_GlobalInvocationID.x;
-
     if (index >= ucbo.totalObjects) return;
 
-    if (isSphereInFrustum(mcb.objects[index].sphere, ucbo.frustumPlanes)) {
-        uint outIdx = atomicAdd(dcb.objects[0].instanceCount, 1);
+    // 1. Проверка видимости
+    bool visible = isSphereInFrustum(mcb.objects[index].sphere, ucbo.frustumPlanes);
 
-        if (outIdx < ucbo.totalObjects) {
-            vib.objects[outIdx].index = index;
+    // 2. Получаем маску всех видимых потоков в подгруппе
+    uvec4 ballot = subgroupBallot(visible);
+
+    // Если в подгруппе вообще никто ничего не видит — выходим сразу
+    if (!subgroupAny(visible)) return;
+
+    uint drawCommandIndex = mcb.objects[index].index;
+
+    // --- ОПТИМИЗАЦИЯ: СКАЛЯРИЗАЦИЯ ---
+    // Перебираем все уникальные DrawCommandIndex внутри подгруппы
+    uvec4 processedBallot = uvec4(0);
+
+    // Пока не обработаем все видимые потоки в подгруппе
+    while (subgroupAny((ballot.x ^ processedBallot.x) != 0 || (ballot.y ^ processedBallot.y) != 0 ||
+    (ballot.z ^ processedBallot.z) != 0 || (ballot.w ^ processedBallot.w) != 0)) {
+
+        // Находим первый необработанный поток
+        uint firstUnprocessed = subgroupBallotFindLSB(ballot ^ processedBallot);
+
+        // Получаем ID модели, которую этот поток хочет отрисовать
+        uint candidateID = subgroupBroadcast(drawCommandIndex, firstUnprocessed);
+
+        // Находим все потоки в подгруппе, которые хотят рисовать ЭТУ ЖЕ модель
+        uvec4 sameModelBallot = subgroupBallot(visible && (drawCommandIndex == candidateID));
+        uint countForThisModel = subgroupBallotBitCount(sameModelBallot);
+
+        uint baseIdx = 0;
+
+        // Только один поток (лидер этой группы в подгруппе) делает атомарную операцию
+        if (gl_SubgroupInvocationID == firstUnprocessed) {
+            baseIdx = atomicAdd(dcb.objects[candidateID].instanceCount, countForThisModel);
+
+            // Если это первые инстансы этой модели — увеличиваем счетчик команд
+            if (baseIdx == 0) {
+                atomicAdd(counter.count, 1);
+            }
         }
+
+        // Рассылаем полученный baseIdx всем потокам с этой же моделью
+        baseIdx = subgroupBroadcast(baseIdx, firstUnprocessed);
+
+        // Если текущий поток относится к этой модели — пишем результат
+        if (visible && (drawCommandIndex == candidateID)) {
+            uint localOffset = subgroupBallotExclusiveBitCount(sameModelBallot);
+            uint firstInstance = dcb.objects[candidateID].firstInstance;
+
+            vib.objects[baseIdx + localOffset + firstInstance].index = index;
+        }
+
+        // Помечаем эти потоки как обработанные
+        processedBallot |= sameModelBallot;
     }
 }

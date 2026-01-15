@@ -12,11 +12,13 @@
 const std::vector<const char*> deviceExtensions = {
     VK_KHR_SWAPCHAIN_EXTENSION_NAME,
     VK_KHR_DRAW_INDIRECT_COUNT_EXTENSION_NAME,
-    VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME
+    VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME,
+    VK_KHR_SHADER_DRAW_PARAMETERS_EXTENSION_NAME,
+    VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME
 };
 
 
-struct PhysDevice {
+struct PhysicalDevice {
     // Main method for picking Graphics device
     static void pickPhysicalDevice(VkPhysicalDevice& physicalDevice, VkInstance& instance, VkSurfaceKHR& surface) {
         uint32_t deviceCount = 0;
@@ -44,32 +46,54 @@ struct PhysDevice {
         }
     }
 
+    static VkPhysicalDeviceSubgroupProperties getSubgroupProperties(const VkPhysicalDevice& device, VkPhysicalDeviceSubgroupProperties& subgroupProperties) {
+        subgroupProperties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SUBGROUP_PROPERTIES;
+        subgroupProperties.pNext = VK_NULL_HANDLE;
+
+        VkPhysicalDeviceProperties2 deviceProperties;
+        deviceProperties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
+        deviceProperties.pNext = &subgroupProperties;
+
+        VkPhysicalDeviceFeatures deviceFeatures;
+
+        vkGetPhysicalDeviceProperties2(device, &deviceProperties);
+
+        return subgroupProperties;
+    }
+
     // Rating devices (for multi gpu setups)
     static int rateDeviceSuitability(VkPhysicalDevice device, VkSurfaceKHR surface) {
-        Logger* LOGGER = Logger::of("physDevice.hpp");
+        auto LOGGER = Logger("physDevice.hpp");
 
-        VkPhysicalDeviceProperties deviceProperties;
+        VkPhysicalDeviceSubgroupProperties subgroupProperties;
+        subgroupProperties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SUBGROUP_PROPERTIES;
+        subgroupProperties.pNext = VK_NULL_HANDLE;
+
+        VkPhysicalDeviceProperties2 deviceProperties;
+        deviceProperties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
+        deviceProperties.pNext = &subgroupProperties;
+
         VkPhysicalDeviceFeatures deviceFeatures;
-        VkPhysicalDeviceFeatures supportedFeatures;
 
-        vkGetPhysicalDeviceProperties(device, &deviceProperties);
+
+        vkGetPhysicalDeviceProperties2(device, &deviceProperties);
         vkGetPhysicalDeviceFeatures(device, &deviceFeatures);
-        vkGetPhysicalDeviceFeatures(device, &supportedFeatures);
+
 
         int score = 0;
 
-        if (!supportedFeatures.samplerAnisotropy) {
+        if (!deviceFeatures.samplerAnisotropy) {
             score -= 1000;
-            LOGGER->warn("Your GPU does not support sampler anisotropy!");
+            LOGGER.warn("Your GPU does not support sampler anisotropy!");
         }
 
         // Discrete GPUs have a significant performance advantage
-        if (deviceProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU) {
+        if (deviceProperties.properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU) {
             score += 1000;
         }
 
         // Maximum possible size of textures affects graphics quality
-        score += deviceProperties.limits.maxImageDimension2D;
+        score += deviceProperties.properties.limits.maxImageDimension2D;
 
         // Application can't function without geometry shaders
         if (!deviceFeatures.geometryShader) {
@@ -78,6 +102,12 @@ struct PhysDevice {
 
         // Maybe you should make your engine work without multiDrawIndirect?
         if (!deviceFeatures.multiDrawIndirect) {
+            return 0;
+        }
+
+        // Subgroups handling
+        if (!subgroupProperties.quadOperationsInAllStages) {
+            LOGGER.error("Your GPU or driver does not fully support subgroups!");
             return 0;
         }
 

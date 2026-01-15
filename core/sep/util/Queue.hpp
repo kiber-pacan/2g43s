@@ -28,7 +28,7 @@ struct Queue {
 
         int i = 0;
         for (const auto& queueFamily : queueFamilies) {
-            // Comparing bits and then setting index of graphicsFamily
+            // Comparing bits and then setting firstIndex of graphicsFamily
             if (queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT) {
                 indices.graphicsFamily = i;
             }
@@ -37,7 +37,7 @@ struct Queue {
             // Checking present support by queueFamily
             vkGetPhysicalDeviceSurfaceSupportKHR(device, i, surface, &presentSupport);
 
-            // Setting index
+            // Setting firstIndex
             if (presentSupport) {
                 indices.presentFamily = i;
             }

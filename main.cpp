@@ -7,28 +7,25 @@
 #include "core/sep/util/Tools.hpp"
 
 #define GLM_FORCE_RADIANS
-#include <imgui_impl_sdl3.h>
+#include "imgui_impl_sdl3.h"
 #include <glm/glm.hpp>
 
-#include "core/sep/control/KeyListener.hpp"
-#include "core/sep/control/MouseListener.hpp"
+#include "core/sep/controls/KeyListener.hpp"
+#include "core/sep/controls/MouseListener.hpp"
 #include "core/sep/util/Random.hpp"
 
 
 #include <omp.h>
-
-
+#include <thread>
 
 
 struct AppContext {
     Engine engine;
-    bool quit = true;
-
     KeyListener* kL;
     MouseListener* mL;
 };
 
-Logger* LOGGER = Logger::of("main.cpp");
+Logger LOGGER = Logger("main.cpp");
 
 SDL_AppResult SDL_Fail() {
     SDL_LogError(SDL_LOG_CATEGORY_CUSTOM, "Error %s", SDL_GetError());
@@ -59,30 +56,31 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
         int width, height, bbwidth, bbheight;
         SDL_GetWindowSize(window, &width, &height);
         SDL_GetWindowSizeInPixels(window, &bbwidth, &bbheight);
-        LOGGER->info("Window size: ${} x ${}", width, height);
-        LOGGER->info("Backbuffer size: ${} x ${}", bbwidth, bbheight);
+        LOGGER.info("Window size: ${} x ${}", width, height);
+        LOGGER.info("Backbuffer size: ${} x ${}", bbwidth, bbheight);
         if (width != bbwidth){
-            LOGGER->info("This is a highdpi environment.");
+            LOGGER.info("This is a highdpi environment.");
         }
-        LOGGER->info("Random number: ${} (between 1 and 100)", Random::randomNum<uint32_t>(1,100));
+        LOGGER.info("Random number: ${} (between 1 and 100)", Random::randomNum<uint32_t>(1,100));
     }
 
     // Set up Vulkan engine
-    Engine vulkan_engine;
+    Engine
+    vulkan_engine;
     vulkan_engine.init(window);
 
     // set up the application data
     *appstate = new AppContext{
         vulkan_engine,
-        false,
-        new KeyListener(),
+        new KeyListener,
         new MouseListener()
     };
 
-    LOGGER->info("Session ID: ${}", vulkan_engine.sid);
-    LOGGER->success("Application started successfully!");
+    LOGGER.info("Session ID: ${}", vulkan_engine.sid);
+    LOGGER.success("Application started successfully!");
 
-    SDL_SetWindowRelativeMouseMode(window, true);
+    SDL_GetRelativeMouseState(&vulkan_engine.mousePosition.x, &vulkan_engine.mousePosition.y);
+    SDL_GetRelativeMouseState(&vulkan_engine.mousePointerPosition.x, &vulkan_engine.mousePointerPosition.y);
 
     return SDL_APP_CONTINUE;
 }
@@ -95,17 +93,15 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *e) {
         return SDL_APP_SUCCESS;
     }
     // Close on ESC
-    if(app->quit) {
+    if(app->engine.quit) {
         return SDL_APP_SUCCESS;
     }
 
     if (e->type == SDL_EVENT_WINDOW_RESIZED) {
         int width, height;
         SDL_GetWindowSizeInPixels(app->engine.window, &width, &height);
-        LOGGER->info("Window resized w:${}, h:${}", width, height);
         app->engine.framebufferResized = true;
     }
-
 
     app->kL->listen(e);
 
@@ -118,14 +114,32 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *e) {
     return SDL_APP_CONTINUE;
 }
 
-SDL_AppResult SDL_AppIterate(void *appstate) {
-    auto* app = static_cast<AppContext *>(appstate);
 
-    app->engine.deltaT->calculateDelta();
-    app->kL->iterateKeys(app->engine, app->quit);
+static std::chrono::duration<double> duration;
+
+SDL_AppResult SDL_AppIterate(void *appstate) {
+    const auto start = std::chrono::high_resolution_clock::now();
+
+    auto* app = static_cast<AppContext *>(appstate);
+    const auto& sleepTime = app->engine.sleepTimeTotalSeconds;
+
+    app->engine.delta.calculateDelta();
+    app->kL->iterateKeys(app->engine);
 
     app->engine.drawFrame();
     vkDeviceWaitIdle(app->engine.device);
+
+    duration = std::chrono::high_resolution_clock::now() - start;
+
+    // Framerate limiter
+    if (duration.count() > sleepTime) return SDL_APP_CONTINUE;
+
+    std::this_thread::sleep_for(std::chrono::duration<double>(sleepTime - duration.count() - sleepTime / 32)); // Rough sleep
+
+    // Precise sleep loop
+    while (duration.count() < sleepTime) {
+        duration = std::chrono::high_resolution_clock::now() - start;
+    }
 
     return SDL_APP_CONTINUE;
 }
@@ -139,5 +153,5 @@ void SDL_AppQuit(void *appstate, SDL_AppResult result) {
     }
 
     SDL_Quit();
-    LOGGER->success("Application quit successfully!");
+    LOGGER.success("Application quit successfully!");
 }

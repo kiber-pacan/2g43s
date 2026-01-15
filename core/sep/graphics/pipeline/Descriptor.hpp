@@ -17,7 +17,7 @@ struct Descriptor {
 
     static void createGraphicsDescriptorPool(const VkDevice& device, const int& MAX_FRAMES_IN_FLIGHT, VkDescriptorPool& graphicsDescriptorPool);
 
-    static void createGraphicsDescriptorSets(const VkDevice& device, const int& MAX_FRAMES_IN_FLIGHT, const VkDescriptorSetLayout& graphicsDescriptorSetLayout, const VkDescriptorPool& graphicsDescriptorPool, std::vector<VkDescriptorSet>& graphicsDescriptorSets, const std::vector<VkBuffer>& uniformBuffers, const VkImageView& textureImageView, const VkSampler& textureSampler, const std::vector<VkBuffer>& modelBuffers, const std::vector<VkBuffer>& visibleIndicesBuffers, const ModelBus& mdlBus);
+    static void createGraphicsDescriptorSets(const VkDevice& device, const int& MAX_FRAMES_IN_FLIGHT, const VkDescriptorSetLayout& graphicsDescriptorSetLayout, const VkDescriptorPool& graphicsDescriptorPool, std::vector<VkDescriptorSet>& graphicsDescriptorSets, const std::vector<VkBuffer>& uniformBuffers, const VkSampler& textureSampler, const std::vector<VkBuffer>& modelBuffers, const std::vector<VkBuffer>& visibleIndicesBuffers, const ModelBus& mdlBus, const VkImageView& textureImageView, const VkBuffer& textureIndexBuffer, const VkBuffer& textureIndexOffsetBuffer);
 
 
     // Matrix
@@ -33,7 +33,11 @@ struct Descriptor {
 
     static void createCullingComputeDescriptorPool(const VkDevice& device, const int& MAX_FRAMES_IN_FLIGHT, VkDescriptorPool& cullingComputeDescriptorPool);
 
-    static void createCullingComputeDescriptorSets(const VkDevice& device, const int& MAX_FRAMES_IN_FLIGHT, const VkDescriptorSetLayout& cullingComputeDescriptorSetLayout, const VkDescriptorPool& cullingComputeDescriptorPool, std::vector<VkDescriptorSet>& cullingComputeDescriptorSets, const ModelBus& mdlBus, const VkBuffer&  drawCommandsBuffers, const std::vector<VkBuffer>& uniformCullingBuffers, const std::vector<VkBuffer>& visibleIndicesBuffers, const VkBuffer& modelCullingBuffer);
+    static void createCullingComputeDescriptorSets(const VkDevice& device, const int& MAX_FRAMES_IN_FLIGHT, const VkDescriptorSetLayout& cullingComputeDescriptorSetLayout,
+                                                   const VkDescriptorPool& cullingComputeDescriptorPool, std::vector<VkDescriptorSet>& cullingComputeDescriptorSets,
+                                                   const ModelBus& mdlBus, const VkBuffer&  drawCommandsBuffer, const std::vector<VkBuffer>& uniformCullingBuffers,
+                                                   const std::vector<VkBuffer>& visibleIndicesBuffers, const VkBuffer& modelCullingBuffer,
+                                                   const std::vector<VkBuffer>& atomicCounterBuffers);
 
 
     // Postprocess
@@ -41,7 +45,13 @@ struct Descriptor {
 
     static void createPostprocessDescriptorPool(const VkDevice& device, const int& MAX_FRAMES_IN_FLIGHT, VkDescriptorPool& postProcessingDescriptorPool);
 
-    static void createPostprocessComputeDescriptorSets(const VkDevice& device, const int& MAX_FRAMES_IN_FLIGHT, const VkDescriptorSetLayout& postProcessingDescriptorSetLayout, const VkDescriptorPool& postProcessingDescriptorPool, std::vector<VkDescriptorSet>& postProcessingDescriptorSets, const std::vector<VkBuffer>& uniformBuffers, const VkImageView& textureImageView, const VkSampler& textureSampler);
+    static void createPostprocessDescriptorSets(const VkDevice &device, const int &MAX_FRAMES_IN_FLIGHT, const VkDescriptorSetLayout &postProcessingDescriptorSetLayout, const
+                                                VkDescriptorPool &postProcessingDescriptorPool, std::vector<VkDescriptorSet> &postProcessingDescriptorSets, const std::
+                                                vector<VkImageView> &offscreenImageViews, const VkImageView& depthImage, const VkSampler &textureSampler, const std::vector<VkBuffer> &
+                                                uniformPostprocessingBuffers);
+
+    static void updatePostprocessDescriptorSets(const VkDevice &device, const int &MAX_FRAMES_IN_FLIGHT, const std::vector<VkDescriptorSet> &postProcessingDescriptorSets, const std::vector<VkImageView> &offscreenImageViews, const VkImageView& ImageView, const VkSampler &textureSampler);
+
 };
 
 
