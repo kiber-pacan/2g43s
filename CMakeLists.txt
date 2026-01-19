@@ -243,15 +243,8 @@ if(${WIN32})
 
     add_subdirectory("libs/fastgltf")
 else ()
-    find_package(SDL3 REQUIRED CONFIG)
-    find_package(glm REQUIRED CONFIG)
-    find_package(imgui REQUIRED CONFIG)
+    find_package(Vulkan REQUIRED)
     find_package(OpenMP REQUIRED)
-    find_library(SPIRV_TOOLS_LIB NAMES SPIRV-Tools)
-    find_library(SPIRV_TOOLS_OPT_LIB NAMES SPIRV-Tools-opt)
-    find_library(GLSLANG_LIB NAMES glslang)
-
-    find_package(nlohmann_json REQUIRED CONFIG)
 
     add_subdirectory("libs/fastgltf")
     include_directories("libs/stb")
