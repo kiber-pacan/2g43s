@@ -17,7 +17,7 @@ jobs:
         os: [ubuntu-latest, windows-latest]
         build_type: [Release]
         include:
-          - os: Ubuntu 24.04
+          - os: ubuntu-15
             c_compiler: clang-21
             cpp_compiler: clang++-21
           - os: windows-latest
@@ -31,13 +31,13 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
-          sudo apt-get install -y gcc-15 g++-15 libstdc++-15-dev
           
           wget https://apt.llvm.org/llvm.sh
           chmod +x llvm.sh
           sudo ./llvm.sh 21
           sudo apt-get update
           sudo apt-get install -y \
+            libc++-21-dev libc++abi-21-dev \
             libomp-21-dev libpolly-21-dev \
             build-essential git make pkg-config cmake ninja-build \
             libasound2-dev libpulse-dev libaudio-dev libfribidi-dev \
