@@ -163,19 +163,25 @@ void ParsedModel::processImageData(fastgltf::Image& image, fastgltf::Asset& asse
 
 
 void ParsedModel::calcOcclusionSphere() {
-     std::vector<Vertex> vertices; vertices.append_range(std::views::join(meshes));
+    std::vector<Vertex> vertices;
+    #if __cpp_lib_containers_ranges >= 202202L
+    vertices.append_range(std::views::join(meshes));
+    #else
+    indices.insert(indices.end(), model->indices.begin(), model->indices.end());
+    #endif
 
-     glm::vec3 modelCenter(0.0f);
-     for (const Vertex& p : vertices) {
-         modelCenter += p.pos;
-     }
-     modelCenter /= static_cast<float>(vertices.size());
 
-     float radius = 0.0f;
-     for (const Vertex& p : vertices) {
-         radius = std::max(radius, glm::length(p.pos - modelCenter));
-     }
+    glm::vec3 modelCenter(0.0f);
+    for (const Vertex& p : vertices) {
+        modelCenter += p.pos;
+    }
+    modelCenter /= static_cast<float>(vertices.size());
 
-     sphere = glm::vec4(modelCenter, radius);
+    float radius = 0.0f;
+    for (const Vertex& p : vertices) {
+        radius = std::max(radius, glm::length(p.pos - modelCenter));
+    }
 
- }
+    sphere = glm::vec4(modelCenter, radius);
+
+}

@@ -109,11 +109,11 @@ VkDeviceSize ModelBus::getModelDataBufferSize() const {
 std::vector<uint32_t> ModelBus::getAllIndices() const {
     std::vector<uint32_t> indices{};
     for (const auto& model : std::views::transform(std::views::values(groups_map), &ModelGroup::model)) {
-#if __cpp_lib_containers_ranges >= 202202L
+        #if __cpp_lib_containers_ranges >= 202202L
         indices.append_range(model->indices);
-#else
+        #else
         indices.insert(indices.end(), model->indices.begin(), model->indices.end());
-#endif
+        #endif
     }
 
     return indices;
