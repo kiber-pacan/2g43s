@@ -1,4 +1,3 @@
-
 name: CMAKE
 
 on:
@@ -16,51 +15,47 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest]
         build_type: [Release]
-        cpp_compiler: [clang++-21]
         include:
-          - os: windows-latest
-            cpp_compiler: clang++-21
           - os: ubuntu-latest
+            c_compiler: clang-21
             cpp_compiler: clang++-21
+          - os: windows-latest
+            c_compiler: clang
+            cpp_compiler: clang++
 
     steps:
       - uses: actions/checkout@v4
 
       - name: Dependencies (Linux)
-        if: runner.os == 'Linux'
+        if: matrix.os == 'ubuntu-latest'
         run: |
+          # Ставим Clang 21 через официальный репозиторий LLVM
+          wget https://apt.llvm.org/llvm.sh
+          chmod +x llvm.sh
+          sudo ./llvm.sh 21
+          
           sudo apt-get update
           sudo apt-get install -y \
-            build-essential git make \
-            pkg-config cmake ninja-build gnome-desktop-testing libasound2-dev libpulse-dev \
-            libaudio-dev libfribidi-dev libjack-dev libsndio-dev libx11-dev libxext-dev \
-            libxrandr-dev libxcursor-dev libxfixes-dev libxi-dev libxss-dev libxtst-dev \
-            libxkbcommon-dev libdrm-dev libgbm-dev libgl1-mesa-dev libgles2-mesa-dev \
-            libegl1-mesa-dev libdbus-1-dev libibus-1.0-dev libudev-dev libthai-dev \
+            pkg-config cmake ninja-build libasound2-dev libpulse-dev \
+            libjack-dev libsndio-dev libx11-dev libxext-dev \
+            libxrandr-dev libxcursor-dev libxfixes-dev libxi-dev libxss-dev \
+            libxkbcommon-dev libdrm-dev libgbm-dev libdbus-1-dev \
             libpipewire-0.3-dev libwayland-dev libdecor-0-dev liburing-dev \
-            libglm-dev libomp-dev
+            libomp-dev # Системный OMP для Clang
 
-      - name: Set up Clang
+      - name: Set up Clang (Windows)
+        if: matrix.os == 'windows-latest'
         uses: egor-tensin/setup-clang@v2
         with:
           version: latest
           platform: x64
 
-      - name: Setup SDL
-        uses: libsdl-org/setup-sdl@main
-        with:
-          version: 3-latest
-          cmake-arguments: -DSDL_X11_XSCRNSAVER=OFF
-
       - name: Setup Vulkan SDK
-        uses: lukka/get-cmake@latest
-
-      - name: Install Vulkan SDK
-        uses: jakoch/install-vulkan-sdk-action@v1
+        uses: adunand/install-vulkan-sdk@v1
         with:
-          install_runtime: true
-          cache: true
-          stripdown: true
+          vulkan-query-version: 1.4.304.1
+          vulkan-components: Vulkan-Headers, Vulkan-Loader, SPIRV-Tools, glslang
+          vulkan-use-cache: true
 
       - name: Configure CMake
         run: >
@@ -79,7 +74,7 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: build-${{ matrix.os }}-${{ matrix.cpp_compiler }}
+          name: build-${{ matrix.os }}-clang-21
           path: |
             build/2g43s
             build/Release/2g43s.exe
