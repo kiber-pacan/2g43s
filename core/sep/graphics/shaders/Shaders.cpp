@@ -107,7 +107,11 @@ std::vector<uint32_t> Shaders::compileShader(const std::filesystem::path& file) 
         std::cout << "Compiled shader: " << filename << std::endl;
 
         addCacheEntry(file);
+#if __cpp_lib_containers_ranges >= 202202L
         shader.append_range(result);
+#else
+        shader.insert(shader.end(), std::ranges::begin(result), std::ranges::end(result));
+#endif
     }
 
     return shader;
