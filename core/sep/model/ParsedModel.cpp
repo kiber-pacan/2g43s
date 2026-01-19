@@ -5,7 +5,7 @@
 
 #include "Images.hpp"
 #include "Logger.hpp"
-#include "libs/stb/stb_image.h"
+#include <libs/stb/stb_image.h>
 #include "fastgltf/tools.hpp"
 
 
