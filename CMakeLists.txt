@@ -277,10 +277,6 @@ target_link_libraries(${EXECUTABLE_NAME} PRIVATE
         ${GLSLANG_LIB}
         ${SPIRV_TOOLS_OPT_LIB}
         ${SPIRV_TOOLS_LIB}
-        OSDependent
-        MachineIndependent
-        GenericCodeGen
-        pthread
 )
 target_compile_definitions(${EXECUTABLE_NAME} PUBLIC SDL_MAIN_USE_CALLBACKS)
 
