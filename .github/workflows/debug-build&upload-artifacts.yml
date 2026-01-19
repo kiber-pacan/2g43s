@@ -18,19 +18,18 @@ jobs:
         build_type: [Release]
         cpp_compiler: [clang++-21]
         include:
-          - os: ubuntu-latest
-            c_compiler: clang-21
-            cpp_compiler: clang++-21
           - os: windows-latest
-            c_compiler: clang
-            cpp_compiler: clang++
+            cpp_compiler: clang++-21
+          - os: ubuntu-latest
+            cpp_compiler: clang++-21
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Dependencies (Linux)
+      - name: Install Clang 21 & Dependencies (Linux)
         if: runner.os == 'Linux'
         run: |
+          sudo ./llvm.sh 21
           sudo apt-get update
           sudo apt-get install -y \
             build-essential git make \
@@ -40,7 +39,7 @@ jobs:
             libxkbcommon-dev libdrm-dev libgbm-dev libgl1-mesa-dev libgles2-mesa-dev \
             libegl1-mesa-dev libdbus-1-dev libibus-1.0-dev libudev-dev libthai-dev \
             libpipewire-0.3-dev libwayland-dev libdecor-0-dev liburing-dev \
-            libglm-dev libomp-dev
+            libglm-dev \ libomp-dev
 
       - name: Set up Clang
         uses: egor-tensin/setup-clang@v2
@@ -67,10 +66,8 @@ jobs:
       - name: Configure CMake
         run: >
           cmake -B build
-          -DCMAKE_C_COMPILER=${{ matrix.c_compiler }}
           -DCMAKE_CXX_COMPILER=${{ matrix.cpp_compiler }}
           -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
-          -DSDL_X11_XSCRNSAVER=OFF
           -DINTERACTIVE_SAMPLES=OFF
           -DUNIT_TESTS=OFF
           -S .
