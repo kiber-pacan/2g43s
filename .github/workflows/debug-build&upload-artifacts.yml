@@ -1,4 +1,4 @@
-name: CMake on multiple platforms
+name: Build Engine C++26
 
 on:
   push:
@@ -15,45 +15,49 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest]
         build_type: [Release]
-        cpp_compiler: [clang++, cl]
+        cpp_compiler: [clang++-19, cl]
         include:
           - os: windows-latest
             cpp_compiler: cl
           - os: ubuntu-latest
-            cpp_compiler: clang++
+            cpp_compiler: clang++-19
         exclude:
           - os: ubuntu-latest
             cpp_compiler: cl
           - os: windows-latest
-            cpp_compiler: clang++
+            cpp_compiler: clang++-19
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Linux Dependencies
+      - name: Install Clang 19 & Dependencies (Linux)
         if: runner.os == 'Linux'
         run: |
+          # Установка свежего Clang 19 для C++26
+          wget https://apt.llvm.org/llvm.sh
+          chmod +x llvm.sh
+          sudo ./llvm.sh 19
           sudo apt-get update
-          sudo apt-get install -y libx11-dev libxcursor-dev libxinerama-dev libxrandr-dev libxi-dev libwayland-dev libxkbcommon-dev libx11-xcb-dev
+          sudo apt-get install -y \
+            clang-19 libpolly-19-dev \
+            libx11-dev libxcursor-dev libxinerama-dev libxrandr-dev \
+            libxi-dev libwayland-dev libxkbcommon-dev libx11-xcb-dev \
+            libxss-dev libasound2-dev libpulse-dev libdbus-1-dev \
+            libpipewire-0.3-dev libjack-dev libsndio-dev libudev-dev
+
+      - name: Install Vulkan SDK
+        uses: adunand/install-vulkan-sdk@v1
+        with:
+          vulkan-query-version: 1.3.296.0
+          vulkan-components: Vulkan-Headers, Vulkan-Loader, SPIRV-Tools, glslang
+          vulkan-use-cache: true
 
       - name: Setup SDL
         uses: libsdl-org/setup-sdl@main
         with:
-          version: 3-latest
-          cmake-arguments: -DSDL_X11_XSCRNSAVER=OFF
-
-      - name: Setup Vulkan SDK
-        uses: lukka/get-cmake@latest
-
-      - name: Install Vulkan SDK
-        uses: jakoch/install-vulkan-sdk-action@v1
-        with:
-          install_runtime: true
-          cache: true
-          stripdown: true
+          version: 3-head
 
       - name: Configure CMake
-        # Добавляем -DINTERACTIVE_SAMPLES=OFF
         run: >
           cmake -B build
           -DCMAKE_CXX_COMPILER=${{ matrix.cpp_compiler }}
@@ -71,5 +75,4 @@ jobs:
           name: build-${{ matrix.os }}-${{ matrix.cpp_compiler }}
           path: |
             build/2g43s
-            build/${{ matrix.build_type }}/2g43s.exe
-            build/*.exe
+            build/Release/2g43s.exe
