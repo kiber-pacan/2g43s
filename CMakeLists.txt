@@ -230,6 +230,8 @@ if(NOT MSVC AND ${MACHINE_ID} EQUAL "fe6032524c88414fb6b688ad7002a3b4")
         -Wl,--strip-all -Wl,--as-needed)
 else()
     add_compile_options(-O3 -fopenmp -fexperimental-library)
+    add_compile_options(--gcc-install-dir=/usr/lib/gcc/x86_64-linux-gnu/14)
+    add_link_options(--gcc-install-dir=/usr/lib/gcc/x86_64-linux-gnu/14)
     add_link_options(-fopenmp)
 endif()
 
