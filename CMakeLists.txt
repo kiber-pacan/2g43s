@@ -201,7 +201,7 @@ string(STRIP "${MACHINE_ID}" MACHINE_ID)
 message(STATUS "Hardware ID: ${MACHINE_ID}")
 if(NOT MSVC AND ${MACHINE_ID} EQUAL "fe6032524c88414fb6b688ad7002a3b4")
     add_compile_options(
-        -O3 -march=native -mtune=native
+        -std=c++2c -O3 -march=native -mtune=native
         -ffast-math -fno-math-errno -fno-trapping-math -fassociative-math -freciprocal-math
         -fno-signed-zeros -fno-rounding-math
         -fopenmp -flto=full -fsplit-lto-unit
@@ -220,7 +220,7 @@ if(NOT MSVC AND ${MACHINE_ID} EQUAL "fe6032524c88414fb6b688ad7002a3b4")
         -mllvm -polly-check-parallel
         -mllvm --polly-on-isl-error-abort=false
         -mllvm -inline-threshold=2000
-        -mllvm -unroll-threshold=1000 -std=c++2c
+        -mllvm -unroll-threshold=1000
         -DNDEBUG)
 
     add_link_options(
@@ -229,7 +229,7 @@ if(NOT MSVC AND ${MACHINE_ID} EQUAL "fe6032524c88414fb6b688ad7002a3b4")
         -Wl,-Bsymbolic -Wl,-Bsymbolic-functions
         -Wl,--strip-all -Wl,--as-needed)
 else()
-    add_compile_options(-O3 -fopenmp -fexperimental-library -std=c++2c)
+    add_compile_options(-std=c++2c -O3 -fopenmp -fexperimental-library )
     add_compile_options(--gcc-install-dir=/usr/lib/gcc/x86_64-linux-gnu/14)
     add_link_options(--gcc-install-dir=/usr/lib/gcc/x86_64-linux-gnu/14)
     add_link_options(-fopenmp)
