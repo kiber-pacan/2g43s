@@ -39,7 +39,7 @@ jobs:
       - name: Setup SDL
         uses: libsdl-org/setup-sdl@main
         with:
-          version: 3-head
+          version: 3-latest
 
       - name: Setup Vulkan SDK
         uses: lukka/get-cmake@latest
