@@ -147,7 +147,8 @@ if(DEFINED ENV{GITHUB_ACTIONS} AND "$ENV{RUNNER_OS}" STREQUAL "Linux")
 endif()
 
 target_include_directories(${EXECUTABLE_NAME} PRIVATE
-        libs/stb
+        ${CMAKE_CURRENT_SOURCE_DIR}/libs
+        ${CMAKE_CURRENT_SOURCE_DIR}/libs/stb
         libs/
         core/
         core/sep
