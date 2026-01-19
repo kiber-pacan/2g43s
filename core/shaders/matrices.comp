@@ -1,5 +1,8 @@
 #version 460
-layout (local_size_x = 1024) in;
+layout (local_size_x = 128) in;
+
+#extension GL_EXT_buffer_reference2 : require
+#extension GL_EXT_scalar_block_layout : enable
 
 struct MBO {
     mat4 model;
@@ -11,18 +14,25 @@ struct MDBO {
     vec4 scl;
 };
 
-layout(std430, binding = 0) buffer MDB {
+layout(scalar, buffer_reference) buffer MDB {
     MDBO objects[];
-} mdb;
+};
 
-layout(std430, binding = 1) buffer MB {
+layout(scalar, buffer_reference) buffer MB {
     MBO objects[];
-} mb;
+};
 
-layout(binding = 0) uniform UniformBufferObject {
+layout(scalar, buffer_reference) readonly buffer UMBO {
     mat4 view;
     mat4 proj;
-} ubo;
+    uint instancesCount;
+};
+
+layout(push_constant) uniform Push {
+    MDB mdb;
+    MB mb;
+    UMBO umbo;
+} pc;
 
 mat4 quaternionToMatrix(vec4 q) {
     float x = q.x;
@@ -41,19 +51,19 @@ mat4 quaternionToMatrix(vec4 q) {
 
 void main() {
     uint idx = gl_GlobalInvocationID.x;
-    if (idx >= mb.objects.length()) return;
+    if (idx >= pc.umbo.instancesCount) return;
 
     mat4 pos = mat4(1.0f);
-    pos[3][0] = mdb.objects[idx].pos.x;
-    pos[3][1] = mdb.objects[idx].pos.y;
-    pos[3][2] = mdb.objects[idx].pos.z;
+    pos[3][0] = pc.mdb.objects[idx].pos.x;
+    pos[3][1] = pc.mdb.objects[idx].pos.y;
+    pos[3][2] = pc.mdb.objects[idx].pos.z;
 
-    mat4 rot = quaternionToMatrix(normalize(mdb.objects[idx].rot));
+    mat4 rot = quaternionToMatrix(normalize(pc.mdb.objects[idx].rot));
 
     mat4 scl = mat4(1.0f);
-    scl[0][0] = mdb.objects[idx].scl.x;
-    scl[1][1] = mdb.objects[idx].scl.y;
-    scl[2][2] = mdb.objects[idx].scl.z;
+    scl[0][0] = pc.mdb.objects[idx].scl.x;
+    scl[1][1] = pc.mdb.objects[idx].scl.y;
+    scl[2][2] = pc.mdb.objects[idx].scl.z;
 
-    mb.objects[idx].model = pos * rot * scl;
+    pc.mb.objects[idx].model = pos * rot * scl;
 }

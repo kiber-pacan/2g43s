@@ -1,7 +1,7 @@
 #version 460
 
-#extension GL_EXT_shader_draw_parameters : enable
-#extension GL_EXT_debug_printf : enable
+#extension GL_EXT_buffer_reference2 : require
+#extension GL_EXT_scalar_block_layout : enable
 
 struct MBO{
     mat4 model;
@@ -10,20 +10,6 @@ struct MBO{
 struct VIBO {
     uint index;
 };
-
-layout(binding = 0) uniform UBO {
-    mat4 view;
-    mat4 proj;
-    uint modelCount;
-} ubo;
-
-layout(std430, binding = 2) readonly buffer MB{
-    MBO objects[];
-} mb;
-
-layout(std430, binding = 3) readonly buffer VIB {
-    VIBO objects[];
-} vib;
 
 struct TIO {
     uint firstIndex;
@@ -36,13 +22,36 @@ struct TIOO {
     uint indexOffset;
 };
 
-layout(std430, binding = 4) readonly buffer TI {
-    TIO objects[];
-} ti;
+layout(scalar, buffer_reference) readonly buffer UBO {
+    mat4 view;
+    mat4 proj;
+    uint modelCount;
+};
 
-layout(std430, binding = 5) readonly buffer TIO1 {
+layout(scalar, buffer_reference) readonly buffer MB{
+    MBO objects[];
+};
+
+layout(scalar, buffer_reference) readonly buffer VIB {
+    VIBO objects[];
+};
+
+
+layout(scalar, buffer_reference) readonly buffer TI {
+    TIO objects[];
+};
+
+layout(scalar, buffer_reference) readonly buffer TIO1 {
     TIOO objects[];
-} tio;
+};
+
+layout(push_constant) uniform Push {
+    UBO ubo;
+    MB mb;
+    VIB vib;
+    TI ti;
+    TIO1 tio;
+} pc;
 
 
 layout(location = 0) in vec3 inPosition;
@@ -55,19 +64,19 @@ layout(location = 1) out vec2 fragTexCoord;
 layout(location = 2) out flat uint textureIndex;
 
 void main() {
-    uint objIndex = vib.objects[gl_InstanceIndex].index;
-    gl_Position = ubo.proj * ubo.view * mb.objects[objIndex].model * vec4(inPosition, 1.0);
+    uint objIndex = pc.vib.objects[gl_InstanceIndex].index;
+    gl_Position = pc.ubo.proj * pc.ubo.view * pc.mb.objects[objIndex].model * vec4(inPosition, 1.0);
 
     fragColor = inColor;
     fragTexCoord = inTexCoord;
 
-    uint firstIndex = ti.objects[gl_DrawID].firstIndex;
+    uint firstIndex = pc.ti.objects[gl_DrawID].firstIndex;
     uint rawIndex = 0;
-    uint models = ubo.modelCount;
+    uint models = pc.ubo.modelCount;
 
-    uint textures = ti.objects[gl_DrawID].indexCount;
+    uint textures = pc.ti.objects[gl_DrawID].indexCount;
     for(uint i = 0; i < textures; i++) {
-        if (gl_VertexIndex > ti.objects[gl_DrawID].pad1 + tio.objects[firstIndex + i].indexOffset) {
+        if (gl_VertexIndex > pc.ti.objects[gl_DrawID].pad1 + pc.tio.objects[firstIndex + i].indexOffset) {
             rawIndex++;
         }
     }
