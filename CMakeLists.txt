@@ -21,8 +21,14 @@ FetchContent_Declare(glm    GIT_REPOSITORY https://github.com/g-truc/glm.git   G
 FetchContent_Declare(fastgltf   GIT_REPOSITORY https://github.com/spnda/fastgltf.git  GIT_TAG main)
 FetchContent_Declare(nlohmann_json  GIT_REPOSITORY https://github.com/nlohmann/json.git  GIT_TAG develop)
 FetchContent_Declare(imgui  GIT_REPOSITORY https://github.com/ocornut/imgui.git  GIT_TAG docking)
+FetchContent_Declare(stb GIT_REPOSITORY https://github.com/nothings/stb.git GIT_TAG master)
 
-FetchContent_MakeAvailable(SDL3 JoltPhysics glm fastgltf nlohmann_json imgui)
+FetchContent_MakeAvailable(SDL3 JoltPhysics glm fastgltf nlohmann_json imgui stb)
+
+FetchContent_GetProperties(stb)
+if(NOT stb_POPULATED)
+    FetchContent_Populate(stb)
+endif()
 
 # Jolt settings
 set(INTERACTIVE_SAMPLES OFF CACHE BOOL "" FORCE)
@@ -38,6 +44,7 @@ project(2g43s)
 set(EXECUTABLE_NAME ${PROJECT_NAME})
 
 set(IMGUI_DIR ${imgui_SOURCE_DIR})
+set(STB_DIR ${stb_SOURCE_DIR})
 
 
 add_executable(${EXECUTABLE_NAME}
@@ -122,7 +129,6 @@ add_executable(${EXECUTABLE_NAME}
         core/sep/util/Logger.hpp
         core/sep/util/Queue.hpp
         core/sep/util/Random.hpp
-        core/sep/util/stb_impl.cpp
         core/sep/util/Tools.hpp
 
         # Window
@@ -139,6 +145,8 @@ add_executable(${EXECUTABLE_NAME}
         ${IMGUI_DIR}/imgui_widgets.cpp
         ${IMGUI_DIR}/backends/imgui_impl_sdl3.cpp
         ${IMGUI_DIR}/backends/imgui_impl_vulkan.cpp
+
+        core/sep/util/stb_impl.cpp
 )
 
 if(DEFINED ENV{GITHUB_ACTIONS} AND "$ENV{RUNNER_OS}" STREQUAL "Linux")
@@ -175,8 +183,6 @@ target_include_directories(${EXECUTABLE_NAME} PRIVATE
 target_include_directories(${EXECUTABLE_NAME} PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/core
         ${CMAKE_CURRENT_SOURCE_DIR}/core/sep
-        ${CMAKE_CURRENT_SOURCE_DIR}/libs
-        ${CMAKE_CURRENT_SOURCE_DIR}/libs/stb
         ${IMGUI_DIR}
         ${IMGUI_DIR}/backends
 )
@@ -231,8 +237,6 @@ endif()
 set(VULKAN_SDK_PATH $ENV{VULKAN_SDK})
 
 target_include_directories(${PROJECT_NAME} PRIVATE "${VULKAN_SDK_PATH}/include")
-
-include_directories("libs/stb")
 
 if(NOT MSVC AND CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     target_compile_options(${EXECUTABLE_NAME} PRIVATE "-fopenmp=libomp")
