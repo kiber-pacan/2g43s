@@ -11,6 +11,16 @@ else()
     set(CMAKE_CXX_EXTENSIONS off)
 endif()
 
+set(SHADERC_SKIP_TESTS ON CACHE BOOL "" FORCE)
+set(SHADERC_SKIP_EXAMPLES ON CACHE BOOL "" FORCE)
+set(SHADERC_SKIP_COPYRIGHT_CHECK ON CACHE BOOL "" FORCE)
+
+set(SPIRV_SKIP_TESTS ON CACHE BOOL "" FORCE)
+set(SPIRV_SKIP_EXECUTABLES ON CACHE BOOL "" FORCE)
+
+set(SKIP_GLSLANG_INSTALL ON CACHE BOOL "" FORCE)
+set(SKIP_SPIRV_TOOLS_INSTALL ON CACHE BOOL "" FORCE)
+
 # Jolt
 include(FetchContent)
 FetchContent_Declare(SDL3   GIT_REPOSITORY https://github.com/libsdl-org/SDL.git  GIT_TAG main)
@@ -23,7 +33,18 @@ FetchContent_Declare(nlohmann_json  GIT_REPOSITORY https://github.com/nlohmann/j
 FetchContent_Declare(imgui  GIT_REPOSITORY https://github.com/ocornut/imgui.git  GIT_TAG docking)
 FetchContent_Declare(stb GIT_REPOSITORY https://github.com/nothings/stb.git GIT_TAG master)
 
-FetchContent_MakeAvailable(SDL3 JoltPhysics glm fastgltf nlohmann_json imgui stb)
+# Spirv
+FetchContent_Declare(spirv_headers GIT_REPOSITORY https://github.com/KhronosGroup/SPIRV-Headers GIT_TAG main)
+FetchContent_Declare(spirv_tools GIT_REPOSITORY https://github.com/KhronosGroup/SPIRV-Tools GIT_TAG main)
+FetchContent_Declare(glslang GIT_REPOSITORY https://github.com/KhronosGroup/glslang GIT_TAG main)
+
+# Shaderc
+FetchContent_Declare(gmock GIT_REPOSITORY https://github.com/google/googletest GIT_TAG main)
+FetchContent_Declare(shaderc GIT_REPOSITORY https://github.com/google/shaderc GIT_TAG main)
+
+
+
+FetchContent_MakeAvailable(SDL3 JoltPhysics glm fastgltf nlohmann_json imgui stb spirv_headers spirv_tools glslang gmock shaderc)
 
 FetchContent_GetProperties(stb)
 if(NOT stb_POPULATED)
@@ -265,18 +286,18 @@ endif()
 
 target_link_libraries(${EXECUTABLE_NAME} PUBLIC
         ${Vulkan_LIBRARIES}
-        SDL3::SDL3
-        glm::glm
-        fastgltf::fastgltf
-        nlohmann_json::nlohmann_json
+        SPIRV-Headers SPIRV-Tools glslang
+        gmock shaderc
+        pthread
+        SDL3
+        glm
+        fastgltf
+        nlohmann_json
         stb
 )
 
 target_link_libraries(${EXECUTABLE_NAME} PRIVATE
-        shaderc_combined
-        ${GLSLANG_LIB}
-        ${SPIRV_TOOLS_OPT_LIB}
-        ${SPIRV_TOOLS_LIB}
+
 )
 target_compile_definitions(${EXECUTABLE_NAME} PUBLIC SDL_MAIN_USE_CALLBACKS)
 
