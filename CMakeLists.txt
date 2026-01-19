@@ -228,8 +228,7 @@ if(NOT MSVC AND ${MACHINE_ID} EQUAL "fe6032524c88414fb6b688ad7002a3b4")
         -Wl,-Bsymbolic -Wl,-Bsymbolic-functions
         -Wl,--strip-all -Wl,--as-needed)
 else()
-    add_compile_options(-O3 -fopenmp -fexperimental-library)
-    add_link_options(-fopenmp)
+
 endif()
 
 # Adding sources to project
