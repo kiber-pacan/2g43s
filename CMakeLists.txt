@@ -141,6 +141,10 @@ add_executable(${EXECUTABLE_NAME}
         ${IMGUI_DIR}/backends/imgui_impl_vulkan.cpp
 )
 
+if(DEFINED ENV{GITHUB_ACTIONS} AND "$ENV{RUNNER_OS}" STREQUAL "Linux")
+    message(STATUS "We are running on Ubuntu Runner in GitHub Actions")
+    # Твои специфичные настройки для CI
+endif()
 
 target_include_directories(${EXECUTABLE_NAME} PRIVATE
         libs/stb
@@ -184,7 +188,10 @@ target_compile_definitions(${EXECUTABLE_NAME} PRIVATE
 )
 
 # Optimizations
-if(NOT MSVC)
+execute_process(COMMAND cat /etc/machine-id OUTPUT_VARIABLE MACHINE_ID)
+string(STRIP "${MACHINE_ID}" MACHINE_ID)
+message(STATUS "Hardware ID: ${MACHINE_ID}")
+if(NOT MSVC AND ${MACHINE_ID} EQUAL "fe6032524c88414fb6b688ad7002a3b4")
     set(CMAKE_CXX_FLAGS_RELEASE " \
         -O3 -march=native -mtune=native \
         -ffast-math -fno-math-errno -fno-trapping-math -fassociative-math -freciprocal-math \
@@ -196,6 +203,7 @@ if(NOT MSVC)
         -fno-stack-protector -fno-stack-check -fno-plt \
         -fno-exceptions -fno-rtti -fno-ident \
         -fomit-frame-pointer -fmerge-all-constants \
+        -fplugin=LLVMPolly.so \
         -mllvm -polly \
         -mllvm -polly-parallel \
         -mllvm -polly-vectorizer=stripmine \
