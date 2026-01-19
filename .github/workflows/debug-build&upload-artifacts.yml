@@ -16,16 +16,11 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest]
         build_type: [Release]
-        cpp_compiler: [clang++-21, cl]
+        cpp_compiler: [clang++-21]
         include:
           - os: windows-latest
-            cpp_compiler: cl
-          - os: ubuntu-latest
             cpp_compiler: clang++-21
-        exclude:
           - os: ubuntu-latest
-            cpp_compiler: cl
-          - os: windows-latest
             cpp_compiler: clang++-21
 
     steps:
@@ -34,12 +29,9 @@ jobs:
       - name: Install Clang 21 & Dependencies (Linux)
         if: runner.os == 'Linux'
         run: |
-          wget https://apt.llvm.org/llvm.sh
-          chmod +x llvm.sh
           sudo ./llvm.sh 21
           sudo apt-get update
           sudo apt-get install -y \
-            clang-21 libpolly-21-dev \
             build-essential git make \
             pkg-config cmake ninja-build gnome-desktop-testing libasound2-dev libpulse-dev \
             libaudio-dev libfribidi-dev libjack-dev libsndio-dev libx11-dev libxext-dev \
@@ -48,7 +40,12 @@ jobs:
             libegl1-mesa-dev libdbus-1-dev libibus-1.0-dev libudev-dev libthai-dev \
             libpipewire-0.3-dev libwayland-dev libdecor-0-dev liburing-dev \
             libglm-dev
-          
+
+      - name: Set up Clang
+        uses: egor-tensin/setup-clang@v2
+        with:
+          version: latest
+          platform: x64
 
       - name: Setup SDL
         uses: libsdl-org/setup-sdl@main
