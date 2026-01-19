@@ -83,6 +83,10 @@ class Tools {
 
         return shaderc_glsl_vertex_shader;
     }
+
+    static std::string getCorePath() {
+        return std::string{PROJECT_ROOT} + "core/";
+    }
 };
 
 #endif //TOOLS_H

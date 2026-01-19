@@ -47,7 +47,7 @@ struct ModelBus {
 
 
     #pragma region instanceModels
-    void createModelInstance(const std::string& file, const auto&... args);
+    void instance(const std::string& file, const auto&... args);
     #pragma endregion
 
 

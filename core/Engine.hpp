@@ -5,7 +5,10 @@
 #include <SDL3/SDL_video.h>
 
 #include <vulkan/vulkan_core.h>
-
+#include "shaders/constants/MatrixPushConstants.hpp"
+#include "shaders/constants/PostprocessPushConstants.hpp"
+#include "shaders/constants/VertexPushConstants.hpp"
+#include "shaders/constants/CullingPushConstants.hpp"
 #include "ModelCullingBufferObject.hpp"
 #include "VisibleIndicesBufferObject.hpp"
 #include "AtomicCounterObject.hpp"
@@ -21,6 +24,7 @@
 #include "Color.hpp"
 #include "TextureIndexObject.h"
 #include "TextureIndexOffsetObject.hpp"
+#include "command/Barrier.h"
 #include "imgui_internal.h"
 #include <ranges>
 #include "sep/graphics/command/Command.hpp"
@@ -35,9 +39,10 @@
 #include "device/PhysicalDevice.hpp"
 #include "graphics/Buffers.hpp"
 #include "window/Surface.hpp"
-#include "Shaders.hpp"
+#include "sep/graphics/shaders/Shaders.hpp"
 
 
+struct CullingPushConstants;
 // Parameters
 inline int HEIGHT = 720;
 inline int WIDTH = 1280;
@@ -50,6 +55,8 @@ public:
 
     void drawImGui(const VkCommandBuffer& commandBuffer);
 
+    void recordCommandBuffer(uint32_t imageIndex, VkPipeline postprocessPipeline);
+
     // Draw
     void drawFrame();
 
@@ -60,7 +67,7 @@ public:
 
     #pragma region Buffers
     // Generic
-    static void updateUniformBuffer(uint32_t currentFrame, const VkExtent2D& swapchainExtent, const std::vector<void*>& uniformBuffersMapped, UniformBufferObject& ubo, const Camera& camera, const ModelBus& mdlBus);
+    static void updateUniformBuffer(uint32_t currentFrame, const VkExtent2D& swapchainExtent, const std::vector<void*>& uniformBuffersMapped, const std::vector<void*>& uniformMatrixBuffersMapped, UniformBufferObject& ubo, UniformBufferObject& umbo, const Camera& camera, const ModelBus& mdlBus);
 
     static void updateUniformPostprocessingBuffer(uint32_t currentFrame, const std::vector<void*>& uniformBuffersMapped, UniformPostprocessingBufferObject& upbo, DeltaManager& delta, const VkExtent2D& swapchainExtent);
 
@@ -86,15 +93,11 @@ public:
     static void updateDrawCommands(void* drawCommandsBufferMapped, DrawCommandsBufferObject& dc, ModelBus& mdlBus);
 
     static void updateTextureIndexBuffer(void* TextureIndexBufferMapped, void* TextureIndexOffsetBufferMapped, TextureIndexObject& tio, TextureIndexOffsetObject& tioo, ModelBus& mdlBus);
-
-    static void updateTextureIndexOffsetBuffer(const void* TextureIndexOffsetBufferMapped, TextureIndexOffsetObject& tioo, ModelBus& mdlBus);
-
-
     #pragma endregion
 
     void recreatePostprocessingPipeline(const std::string& filename);
 
-    #pragma region PublicVars
+    #pragma region Public variables
     // SDL
     SDL_Window* window{};
 
@@ -102,7 +105,7 @@ public:
     uint64_t sid{};
 
 
-    Color clear_color = Color::hex(0x84bed1);
+    Color clear_color = Color::hex(0x000000);
 
     // Devices
     VkPhysicalDevice physicalDevice{};
@@ -113,6 +116,7 @@ public:
 
     // Generic
     UniformBufferObject ubo{};
+    UniformBufferObject umbo{};
     UniformCullingBufferObject ucbo{};
     UniformPostprocessingBufferObject upbo{};
     AtomicCounterObject atomic_counter{};
@@ -180,40 +184,28 @@ private:
     std::vector<VkDeviceMemory> offscreenImagesMemory{};
     std::vector<VkImageView> offscreenImageViews{};
 
-    std::vector<VkBuffer> uniformPostprocessingBuffers{};
-    std::vector<VkDeviceMemory> uniformPostprocessingBuffersMemory{};
-    std::vector<void*> uniformPostprocessingBuffersMapped{};
-
     // Graphics
     VkPipeline graphicsPipeline{};
     VkPipelineLayout graphicsPipelineLayout{};
-    VkDescriptorSetLayout graphicsDescriptorSetLayout{};
+    VkCommandPool graphicsCommandPool{};
 
+    VkDescriptorSetLayout graphicsDescriptorSetLayout{};
     std::vector<VkDescriptorSet> graphicsDescriptorSets{};
     VkDescriptorPool graphicsDescriptorPool{};
-    VkCommandPool graphicsCommandPool{};
 
     // Matrix
     VkPipeline matrixComputePipeline{};
     VkPipelineLayout matrixComputePipelineLayout{};
-    VkDescriptorSetLayout matrixComputeDescriptorSetLayout{};
-    bool matrixDirty = true;
-
-    std::vector<VkDescriptorSet> matrixComputeDescriptorSets{};
-    VkDescriptorPool matrixComputeDescriptorPool{};
     VkCommandPool matrixComputeCommandPool{};
+    bool matrixDirty = true;
 
     // Culling
     VkPipeline cullingComputePipeline{};
     VkPipelineLayout cullingComputePipelineLayout{};
-    VkDescriptorSetLayout cullingComputeDescriptorSetLayout{};
-
-    std::vector<VkDescriptorSet> cullingComputeDescriptorSets{};
-    VkDescriptorPool cullingComputeDescriptorPool{};
     VkCommandPool cullingComputeCommandPool{};
 
     // Graphics
-    std::string selectedShader = "hdr.spv";
+    std::string selectedShader = "hdr_fog.spv";
     std::unordered_map<std::string, VkPipeline> postprocessPipelines;
     VkPipelineLayout postprocessPipelineLayout{};
     VkDescriptorSetLayout postprocessDescriptorSetLayout{};
@@ -243,48 +235,68 @@ private:
     VkBuffer drawCommandsBuffer{};
     VkDeviceMemory drawCommandsBufferMemory{};
     void* drawCommandsBufferMapped{};
+    uint64_t drawCommandsConstant{};
 
     // Generic
     std::vector<VkBuffer> uniformBuffers{};
     std::vector<VkDeviceMemory> uniformBuffersMemory{};
     std::vector<void*> uniformBuffersMapped{};
+    std::vector<uint64_t> uniformConstants{};
+
+    std::vector<VkBuffer> uniformMatrixBuffers{};
+    std::vector<VkDeviceMemory> uniformMatrixBuffersMemory{};
+    std::vector<void*> uniformMatrixBuffersMapped{};
+    std::vector<uint64_t> uniformMatrixConstants{};
+
+    std::vector<VkBuffer> uniformPostprocessingBuffers{};
+    std::vector<VkDeviceMemory> uniformPostprocessingBuffersMemory{};
+    std::vector<void*> uniformPostprocessingBuffersMapped{};
+    std::vector<uint64_t> uniformPostprocessingConstants{};
 
     std::vector<VkBuffer> uniformCullingBuffers{};
     std::vector<VkDeviceMemory> uniformCullingBuffersMemory{};
     std::vector<void*> uniformCullingBuffersMapped{};
+    std::vector<uint64_t> uniformCullingConstants{};
 
     std::vector<VkBuffer> atomicCounterBuffers{};
     std::vector<VkDeviceMemory> atomicCounterBuffersMemory{};
     std::vector<void*> atomicCounterBuffersMapped{};
+    std::vector<uint64_t> atomicCounterConstants{};
 
 
     // Matrices
     std::vector<VkBuffer> modelBuffers{};
     std::vector<VkDeviceMemory> modelBuffersMemory{};
     std::vector<void*> modelBuffersMapped{};
+    std::vector<uint64_t> modelConstants{};
 
     std::vector<VkBuffer> modelDataBuffers{};
     std::vector<VkDeviceMemory> modelDataBuffersMemory{};
     std::vector<void*> modelDataBuffersMapped{};
+    std::vector<uint64_t> modelDataConstants{};
 
 
     // Culling
     std::vector<VkBuffer> visibleIndicesBuffers{};
     std::vector<VkDeviceMemory> visibleIndicesMemory{};
     std::vector<void*> visibleIndicesMapped{};
+    std::vector<uint64_t> visibleIndicesConstants{};
 
     VkBuffer modelCullingBuffer{};
     VkDeviceMemory modelCullingBufferMemory{};
     void* modelCullingBufferMapped{};
+    uint64_t modelCullingConstant{};
 
     // Index
     VkBuffer textureIndexBuffer{};
     VkDeviceMemory textureIndexMemory{};
     void* textureIndexMapped{};
+    uint64_t textureIndexConstant{};
 
     VkBuffer textureIndexOffsetBuffer{};
     VkDeviceMemory textureIndexOffsetMemory{};
     void* textureIndexOffsetMapped{};
+    uint64_t textureIndexOffsetConstant{};
 
     // Image
     VkImage textureImage{};
@@ -301,6 +313,11 @@ private:
     // Frames
     static constexpr int MAX_FRAMES_IN_FLIGHT = 4;
     uint32_t currentFrame = 0;
+
+    // Constants
+
+    // modelCullingBuffer, visibleIndicesBuffers, drawCommandsBuffer, uniformCullingBuffers, atomicCounterBuffers
+    //std::array<CullingPushConstants, MAX_FRAMES_IN_FLIGHT> cullingAddress;
     #pragma endregion
 
     #pragma region Initialization
@@ -313,7 +330,6 @@ private:
     void initializeOffscreenImages(int width, int height);
 
     void initializePostprocessPipelines();
-
     // Vulkan related stuff
     void initializeVulkan();
 

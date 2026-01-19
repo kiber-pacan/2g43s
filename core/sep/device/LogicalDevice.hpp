@@ -40,12 +40,22 @@ struct LogicalDevice {
         features12.runtimeDescriptorArray = VK_TRUE;
         features12.descriptorBindingPartiallyBound = VK_TRUE;
         features12.descriptorBindingUpdateUnusedWhilePending = VK_TRUE;
+        features12.bufferDeviceAddress = VK_TRUE;
         features12.pNext = &sync2;
+
 
         VkPhysicalDeviceDynamicRenderingFeatures dynamicRenderingFeatures{};
         dynamicRenderingFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES;
         dynamicRenderingFeatures.dynamicRendering = VK_TRUE;
         dynamicRenderingFeatures.pNext = &features12;
+
+        VkPhysicalDeviceDescriptorIndexingFeatures indexingFeatures{};
+        indexingFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES;
+        indexingFeatures.runtimeDescriptorArray = VK_TRUE;
+        indexingFeatures.descriptorBindingPartiallyBound = VK_TRUE;
+        indexingFeatures.descriptorBindingVariableDescriptorCount = VK_TRUE;
+        indexingFeatures.shaderSampledImageArrayNonUniformIndexing = VK_TRUE;
+        indexingFeatures.pNext = &dynamicRenderingFeatures;
 
         VkPhysicalDeviceFeatures deviceFeatures{};
         deviceFeatures.samplerAnisotropy = VK_TRUE;

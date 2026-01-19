@@ -6,10 +6,13 @@
 
 #include <stdexcept>
 
-#include "Shaders.hpp"
+#include "../shaders/Shaders.hpp"
 #include "Helper.hpp"
 #include "Tools.hpp"
 #include "Vertex.hpp"
+#include "shaders/constants/CullingPushConstants.hpp"
+#include "shaders/constants/MatrixPushConstants.hpp"
+#include "shaders/constants/PostprocessPushConstants.hpp"
 
 void PipelineCreation::createGraphicsPipeline(VkDevice& device, VkPhysicalDevice& physicalDevice, VkPipelineLayout& pipelineLayout, VkPipeline& graphicsPipeline, VkDescriptorSetLayout& descriptorSetLayout, VkFormat& swapchainImageFormat) {
     auto vertShaderCode = Tools::readFile(Tools::getCompiledShaderFilePath("vertex.spv").c_str());
@@ -92,8 +95,15 @@ void PipelineCreation::createGraphicsPipeline(VkDevice& device, VkPhysicalDevice
     dynamicState.dynamicStateCount = static_cast<uint32_t>(dynamicStates.size());
     dynamicState.pDynamicStates = dynamicStates.data();
 
+    VkPushConstantRange pushConstantRange = {};
+    pushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+    pushConstantRange.offset = 0;
+    pushConstantRange.size = sizeof(CullingPushConstants);
+
     VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
     pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+    pipelineLayoutInfo.pushConstantRangeCount = 1;
+    pipelineLayoutInfo.pPushConstantRanges = &pushConstantRange;
     pipelineLayoutInfo.setLayoutCount = 1;
     pipelineLayoutInfo.pSetLayouts = &descriptorSetLayout;
 
@@ -149,7 +159,7 @@ void PipelineCreation::createGraphicsPipeline(VkDevice& device, VkPhysicalDevice
     vkDestroyShaderModule(device, vertShaderModule, nullptr);
 }
 
-void PipelineCreation::createMatrixComputePipeline(const VkDevice& device, const VkDescriptorSetLayout& matrixComputeDescriptorSetLayout, VkPipelineLayout& matrixComputePipelineLayout, VkPipeline& matrixComputePipeline) {
+void PipelineCreation::createMatrixComputePipeline(const VkDevice& device, VkPipelineLayout& matrixComputePipelineLayout, VkPipeline& matrixComputePipeline) {
     const auto matricesShaderCode = Tools::readFile(Tools::getCompiledShaderFilePath("matrices.spv").c_str());
 
     const VkShaderModule& compShaderModule = Shaders::createShaderModule(matricesShaderCode, device);
@@ -160,10 +170,17 @@ void PipelineCreation::createMatrixComputePipeline(const VkDevice& device, const
     compShaderStageInfo.module = compShaderModule;
     compShaderStageInfo.pName = "main";
 
+    VkPushConstantRange pushConstantRange = {};
+    pushConstantRange.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+    pushConstantRange.offset = 0;
+    pushConstantRange.size = sizeof(MatrixPushConstants);
+
     VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
     pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    pipelineLayoutInfo.setLayoutCount = 1;
-    pipelineLayoutInfo.pSetLayouts = &matrixComputeDescriptorSetLayout;
+    pipelineLayoutInfo.pushConstantRangeCount = 1;
+    pipelineLayoutInfo.pPushConstantRanges = &pushConstantRange;
+    pipelineLayoutInfo.setLayoutCount = 0;
+    pipelineLayoutInfo.pSetLayouts = nullptr;
 
     if (vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &matrixComputePipelineLayout) != VK_SUCCESS) {
         throw std::runtime_error("failed to create compute pipeline layout!");
@@ -180,7 +197,7 @@ void PipelineCreation::createMatrixComputePipeline(const VkDevice& device, const
     vkDestroyShaderModule(device, compShaderModule, nullptr);
 }
 
-void PipelineCreation::createCullingComputePipeline(const VkDevice& device, const VkDescriptorSetLayout& cullingComputeDescriptorSetLayout, VkPipelineLayout& cullingComputePipelineLayout, VkPipeline& cullingComputePipeline) {
+void PipelineCreation::createCullingComputePipeline(const VkDevice& device, VkPipelineLayout& cullingComputePipelineLayout, VkPipeline& cullingComputePipeline) {
     const auto cullingShaderCode = Tools::readFile(Tools::getCompiledShaderFilePath("culling.spv").c_str());
 
     const VkShaderModule& compShaderModule = Shaders::createShaderModule(cullingShaderCode, device);
@@ -191,10 +208,17 @@ void PipelineCreation::createCullingComputePipeline(const VkDevice& device, cons
     compShaderStageInfo.module = compShaderModule;
     compShaderStageInfo.pName = "main";
 
+    VkPushConstantRange pushConstantRange = {};
+    pushConstantRange.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+    pushConstantRange.offset = 0;
+    pushConstantRange.size = sizeof(CullingPushConstants);
+
     VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
     pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    pipelineLayoutInfo.setLayoutCount = 1;
-    pipelineLayoutInfo.pSetLayouts = &cullingComputeDescriptorSetLayout;
+    pipelineLayoutInfo.pushConstantRangeCount = 1;
+    pipelineLayoutInfo.pPushConstantRanges = &pushConstantRange;
+    pipelineLayoutInfo.setLayoutCount = 0;
+    pipelineLayoutInfo.pSetLayouts = nullptr;
 
     if (vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &cullingComputePipelineLayout) != VK_SUCCESS) {
         throw std::runtime_error("failed to create compute pipeline layout!");
@@ -212,8 +236,15 @@ void PipelineCreation::createCullingComputePipeline(const VkDevice& device, cons
 }
 
 void PipelineCreation::createPostprocessPipelineLayout(const VkDevice &device, VkPipelineLayout &pipelineLayout, const VkDescriptorSetLayout &descriptorSetLayout) {
+    VkPushConstantRange pushConstantRange = {};
+    pushConstantRange.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+    pushConstantRange.offset = 0;
+    pushConstantRange.size = sizeof(PostprocessPushConstants);
+
     VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
     pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+    pipelineLayoutInfo.pushConstantRangeCount = 1;
+    pipelineLayoutInfo.pPushConstantRanges = &pushConstantRange;
     pipelineLayoutInfo.setLayoutCount = 1;
     pipelineLayoutInfo.pSetLayouts = &descriptorSetLayout;
 

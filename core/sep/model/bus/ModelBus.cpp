@@ -51,7 +51,7 @@ std::shared_ptr<ParsedModel> ModelBus::getModel(const std::string& file) {
 
 #pragma region instanceModels
 /// TIP args: pos, rot, scl (MAX 3 ELEMENTS)
-void ModelBus::createModelInstance(const std::string& file, const auto&... args) {
+void ModelBus::instance(const std::string& file, const auto&... args) {
     static_assert(sizeof...(args) <= 3, "Maximum 3 arguments allowed!");
 
     if (groups_map.contains(file)) {
@@ -247,7 +247,7 @@ void ModelBus::square(size_t count, const std::string& file, const double gap) {
 
 void ModelBus::loadModels() {
     const auto start1 = std::chrono::high_resolution_clock::now();
-    loadModels("/home/down1/2g43s/core/models/", "BoxTextured.glb");
+    loadModels("/home/down1/2g43s/core/models/", "land2.glb");
     const auto end1 = std::chrono::high_resolution_clock::now();
     const std::chrono::duration<double> duration1 = end1 - start1;
 
@@ -255,11 +255,8 @@ void ModelBus::loadModels() {
 
     const auto start = std::chrono::high_resolution_clock::now();
 
-    randomVolume(10000000, "BoxTextured.glb", -100, 100);
-
-
-    //createModelInstance("AntiqueCamera.glb");
-
+    //randomVolume(1000000, "box.glb", -1000, 1000);
+    instance("land2.glb");
 
     const auto end = std::chrono::high_resolution_clock::now();
     const std::chrono::duration<double> duration = end - start;

@@ -6,7 +6,7 @@
 struct UniformBufferObject {
     glm::mat4 view;
     glm::mat4 proj;
-    uint32_t modelCount;
+    uint32_t count;
 };
 
 #endif //INC_2G43S_UNIFORMBUFFEROBJECT_H

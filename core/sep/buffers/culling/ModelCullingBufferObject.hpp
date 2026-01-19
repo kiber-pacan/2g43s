@@ -5,7 +5,6 @@
 #ifndef INC_2G43S_MODELCULLINGBUFFEROBJECT_H
 #define INC_2G43S_MODELCULLINGBUFFEROBJECT_H
 #include <vector>
-#include <glm/fwd.hpp>
 
 struct CullingData {
     CullingData(const glm::vec4 sphere, const uint32_t drawCommandIndex) : sphere(sphere), drawCommandIndex(drawCommandIndex) {}

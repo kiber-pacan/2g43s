@@ -1,13 +1,31 @@
-#Set cmake version
+# Set cmake version
 cmake_minimum_required(VERSION 3.28)
 
-#Setting c++ 26 standard
+# Setting c++ 26 standard
 set(CMAKE_CXX_STANDARD 26)
 set(DCMAKE_CXX_STANDARD 26)
 set(CMAKE_CXX_STANDARD_REQUIRED on)
 set(CMAKE_CXX_EXTENSIONS off)
 
-#Declaring project
+# Jolt
+include(FetchContent)
+FetchContent_Declare(
+        JoltPhysics
+        GIT_REPOSITORY https://github.com/jrouwe/JoltPhysics.git
+        GIT_TAG        master
+)
+
+# Jolt settings
+set(INTERACTIVE_SAMPLES OFF CACHE BOOL "" FORCE)
+set(SAMPLES OFF CACHE BOOL "" FORCE)
+set(UNIT_TESTS OFF CACHE BOOL "" FORCE)
+set(GENERATE_DEBUG_SYMBOLS ON CACHE BOOL "" FORCE)
+set(USE_SSE4_2 ON CACHE BOOL "" FORCE)
+
+FetchContent_MakeAvailable(JoltPhysics)
+
+
+# Declaring project
 project(2g43s)
 set(EXECUTABLE_NAME ${PROJECT_NAME})
 
@@ -28,8 +46,8 @@ add_executable(${EXECUTABLE_NAME}
         core/sep/graphics/DeltaManager.cpp
 
         # Pipeline
-        core/sep/graphics/pipeline/Shaders.cpp
-        core/sep/graphics/pipeline/Shaders.hpp
+        core/sep/graphics/shaders/Shaders.cpp
+        core/sep/graphics/shaders/Shaders.hpp
         core/sep/graphics/pipeline/PipelineCreation.cpp
         core/sep/graphics/pipeline/PipelineCreation.hpp
         core/sep/graphics/pipeline/Descriptor.cpp
@@ -103,6 +121,10 @@ add_executable(${EXECUTABLE_NAME}
         core/sep/entity/PlayerEntity.h
 
         core/sep/model/Texture.hpp
+        core/sep/graphics/shaders/constants/CullingPushConstants.hpp
+        core/sep/graphics/shaders/constants/VertexPushConstants.hpp
+        core/sep/graphics/shaders/constants/MatrixPushConstants.hpp
+        core/sep/graphics/shaders/constants/PostprocessPushConstants.hpp
 )
 
 
@@ -143,36 +165,38 @@ target_compile_definitions(${EXECUTABLE_NAME} PRIVATE
 )
 
 # Optimizations
-set(CMAKE_CXX_FLAGS_RELEASE " \
-    -O3 -march=native -mtune=native \
-    -ffast-math -fno-math-errno -fno-trapping-math -fassociative-math -freciprocal-math \
-    -fno-signed-zeros -fno-rounding-math \
-    -fopenmp -flto=full -fsplit-lto-unit \
-    -fstrict-aliasing -fstrict-vtable-pointers -fwhole-program-vtables \
-    -fno-semantic-interposition -fvisibility=hidden -fvisibility-inlines-hidden \
-    -funroll-loops -fvectorize -fslp-vectorize \
-    -fno-stack-protector -fno-stack-check -fno-plt \
-    -fno-exceptions -fno-rtti -fno-ident \
-    -fomit-frame-pointer -fmerge-all-constants \
-    -fplugin=LLVMPolly.so \
-    -mllvm -polly \
-    -mllvm -polly-parallel \
-    -mllvm -polly-vectorizer=stripmine \
-    -mllvm -polly-invariant-load-hoisting \
-    -mllvm -polly-run-dce \
-    -mllvm -polly-check-parallel \
-    -mllvm --polly-on-isl-error-abort=false \
-    -mllvm -inline-threshold=2000 \
-    -mllvm -unroll-threshold=1000 \
-    -DNDEBUG")
+if(NOT MSVC)
+    set(CMAKE_CXX_FLAGS_RELEASE " \
+        -O3 -march=native -mtune=native \
+        -ffast-math -fno-math-errno -fno-trapping-math -fassociative-math -freciprocal-math \
+        -fno-signed-zeros -fno-rounding-math \
+        -fopenmp -flto=full -fsplit-lto-unit \
+        -fstrict-aliasing -fstrict-vtable-pointers -fwhole-program-vtables \
+        -fno-semantic-interposition -fvisibility=hidden -fvisibility-inlines-hidden \
+        -funroll-loops -fvectorize -fslp-vectorize \
+        -fno-stack-protector -fno-stack-check -fno-plt \
+        -fno-exceptions -fno-rtti -fno-ident \
+        -fomit-frame-pointer -fmerge-all-constants \
+        -fplugin=LLVMPolly.so \
+        -mllvm -polly \
+        -mllvm -polly-parallel \
+        -mllvm -polly-vectorizer=stripmine \
+        -mllvm -polly-invariant-load-hoisting \
+        -mllvm -polly-run-dce \
+        -mllvm -polly-check-parallel \
+        -mllvm --polly-on-isl-error-abort=false \
+        -mllvm -inline-threshold=2000 \
+        -mllvm -unroll-threshold=1000 \
+        -DNDEBUG")
 
-set(CMAKE_EXE_LINKER_FLAGS_RELEASE " \
-    -fopenmp -flto=full -fuse-ld=mold \
-    -Wl,-O3 -Wl,--gc-sections -Wl,--icf=all \
-    -Wl,-Bsymbolic -Wl,-Bsymbolic-functions \
-    -Wl,--strip-all -Wl,--as-needed")
+    set(CMAKE_EXE_LINKER_FLAGS_RELEASE " \
+        -fopenmp -flto=full -fuse-ld=mold \
+        -Wl,-O3 -Wl,--gc-sections -Wl,--icf=all \
+        -Wl,-Bsymbolic -Wl,-Bsymbolic-functions \
+        -Wl,--strip-all -Wl,--as-needed")
+endif()
 
-#Adding sources to project
+# Adding sources to project
 target_sources(${EXECUTABLE_NAME} PRIVATE ${include})
 
 if(NOT DEFINED ENV{VULKAN_SDK})
@@ -181,10 +205,9 @@ endif()
 
 set(VULKAN_SDK_PATH $ENV{VULKAN_SDK})
 
-# Добавляем пути к заголовкам
 target_include_directories(${PROJECT_NAME} PRIVATE "${VULKAN_SDK_PATH}/include")
 
-#Adding SDL3 and glm
+
 if(${WIN32})
     add_subdirectory("libs/SDL")
 
@@ -214,7 +237,7 @@ endif ()
 
 include_directories(${Vulkan_INCLUDE_DIRS})
 
-#Finding Vulkan API and adding it to project
+# Finding Vulkan API and adding it to project
 find_package(Vulkan REQUIRED)
 if(Vulkan_FOUND)
     include_directories(${Vulkan_INCLUDE_DIRS})
@@ -223,6 +246,7 @@ endif()
 
 target_link_libraries(${EXECUTABLE_NAME} PUBLIC
         ${Vulkan_LIBRARIES}
+        Jolt
         SDL3::SDL3
         glm::glm
         fastgltf::fastgltf

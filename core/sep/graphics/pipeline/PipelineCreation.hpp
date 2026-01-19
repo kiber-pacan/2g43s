@@ -11,9 +11,9 @@
 struct PipelineCreation {
     static void createGraphicsPipeline(VkDevice& device, VkPhysicalDevice& physicalDevice, VkPipelineLayout& pipelineLayout, VkPipeline& graphicsPipeline, VkDescriptorSetLayout& descriptorSetLayout, VkFormat& swapchainImageFormat);
 
-    static void createMatrixComputePipeline(const VkDevice& device, const VkDescriptorSetLayout& matrixComputeDescriptorSetLayout, VkPipelineLayout& matrixComputePipelineLayout, VkPipeline& matrixComputePipeline);
+    static void createMatrixComputePipeline(const VkDevice& device, VkPipelineLayout& matrixComputePipelineLayout, VkPipeline& matrixComputePipeline);
 
-    static void createCullingComputePipeline(const VkDevice& device, const VkDescriptorSetLayout& cullingComputeDescriptorSetLayout, VkPipelineLayout& cullingComputePipelineLayout, VkPipeline& cullingComputePipeline);
+    static void createCullingComputePipeline(const VkDevice& device, VkPipelineLayout& cullingComputePipelineLayout, VkPipeline& cullingComputePipeline);
 
     static void createPostprocessPipelineLayout(const VkDevice &device, VkPipelineLayout &pipelineLayout, const VkDescriptorSetLayout &descriptorSetLayout);
 

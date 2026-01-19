@@ -3,8 +3,6 @@
 
 #include "Engine.hpp"
 
-
-
 #pragma region Main
 // Method for initializing and running engine
 void Engine::init(SDL_Window* window) {
@@ -97,6 +95,301 @@ void Engine::drawImGui(const VkCommandBuffer& commandBuffer) {
     ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), commandBuffer);
 }
 
+void Engine::recordCommandBuffer(uint32_t imageIndex, VkPipeline postprocessPipeline) {
+    VkCommandBuffer& commandBuffer = commandBuffers[currentFrame];
+    VkCommandBufferBeginInfo beginInfo{};
+    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+
+    if (vkBeginCommandBuffer(commandBuffer, &beginInfo) != VK_SUCCESS) {
+        throw std::runtime_error("failed to begin recording command buffer!");
+    }
+
+
+    #pragma region Cleanup
+    vkCmdFillBuffer(commandBuffer, atomicCounterBuffers[currentFrame], 0, sizeof(uint32_t), 0); // Clear atomic counter
+    for (int i = 0; i < mdlBus.getTotalModelCount(); i++) {
+        vkCmdFillBuffer(commandBuffer, drawCommandsBuffer, offsetof(VkDrawIndexedIndirectCommand, instanceCount) + sizeof(VkDrawIndexedIndirectCommand) * i, 4, 0); // Clear 4 bites with offset of 4
+    }
+    #pragma endregion
+
+    std::array<VkClearValue, 2> clearValues{};
+    clearValues[0].color = {
+        {
+            static_cast<float>(clear_color.r) / 255,
+            static_cast<float>(clear_color.g) / 255,
+            static_cast<float>(clear_color.b) / 255,
+            static_cast<float>(clear_color.a) / 255
+        }
+    };
+    clearValues[1].depthStencil = {1.0f, 0};
+
+    #pragma region Matrices
+    static size_t frame = 0;
+
+    if (matrixDirty) {
+        constexpr uint32_t workgroupSize = 128;
+        vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, matrixComputePipeline);
+
+        MatrixPushConstants matrixConstants{};
+        matrixConstants.mdb = modelDataConstants[currentFrame];
+        matrixConstants.mb = modelConstants[currentFrame];
+        matrixConstants.umbo = uniformMatrixConstants[currentFrame];
+
+        vkCmdPushConstants(
+        commandBuffer,
+        matrixComputePipelineLayout,
+        VK_SHADER_STAGE_COMPUTE_BIT,
+        0,
+        sizeof(MatrixPushConstants),
+        &matrixConstants
+        );
+
+        frame++;
+        if (frame == MAX_FRAMES_IN_FLIGHT) {
+            matrixDirty = false;
+            frame = 0;
+        }
+
+        const size_t totalInstances = mdlBus.getTotalInstanceCount();
+        uint32_t groupCount = (totalInstances + workgroupSize - 1) / workgroupSize;
+
+        vkCmdDispatch(commandBuffer, groupCount, 1, 1);
+        Barrier vibBarrier(commandBuffer);
+        vibBarrier.buffer(
+            modelDataBuffers[currentFrame],
+            VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED,
+            VK_ACCESS_2_SHADER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT,
+            VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+            0, VK_WHOLE_SIZE
+            ).apply();
+    }
+    #pragma endregion
+
+    #pragma region Culling
+    static size_t frame1 = 0;
+
+    if (frame1 % 4 == 0 || true) {
+        vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, cullingComputePipeline);
+
+        CullingPushConstants cullingConstants{};
+        cullingConstants.mcb = modelCullingConstant;
+        cullingConstants.vib = visibleIndicesConstants[currentFrame];
+        cullingConstants.dcb = drawCommandsConstant;
+        cullingConstants.ucbo = uniformCullingConstants[currentFrame];
+        cullingConstants.counter = atomicCounterConstants[currentFrame];
+
+        vkCmdPushConstants(
+        commandBuffer,
+        cullingComputePipelineLayout,
+        VK_SHADER_STAGE_COMPUTE_BIT,
+        0,
+        sizeof(CullingPushConstants),
+        &cullingConstants
+        );
+
+        constexpr uint32_t workgroupSize1 = 128;
+        const size_t totalInstances = mdlBus.getTotalInstanceCount();
+        uint32_t groupCount = (totalInstances + workgroupSize1 - 1) / workgroupSize1;
+
+        vkCmdDispatch(commandBuffer, groupCount, 1, 1);
+        Barrier vibBarrier(commandBuffer);
+        vibBarrier.buffer(
+        atomicCounterBuffers[currentFrame],
+        VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED,
+        VK_ACCESS_2_SHADER_WRITE_BIT, VK_ACCESS_INDIRECT_COMMAND_READ_BIT,
+        VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_2_DRAW_INDIRECT_BIT | VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT,
+        0, VK_WHOLE_SIZE
+        ).buffer(
+        visibleIndicesBuffers[currentFrame],
+        VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED,
+        VK_ACCESS_2_SHADER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT,
+        VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_2_DRAW_INDIRECT_BIT | VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT,
+        0, VK_WHOLE_SIZE
+        ).apply();
+    }
+    frame1++;
+    #pragma endregion
+
+    // Dynamic rendering info
+    #pragma region offScreenRenderInfo
+    VkRenderingAttachmentInfo colorAttachment{};
+    colorAttachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+    colorAttachment.imageView = offscreenImageViews[currentFrame];
+    colorAttachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+    colorAttachment.clearValue = clearValues[0];
+
+    VkRenderingAttachmentInfo depthAttachment{};
+    depthAttachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+    depthAttachment.imageView = depthImageView;
+    depthAttachment.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+    depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    depthAttachment.clearValue.depthStencil = {1.0f, 0};
+
+    VkRenderingInfo renderingInfo{};
+    renderingInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
+    renderingInfo.renderArea = {{0, 0}, swapchainExtent};
+    renderingInfo.layerCount = 1;
+    renderingInfo.colorAttachmentCount = 1;
+    renderingInfo.pColorAttachments = &colorAttachment;
+    renderingInfo.pDepthAttachment = &depthAttachment;
+    #pragma endregion
+
+    // Transition image layouts so we can write in it
+    #pragma region initialImageLayoutTransition
+    Barrier barrier(commandBuffer);
+
+    barrier.image(
+    depthImage,
+    VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+    VK_ACCESS_2_NONE, VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
+    VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT,
+    VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT
+    ).image(
+    offscreenImages[currentFrame],
+    VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL,
+    VK_ACCESS_2_NONE, VK_ACCESS_2_NONE,
+    VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+    VK_IMAGE_ASPECT_COLOR_BIT
+    ).apply();
+    #pragma endregion
+
+    // Render scene without screen elements
+    #pragma region offScreenRender
+    vkCmdBeginRendering(commandBuffer, &renderingInfo);
+
+    vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
+    vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipelineLayout, 0, 1, &graphicsDescriptorSets[currentFrame], 0, nullptr);
+
+    VertexPushConstants vertexConstants{};
+    vertexConstants.ubo = uniformConstants[currentFrame];
+    vertexConstants.mb = modelConstants[currentFrame];
+    vertexConstants.vib = visibleIndicesConstants[currentFrame];
+    vertexConstants.ti = textureIndexConstant;
+    vertexConstants.tio = textureIndexOffsetConstant;
+
+    vkCmdPushConstants(
+    commandBuffer,
+    graphicsPipelineLayout,
+    VK_SHADER_STAGE_VERTEX_BIT,
+    0,
+    sizeof(VertexPushConstants),
+    &vertexConstants
+    );
+
+    VkViewport viewport{};
+    viewport.x = 0.0f;
+    viewport.y = 0.0f;
+    viewport.width = static_cast<float>(swapchainExtent.width);
+    viewport.height = static_cast<float>(swapchainExtent.height);
+    viewport.minDepth = 0.0f;
+    viewport.maxDepth = 1.0f;
+    vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
+
+    VkRect2D scissor{};
+    scissor.offset = {0, 0};
+    scissor.extent = swapchainExtent;
+    vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
+
+    VkBuffer vertexBuffers[] = {vertexBuffer};
+    VkDeviceSize offsets[] = {0};
+
+    vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
+
+    vkCmdBindIndexBuffer(commandBuffer, indexBuffer, 0, VK_INDEX_TYPE_UINT32);
+
+    vkCmdDrawIndexedIndirectCount(commandBuffer, drawCommandsBuffer, 0, atomicCounterBuffers[currentFrame], 0, 1024, sizeof(VkDrawIndexedIndirectCommand));
+
+    vkCmdEndRendering(commandBuffer);
+    #pragma endregion
+
+    // Transition Offscreen image layout so we can read it from shaders
+    #pragma region offscreenLayoutTransition
+    Barrier midBarrier(commandBuffer);
+    barrier.image(
+    offscreenImages[currentFrame],
+    VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+    VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT, VK_ACCESS_2_SHADER_READ_BIT,
+    VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+    VK_IMAGE_ASPECT_COLOR_BIT
+    ).image(
+    depthImage,
+    VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+    VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT, VK_ACCESS_2_SHADER_READ_BIT,
+    VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+    VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT
+    ).image(
+    swapchainImages[imageIndex],
+    VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+    VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT, VK_ACCESS_2_SHADER_READ_BIT,
+    VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+    VK_IMAGE_ASPECT_COLOR_BIT
+    ).apply();
+    #pragma endregion
+
+    #pragma region screenRenderInfo
+    VkRenderingAttachmentInfo colorAttachmentInfo{};
+    colorAttachmentInfo.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+    colorAttachmentInfo.imageView = swapchainImageViews[imageIndex];
+    colorAttachmentInfo.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    colorAttachmentInfo.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+    colorAttachmentInfo.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+
+    VkRenderingInfo renderingInfoScreen{};
+    renderingInfoScreen.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
+    renderingInfoScreen.renderArea = {{0, 0}, swapchainExtent};
+    renderingInfoScreen.layerCount = 1;
+    renderingInfoScreen.colorAttachmentCount = 1;
+    renderingInfoScreen.pColorAttachments = &colorAttachmentInfo;
+    #pragma endregion
+
+    // Render face with offscreen image so we can do postprocessing
+    #pragma region renderScreen
+    vkCmdBeginRendering(commandBuffer, &renderingInfoScreen);
+
+    vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, postprocessPipeline);
+
+    PostprocessPushConstants postprocessingConstants{};
+    postprocessingConstants.mpbo = uniformPostprocessingConstants[currentFrame];
+
+    vkCmdPushConstants(
+    commandBuffer,
+    postprocessPipelineLayout,
+    VK_SHADER_STAGE_FRAGMENT_BIT,
+    0,
+    sizeof(PostprocessPushConstants),
+    &postprocessingConstants
+    );
+
+    vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, postprocessPipelineLayout, 0, 1, &postprocessDescriptorSets[currentFrame], 0, nullptr);
+
+    vkCmdDraw(commandBuffer, 3, 1, 0, 0);
+
+    drawImGui(commandBuffer);
+    vkCmdEndRendering(commandBuffer);
+    #pragma endregion
+
+    // Transition swapchain layout so we can show it on screen
+    #pragma region swapchainLayoutTransition
+    Barrier swapchainBarrier(commandBuffer);
+
+    swapchainBarrier.image(
+    swapchainImages[imageIndex],
+    VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+    VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT, VK_ACCESS_2_NONE,
+    VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT,
+    VK_IMAGE_ASPECT_COLOR_BIT
+    ).apply();
+    #pragma endregion
+
+    if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
+        throw std::runtime_error("failed to record command buffer!");
+    }
+}
+
 // Draw
 void Engine::drawFrame() {
     vkWaitForFences(device, 1, &inFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
@@ -111,33 +404,19 @@ void Engine::drawFrame() {
         throw std::runtime_error("failed to acquire swap chain image!");
     }
 
-    updateUniformBuffer(currentFrame, swapchainExtent, uniformBuffersMapped, ubo, camera, mdlBus);
+    updateUniformBuffer(currentFrame, swapchainExtent, uniformBuffersMapped, uniformMatrixBuffersMapped, ubo, umbo, camera, mdlBus);
     updateUniformPostprocessingBuffer(currentFrame, uniformPostprocessingBuffersMapped, upbo, delta, swapchainExtent);
     updateCullingUniformBuffer(currentFrame, swapchainExtent, uniformCullingBuffersMapped, ucbo, camera, mdlBus);
     updateModelCullingBuffer(modelCullingBufferMapped, mcbo, mdlBus);
     updateModelDataBuffer(currentFrame, modelDataBuffersMapped, mdlBus);
     updateModelBuffer(modelBuffersMapped, mbo, mdlBus);
     updateTextureIndexBuffer(textureIndexMapped, textureIndexOffsetMapped, tio, tioo, mdlBus);
-    //updateDrawCommands(drawCommandsBufferMapped, dc, mdlBus);
 
     std::function<void(VkCommandBuffer&)> imGui = [this](const VkCommandBuffer& commandBuffer) { drawImGui(commandBuffer); };
 
-    Command::recordCommandBuffer(
-        device, physicalDevice, commandBuffers[currentFrame], imageIndex,
-        swapchainExtent, vertexBuffer,
-        indexBuffer,
-        graphicsPipeline, matrixComputePipeline, cullingComputePipeline, postprocessPipelines[selectedShader],
-        graphicsPipelineLayout, matrixComputePipelineLayout, cullingComputePipelineLayout, postprocessPipelineLayout,
-        graphicsDescriptorSets, matrixComputeDescriptorSets, cullingComputeDescriptorSets, postprocessDescriptorSets,
-        currentFrame, clear_color, mdlBus,
-        modelDataBuffers, drawCommandsBuffer, MAX_FRAMES_IN_FLIGHT,
-        matrixDirty, atomicCounterBuffers, visibleIndicesBuffers,
-        imGui,
-        swapchainImageViews, depthImageView, depthImage, swapchainImages, offscreenImageViews, offscreenImages, depth
-    );
+    recordCommandBuffer(imageIndex, postprocessPipelines[selectedShader]);
 
     vkResetFences(device, 1, &inFlightFences[currentFrame]);
-    //vkResetCommandBuffer(commandBuffers[currentFrame], /*VkCommandBufferResetFlagBits*/ 0);
 
     VkSubmitInfo submitInfo{};
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -184,8 +463,6 @@ void Engine::drawFrame() {
 }
 
 
-
-
 // Clean trash before closing app
 void Engine::cleanup() const {
     vkDeviceWaitIdle(device);
@@ -214,6 +491,11 @@ void Engine::cleanup() const {
     for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
         vkDestroyBuffer(device, uniformBuffers[i], nullptr);
         vkFreeMemory(device, uniformBuffersMemory[i], nullptr);
+    }
+
+    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+        vkDestroyBuffer(device, uniformMatrixBuffers[i], nullptr);
+        vkFreeMemory(device, uniformMatrixBuffersMemory[i], nullptr);
     }
 
     for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
@@ -253,12 +535,6 @@ void Engine::cleanup() const {
 
     vkDestroyDescriptorPool(device, graphicsDescriptorPool, nullptr);
     vkDestroyDescriptorSetLayout(device, graphicsDescriptorSetLayout, nullptr);
-
-    vkDestroyDescriptorPool(device, matrixComputeDescriptorPool, nullptr);
-    vkDestroyDescriptorSetLayout(device, matrixComputeDescriptorSetLayout, nullptr);
-
-    vkDestroyDescriptorPool(device, cullingComputeDescriptorPool, nullptr);
-    vkDestroyDescriptorSetLayout(device, cullingComputeDescriptorSetLayout, nullptr);
 
     vkDestroyDescriptorPool(device, postprocessDescriptorPool, nullptr);
     vkDestroyDescriptorSetLayout(device, postprocessDescriptorSetLayout, nullptr);
@@ -322,18 +598,27 @@ void Engine::cleanup() const {
 
 #pragma region Buffers
 // Generic
-void Engine::updateUniformBuffer(const uint32_t currentFrame, const VkExtent2D& swapchainExtent, const std::vector<void*>& uniformBuffersMapped, UniformBufferObject& ubo, const Camera& camera, const ModelBus& mdlBus) {
-    ubo.view = glm::lookAt(camera.pos + glm::vec3(0), camera.pos + camera.look, glm::vec3(0.0f, 0.0f, 1.0f));
-    ubo.proj = glm::perspective(camera.fov,  static_cast<float>(swapchainExtent.width) / static_cast<float>(swapchainExtent.height), 0.1f, 4096.0f);
-    ubo.proj[1][1] *= -1;
-    ubo.modelCount = mdlBus.getTotalModelCount();
+void Engine::updateUniformBuffer(uint32_t currentFrame, const VkExtent2D& swapchainExtent, const std::vector<void*>& uniformBuffersMapped, const std::vector<void*>& uniformMatrixBuffersMapped, UniformBufferObject& ubo, UniformBufferObject& umbo, const Camera& camera, const ModelBus& mdlBus) {
+    const glm::mat4 view = glm::lookAt(camera.pos + glm::vec3(0), camera.pos + camera.look, glm::vec3(0.0f, 0.0f, 1.0f));
+    glm::mat4 proj = glm::perspective(camera.fov,  static_cast<float>(swapchainExtent.width) / static_cast<float>(swapchainExtent.height), 0.1f, 4096.0f);
+    proj[1][1] *= -1;
+
+    ubo.view = view;
+    ubo.proj = proj;
+    ubo.count = mdlBus.getTotalModelCount();
+
+    umbo.view = view;
+    umbo.proj = proj;
+    umbo.count = mdlBus.getTotalInstanceCount();
+
     memcpy(uniformBuffersMapped[currentFrame], &ubo, sizeof(ubo));
+    memcpy(uniformMatrixBuffersMapped[currentFrame], &umbo, sizeof(umbo));
 }
 
-void Engine::updateUniformPostprocessingBuffer(const uint32_t currentFrame, const std::vector<void*>& uniformBuffersMapped, UniformPostprocessingBufferObject& upbo, DeltaManager& delta, const VkExtent2D& swapchainExtent) {
+void Engine::updateUniformPostprocessingBuffer(const uint32_t currentFrame, const std::vector<void*>& uniformPostprocessingBuffersMapped, UniformPostprocessingBufferObject& upbo, DeltaManager& delta, const VkExtent2D& swapchainExtent) {
     upbo.time += delta.deltaTime;
     upbo.resolution = glm::vec2(swapchainExtent.width, swapchainExtent.height);
-    memcpy(uniformBuffersMapped[currentFrame], &upbo, sizeof(upbo));
+    memcpy(uniformPostprocessingBuffersMapped[currentFrame], &upbo, sizeof(upbo));
 }
 
 void Engine::normalizePlane(glm::vec4& plane) {
@@ -449,51 +734,29 @@ void Engine::updateVisibleIndicesBuffer(const std::vector<void*>& visibleIndices
 }
 
 void Engine::updateDrawCommands(void* drawCommandsBufferMapped, DrawCommandsBufferObject& dc, ModelBus& mdlBus) {
-    if (mdlBus.dirtyCommands) {
-        dc.commands.clear();
+    dc.commands.clear();
 
-        uint32_t firstIndex = 0;
-        int32_t vertexOffset = 0;
-        uint32_t firstInstance = 0;
+    uint32_t firstIndex = 0;
+    int32_t vertexOffset = 0;
+    uint32_t firstInstance = 0;
 
+    for (const auto& group : std::views::values(mdlBus.groups_map)) {
+        VkDrawIndexedIndirectCommand command{};
 
-        for (const auto& group : std::views::values(mdlBus.groups_map)) {
-            const auto& model = group.model;
-            VkDrawIndexedIndirectCommand command{};
+        const size_t instanceCount = group.instances.size();
+        const uint32_t indexCount = ModelBus::getIndexCount(group.model);
 
-            const size_t instanceCount = group.instances.size();
-            const uint32_t indexCount = ModelBus::getIndexCount(group.model);
+        command.firstInstance = firstInstance;
+        command.instanceCount = instanceCount;
 
-            static bool initialized = false;
-            if (!initialized) {
-                command.firstInstance = firstInstance;
-                command.instanceCount = group.instances.size();
-            }
+        command.firstIndex = firstIndex;
+        command.indexCount = indexCount;
+        command.vertexOffset = vertexOffset;
 
-            command.firstIndex = firstIndex;
-            command.indexCount = indexCount;
-            command.vertexOffset = vertexOffset;
-
-            firstIndex += indexCount;
-            vertexOffset += ModelBus::getVertexCount(group.model);
-            firstInstance += instanceCount;
-            dc.commands.emplace_back(command);
-        }
-
-        mdlBus.dirtyCommands = false;
-        static bool initialized = true;
-
-
-        memcpy(drawCommandsBufferMapped, dc.commands.data(), dc.commands.size() * sizeof(VkDrawIndexedIndirectCommand));
-    }
-}
-
-void Engine::updateTextureIndexOffsetBuffer(const void* TextureIndexBufferMapped, TextureIndexOffsetObject& tio, ModelBus& mdlBus) {
-    static bool initialized = false;
-
-    if (!initialized) {
-
-        initialized = true;
+        firstIndex += indexCount;
+        vertexOffset += ModelBus::getVertexCount(group.model);
+        firstInstance += instanceCount;
+        dc.commands.emplace_back(command);
     }
 }
 
@@ -502,7 +765,7 @@ void Engine::updateTextureIndexBuffer(void* TextureIndexBufferMapped, void* Text
 
     if (!initialized) {
         size_t i = 0;
-        size_t count = mdlBus.getTotalModelCount();
+        const size_t count = mdlBus.getTotalModelCount();
         uint32_t currentGlobalVertexOffset = 0;
 
         tio.indices.resize(count);
@@ -640,6 +903,66 @@ void Engine::createInstance() {
 void Engine::initializeImGui(SDL_Window* window) {
     ImGui::CreateContext();
 
+        ImGuiStyle& style = ImGui::GetStyle();
+    ImVec4* colors = style.Colors;
+
+    // Скругляем углы для более современного вида
+    style.WindowRounding = 5.0f;
+    style.FrameRounding = 3.0f;
+    style.FrameBorderSize = 1.0f;
+
+    colors[ImGuiCol_Text]                   = ImVec4(1.00f, 1.00f, 1.00f, 1.00f);
+    colors[ImGuiCol_TextDisabled]           = ImVec4(0.50f, 0.50f, 0.50f, 1.00f);
+    colors[ImGuiCol_WindowBg]               = ImVec4(0.06f, 0.01f, 0.01f, 0.94f);
+    colors[ImGuiCol_ChildBg]                = ImVec4(0.00f, 0.00f, 0.00f, 0.00f);
+    colors[ImGuiCol_PopupBg]                = ImVec4(0.08f, 0.02f, 0.02f, 0.94f);
+    colors[ImGuiCol_Border]                 = ImVec4(0.50f, 0.00f, 0.00f, 0.50f);
+    colors[ImGuiCol_BorderShadow]           = ImVec4(0.00f, 0.00f, 0.00f, 0.00f);
+
+    colors[ImGuiCol_FrameBg]                = ImVec4(0.16f, 0.03f, 0.03f, 0.54f);
+    colors[ImGuiCol_FrameBgHovered]         = ImVec4(0.40f, 0.00f, 0.00f, 0.40f);
+    colors[ImGuiCol_FrameBgActive]          = ImVec4(0.58f, 0.00f, 0.00f, 0.67f);
+    colors[ImGuiCol_TitleBg]                = ImVec4(0.15f, 0.00f, 0.00f, 1.00f);
+    colors[ImGuiCol_TitleBgActive]          = ImVec4(0.35f, 0.00f, 0.00f, 1.00f);
+    colors[ImGuiCol_TitleBgCollapsed]       = ImVec4(0.00f, 0.00f, 0.00f, 0.51f);
+    colors[ImGuiCol_MenuBarBg]              = ImVec4(0.14f, 0.14f, 0.14f, 1.00f);
+
+    colors[ImGuiCol_ScrollbarBg]            = ImVec4(0.02f, 0.02f, 0.02f, 0.53f);
+    colors[ImGuiCol_ScrollbarGrab]          = ImVec4(0.31f, 0.00f, 0.00f, 1.00f);
+    colors[ImGuiCol_ScrollbarGrabHovered]   = ImVec4(0.51f, 0.00f, 0.00f, 1.00f);
+    colors[ImGuiCol_ScrollbarGrabActive]    = ImVec4(0.71f, 0.00f, 0.00f, 1.00f);
+
+    colors[ImGuiCol_CheckMark]              = ImVec4(1.00f, 0.00f, 0.00f, 1.00f);
+    colors[ImGuiCol_SliderGrab]             = ImVec4(0.51f, 0.00f, 0.00f, 1.00f);
+    colors[ImGuiCol_SliderGrabActive]       = ImVec4(0.86f, 0.00f, 0.00f, 1.00f);
+
+    colors[ImGuiCol_Button]                 = ImVec4(0.44f, 0.00f, 0.00f, 0.40f);
+    colors[ImGuiCol_ButtonHovered]          = ImVec4(0.74f, 0.00f, 0.00f, 1.00f);
+    colors[ImGuiCol_ButtonActive]           = ImVec4(0.98f, 0.06f, 0.06f, 1.00f);
+
+    colors[ImGuiCol_Header]                 = ImVec4(0.70f, 0.00f, 0.00f, 0.31f);
+    colors[ImGuiCol_HeaderHovered]          = ImVec4(0.70f, 0.00f, 0.00f, 0.80f);
+    colors[ImGuiCol_HeaderActive]           = ImVec4(0.48f, 0.00f, 0.00f, 1.00f);
+
+    colors[ImGuiCol_Separator]              = colors[ImGuiCol_Border];
+    colors[ImGuiCol_SeparatorHovered]       = ImVec4(0.75f, 0.10f, 0.10f, 0.78f);
+    colors[ImGuiCol_SeparatorActive]        = ImVec4(0.75f, 0.10f, 0.10f, 1.00f);
+
+    colors[ImGuiCol_ResizeGrip]             = ImVec4(0.47f, 0.00f, 0.00f, 0.20f);
+    colors[ImGuiCol_ResizeGripHovered]      = ImVec4(0.66f, 0.00f, 0.00f, 0.67f);
+    colors[ImGuiCol_ResizeGripActive]       = ImVec4(0.81f, 0.00f, 0.00f, 0.95f);
+
+    colors[ImGuiCol_Tab]                    = ImLerp(colors[ImGuiCol_Header],       colors[ImGuiCol_TitleBgActive], 0.80f);
+    colors[ImGuiCol_TabHovered]             = colors[ImGuiCol_HeaderHovered];
+    colors[ImGuiCol_TabActive]              = ImLerp(colors[ImGuiCol_HeaderActive], colors[ImGuiCol_TitleBgActive], 0.60f);
+    colors[ImGuiCol_TabUnfocused]           = ImLerp(colors[ImGuiCol_Tab],          colors[ImGuiCol_TitleBg], 0.80f);
+    colors[ImGuiCol_TabUnfocusedActive]     = ImLerp(colors[ImGuiCol_TabActive],     colors[ImGuiCol_TitleBg], 0.40f);
+
+    ImGuiIO& io = ImGui::GetIO();
+
+    io.Fonts->AddFontFromFileTTF((Tools::getCorePath() + "fonts/opensans.ttf").c_str(), 18.0f);
+    io.FontGlobalScale = 1.0f;
+
     ImGui_ImplSDL3_InitForVulkan(window);
 
     QueueFamilyIndices indices = Queue::findQueueFamilies(physicalDevice, surface);
@@ -727,16 +1050,14 @@ void Engine::initializeVulkan() {
 
     // Desccriptor
     Descriptor::createGraphicsDescriptorSetLayout(device, graphicsDescriptorSetLayout);
-    Descriptor::createMatrixComputeDescriptorSetLayout(device, matrixComputeDescriptorSetLayout);
-    Descriptor::createCullingComputeDescriptorSetLayout(device, cullingComputeDescriptorSetLayout);
     Descriptor::createPostprocessDescriptorSetLayout(device, postprocessDescriptorSetLayout);
 
     PipelineCreation::createGraphicsPipeline(device, physicalDevice, graphicsPipelineLayout, graphicsPipeline, graphicsDescriptorSetLayout, swapchainImageFormat);
-    PipelineCreation::createMatrixComputePipeline(device, matrixComputeDescriptorSetLayout, matrixComputePipelineLayout, matrixComputePipeline);
-    PipelineCreation::createCullingComputePipeline(device, cullingComputeDescriptorSetLayout, cullingComputePipelineLayout, cullingComputePipeline);
+    PipelineCreation::createMatrixComputePipeline(device, matrixComputePipelineLayout, matrixComputePipeline);
+    PipelineCreation::createCullingComputePipeline(device, cullingComputePipelineLayout, cullingComputePipeline);
 
     initializePostprocessPipelines();
-    Buffers::createUniformBuffers(device, physicalDevice, uniformPostprocessingBuffers, uniformPostprocessingBuffersMemory, uniformPostprocessingBuffersMapped, MAX_FRAMES_IN_FLIGHT);
+    Buffers::createGenericBuffers(device, physicalDevice, uniformPostprocessingConstants, uniformPostprocessingBuffers, uniformPostprocessingBuffersMemory, uniformPostprocessingBuffersMapped, MAX_FRAMES_IN_FLIGHT, sizeof(UniformPostprocessingBufferObject), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_2_SHADER_DEVICE_ADDRESS_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
     Command::createCommandPool(device, physicalDevice, graphicsCommandPool, surface);
     Helper::createDepthResources(device, physicalDevice, depthImage, depthImageMemory, depthImageView, swapchainExtent);
@@ -752,33 +1073,30 @@ void Engine::initializeVulkan() {
     Buffers::createIndexBuffer(device, physicalDevice, graphicsCommandPool, graphicsQueue, indexBuffer, indexBufferMemory, mdlBus);
 
     // Generic
-    Buffers::createUniformBuffers(device, physicalDevice, uniformBuffers, uniformBuffersMemory, uniformBuffersMapped, MAX_FRAMES_IN_FLIGHT);
-    Buffers::createAtomicCounterBuffers(device, physicalDevice, atomicCounterBuffers, atomicCounterBuffersMemory, atomicCounterBuffersMapped, MAX_FRAMES_IN_FLIGHT);
+    Buffers::createGenericBuffers(device, physicalDevice, uniformConstants, uniformBuffers, uniformBuffersMemory, uniformBuffersMapped, MAX_FRAMES_IN_FLIGHT, sizeof(UniformBufferObject), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_2_SHADER_DEVICE_ADDRESS_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+    Buffers::createGenericBuffers(device, physicalDevice, uniformMatrixConstants, uniformMatrixBuffers, uniformMatrixBuffersMemory, uniformMatrixBuffersMapped, MAX_FRAMES_IN_FLIGHT, sizeof(UniformBufferObject), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_2_SHADER_DEVICE_ADDRESS_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+    Buffers::createGenericBuffers(device, physicalDevice, atomicCounterConstants, atomicCounterBuffers, atomicCounterBuffersMemory, atomicCounterBuffersMapped, MAX_FRAMES_IN_FLIGHT, sizeof(uint32_t), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_2_SHADER_DEVICE_ADDRESS_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
     // Matrices
-    Buffers::createModelBuffers(device, physicalDevice, modelBuffers, modelBuffersMemory, modelBuffersMapped, MAX_FRAMES_IN_FLIGHT, mdlBus);
-    Buffers::createModelDataBuffers(device, physicalDevice, modelDataBuffers, modelDataBuffersMemory, modelDataBuffersMapped, MAX_FRAMES_IN_FLIGHT, mdlBus);
+    Buffers::createGenericBuffers(device, physicalDevice, modelConstants, modelBuffers, modelBuffersMemory, modelBuffersMapped, MAX_FRAMES_IN_FLIGHT, mdlBus.getModelBufferSize(), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_2_SHADER_DEVICE_ADDRESS_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+    Buffers::createGenericBuffers(device, physicalDevice, modelDataConstants, modelDataBuffers, modelDataBuffersMemory, modelDataBuffersMapped, MAX_FRAMES_IN_FLIGHT, mdlBus.getModelDataBufferSize(), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_2_SHADER_DEVICE_ADDRESS_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
     // Culling
-    Buffers::createUniformBuffers(device, physicalDevice, uniformCullingBuffers, uniformCullingBuffersMemory, uniformCullingBuffersMapped, MAX_FRAMES_IN_FLIGHT);
-    Buffers::createVisibleIndicesBuffers(device, physicalDevice, visibleIndicesBuffers, visibleIndicesMemory, visibleIndicesMapped, MAX_FRAMES_IN_FLIGHT, mdlBus);
+    Buffers::createGenericBuffers(device, physicalDevice, uniformCullingConstants, uniformCullingBuffers, uniformCullingBuffersMemory, uniformCullingBuffersMapped, MAX_FRAMES_IN_FLIGHT, sizeof(UniformCullingBufferObject), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_2_SHADER_DEVICE_ADDRESS_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+    Buffers::createGenericBuffers(device, physicalDevice, visibleIndicesConstants, visibleIndicesBuffers, visibleIndicesMemory, visibleIndicesMapped, MAX_FRAMES_IN_FLIGHT, sizeof(uint32_t) * mdlBus.getTotalInstanceCount(), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_2_SHADER_DEVICE_ADDRESS_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
-    Buffers::createModelCullingBuffer(device, physicalDevice, modelCullingBuffer, modelCullingBufferMemory, modelCullingBufferMapped, MAX_FRAMES_IN_FLIGHT, mdlBus);
-    Buffers::createDrawCommandsBuffer(device, physicalDevice, drawCommandsBuffer, drawCommandsBufferMemory, mdlBus, drawCommandsBufferMapped, dc);
+    Buffers::createGenericBuffer(device, physicalDevice, modelCullingConstant, modelCullingBuffer, modelCullingBufferMemory, modelCullingBufferMapped, sizeof(CullingData) * mdlBus.getTotalInstanceCount(), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_2_SHADER_DEVICE_ADDRESS_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
-    Buffers::createGenericBuffer(device, physicalDevice, textureIndexBuffer, textureIndexMemory, textureIndexMapped, sizeof(uint32_t) * 4 * 128, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
-    Buffers::createGenericBuffer(device, physicalDevice, textureIndexOffsetBuffer, textureIndexOffsetMemory, textureIndexOffsetMapped, sizeof(uint32_t) * 128, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
+    updateDrawCommands(drawCommandsBufferMapped, dc, mdlBus);
+    Buffers::createGenericBuffer(device, physicalDevice, drawCommandsConstant, drawCommandsBuffer, drawCommandsBufferMemory, drawCommandsBufferMapped, sizeof(VkDrawIndexedIndirectCommand) * 1024, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_2_SHADER_DEVICE_ADDRESS_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+    memcpy(drawCommandsBufferMapped, dc.commands.data(), sizeof(VkDrawIndexedIndirectCommand) * dc.commands.size());
 
+    Buffers::createGenericBuffer(device, physicalDevice, textureIndexConstant, textureIndexBuffer, textureIndexMemory, textureIndexMapped, sizeof(uint32_t) * 4 * 128, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_2_SHADER_DEVICE_ADDRESS_BIT, VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
+    Buffers::createGenericBuffer(device, physicalDevice, textureIndexOffsetConstant, textureIndexOffsetBuffer, textureIndexOffsetMemory, textureIndexOffsetMapped, sizeof(uint32_t) * 128, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_2_SHADER_DEVICE_ADDRESS_BIT, VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
 
     // Descriptor
     Descriptor::createGraphicsDescriptorPool(device, MAX_FRAMES_IN_FLIGHT, graphicsDescriptorPool);
     Descriptor::createGraphicsDescriptorSets(device, MAX_FRAMES_IN_FLIGHT, graphicsDescriptorSetLayout, graphicsDescriptorPool, graphicsDescriptorSets, uniformBuffers, textureSampler, modelBuffers, visibleIndicesBuffers, mdlBus, textureImageView, textureIndexBuffer, textureIndexOffsetBuffer);
-
-    Descriptor::createMatrixComputeDescriptorPool(device, MAX_FRAMES_IN_FLIGHT, matrixComputeDescriptorPool);
-    Descriptor::createMatrixComputeDescriptorSets(device, MAX_FRAMES_IN_FLIGHT, matrixComputeDescriptorSetLayout, matrixComputeDescriptorPool, matrixComputeDescriptorSets, modelBuffers, mdlBus, modelDataBuffers);
-
-    Descriptor::createCullingComputeDescriptorPool(device, MAX_FRAMES_IN_FLIGHT, cullingComputeDescriptorPool);
-    Descriptor::createCullingComputeDescriptorSets(device, MAX_FRAMES_IN_FLIGHT, cullingComputeDescriptorSetLayout, cullingComputeDescriptorPool, cullingComputeDescriptorSets, mdlBus, drawCommandsBuffer, uniformCullingBuffers, visibleIndicesBuffers, modelCullingBuffer, atomicCounterBuffers);
 
     Descriptor::createPostprocessDescriptorPool(device, MAX_FRAMES_IN_FLIGHT, postprocessDescriptorPool);
     Descriptor::createPostprocessDescriptorSets(device, MAX_FRAMES_IN_FLIGHT, postprocessDescriptorSetLayout, postprocessDescriptorPool, postprocessDescriptorSets, offscreenImageViews, depthImageView, textureSampler, uniformPostprocessingBuffers);
