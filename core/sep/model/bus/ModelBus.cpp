@@ -109,7 +109,11 @@ VkDeviceSize ModelBus::getModelDataBufferSize() const {
 std::vector<uint32_t> ModelBus::getAllIndices() const {
     std::vector<uint32_t> indices{};
     for (const auto& model : std::views::transform(std::views::values(groups_map), &ModelGroup::model)) {
+#if __cpp_lib_containers_ranges >= 202202L
         indices.append_range(model->indices);
+#else
+        indices.insert(indices.end(), model->indices.begin(), model->indices.end());
+#endif
     }
 
     return indices;
@@ -128,7 +132,11 @@ std::vector<Vertex> ModelBus::getAllVertices() const {
 
     for (const auto& model : std::views::transform(std::views::values(groups_map), &ModelGroup::model)) {
         for (const auto& mesh: model->meshes) {
+            #if __cpp_lib_containers_ranges >= 202202L
             vertices.append_range(mesh);
+            #else
+            vertices.insert(vertices.end(), mesh.begin(), mesh.end());
+            #endif
         }
     }
 
@@ -141,7 +149,11 @@ std::vector<Vertex> ModelBus::getVertices(const std::string& file) const {
     if (const auto& it = groups_map.find(file); it != groups_map.end()) {
         const auto& meshes = it->second.model->meshes;
         std::for_each(meshes.begin(), meshes.end(), [&vertices](const auto& mesh) {
+            #if __cpp_lib_containers_ranges >= 202202L
             vertices.append_range(mesh);
+            #else
+            vertices.insert(vertices.end(), mesh.begin(), mesh.end());
+            #endif
         });
     }
 
