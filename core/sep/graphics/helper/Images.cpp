@@ -5,7 +5,7 @@
 #include "Images.hpp"
 
 #include <stdexcept>
-#include <stb/stb_image.h>
+#include <stb_image.h>
 
 #include "Buffers.hpp"
 #include "../command/Command.hpp"

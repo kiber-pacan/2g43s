@@ -4,7 +4,7 @@
 
 #ifndef INC_2G43S_TEXTURE_H
 #define INC_2G43S_TEXTURE_H
-#include <stb/stb_image.h>
+#include <stb_image.h>
 #include <vulkan/vulkan_core.h>
 
 struct Texture {

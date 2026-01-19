@@ -46,6 +46,8 @@ set(EXECUTABLE_NAME ${PROJECT_NAME})
 set(IMGUI_DIR ${imgui_SOURCE_DIR})
 set(STB_DIR ${stb_SOURCE_DIR})
 
+add_library(stb INTERFACE)
+target_include_directories(stb INTERFACE ${stb_SOURCE_DIR})
 
 add_executable(${EXECUTABLE_NAME}
         main.cpp
@@ -262,8 +264,8 @@ target_link_libraries(${EXECUTABLE_NAME} PUBLIC
         SDL3::SDL3
         glm::glm
         fastgltf::fastgltf
-        stb
         nlohmann_json::nlohmann_json
+        stb
 )
 
 target_link_libraries(${EXECUTABLE_NAME} PRIVATE

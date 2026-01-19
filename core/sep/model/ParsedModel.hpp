@@ -6,7 +6,7 @@
 #include "fastgltf/core.hpp"
 #include <glm/ext/quaternion_geometric.hpp>
 
-#include <stb/stb_image.h>
+#include <stb_image.h>
 #include "Texture.hpp"
 #include "primitives/Vertex.hpp"
 
