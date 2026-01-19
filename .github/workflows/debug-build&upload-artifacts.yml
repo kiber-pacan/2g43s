@@ -42,7 +42,7 @@ jobs:
             libxkbcommon-dev libdrm-dev libgbm-dev libgl1-mesa-dev libgles2-mesa-dev \
             libegl1-mesa-dev libdbus-1-dev libibus-1.0-dev libudev-dev libthai-dev \
             libpipewire-0.3-dev libwayland-dev libdecor-0-dev liburing-dev \
-            libglm-dev gcc-15 g++-15 libstdc++-15-dev libomp-21-dev
+            libglm-dev libgcc-15 libg++-15 libstdc++-15-dev libomp-21-dev
 
       - name: Set up Clang
         if: runner.os == 'Windows'
