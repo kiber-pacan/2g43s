@@ -167,7 +167,8 @@ void ParsedModel::calcOcclusionSphere() {
     #if __cpp_lib_containers_ranges >= 202202L
     vertices.append_range(std::views::join(meshes));
     #else
-    indices.insert(indices.end(), model->indices.begin(), model->indices.end());
+    auto vector = std::views::join(meshes);
+    vertices.insert(vertices.end(), vector.begin(), vector.end());
     #endif
 
 
