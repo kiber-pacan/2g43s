@@ -10,7 +10,6 @@
 
 #include "ModelBus.hpp"
 
-
 struct Descriptor {
     // Graphics
     static void createGraphicsDescriptorSetLayout(const VkDevice& device, VkDescriptorSetLayout& graphicsDescriptorSetLayout);

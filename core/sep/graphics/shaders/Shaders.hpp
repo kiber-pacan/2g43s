@@ -11,8 +11,6 @@
 #include <vulkan/vulkan_core.h>
 #include <filesystem>
 #include <stdexcept>
-#include "Tools.hpp"
-#include "Helper.hpp"
 #include <shaderc/shaderc.hpp>
 #include <nlohmann/json.hpp>
 

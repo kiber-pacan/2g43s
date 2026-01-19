@@ -4,6 +4,8 @@
 
 #include "Shaders.hpp"
 
+#include "Tools.hpp"
+
 VkShaderModule Shaders::createShaderModule(const std::vector<char>& code, const VkDevice& device) {
     VkShaderModuleCreateInfo createInfo{};
     createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;

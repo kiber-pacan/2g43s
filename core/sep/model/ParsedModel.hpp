@@ -8,7 +8,7 @@
 
 #include "stb_image.h"
 #include "Texture.hpp"
-#include "Vertex.hpp"
+#include "primitives/Vertex.hpp"
 
 class ParsedModel {
     public:

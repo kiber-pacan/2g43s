@@ -4,7 +4,7 @@
 #include <memory>
 #include <vector>
 
-#include "Logger.hpp"
+#include "util/Logger.hpp"
 #include "../ModelInstance.hpp"
 #include "../ParsedModel.hpp"
 #include "../../util/Random.hpp"

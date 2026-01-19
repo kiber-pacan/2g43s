@@ -247,7 +247,7 @@ void ModelBus::square(size_t count, const std::string& file, const double gap) {
 
 void ModelBus::loadModels() {
     const auto start1 = std::chrono::high_resolution_clock::now();
-    loadModels("/home/down1/2g43s/core/models/", "land2.glb");
+    loadModels("/home/down1/2g43s/core/models/", "land1.glb", "box.glb");
     const auto end1 = std::chrono::high_resolution_clock::now();
     const std::chrono::duration<double> duration1 = end1 - start1;
 
@@ -255,8 +255,8 @@ void ModelBus::loadModels() {
 
     const auto start = std::chrono::high_resolution_clock::now();
 
-    //randomVolume(1000000, "box.glb", -1000, 1000);
-    instance("land2.glb");
+    randomVolume(1000000, "box.glb", -1000, 1000);
+    instance("land1.glb", glm::vec4(0, 0, -4, 1));
 
     const auto end = std::chrono::high_resolution_clock::now();
     const std::chrono::duration<double> duration = end - start;

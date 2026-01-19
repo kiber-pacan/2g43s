@@ -25,13 +25,11 @@ void Engine::drawImGui(const VkCommandBuffer& commandBuffer) {
     ImVec2 pos = ImGui::GetWindowPos();
     ImVec2 size = ImGui::GetWindowSize();
 
-    // 2. Считаем границы, гарантируя, что max всегда >= min
     float minX = viewport->Pos.x;
     float minY = viewport->Pos.y;
     float maxX = std::max(minX, viewport->Pos.x + viewport->Size.x - size.x);
     float maxY = std::max(minY, viewport->Pos.y + viewport->Size.y - size.y);
 
-    // 3. Теперь зажимаем безопасно
     float clampedX = std::clamp(pos.x, minX, maxX);
     float clampedY = std::clamp(pos.y, minY, maxY);
 
@@ -48,7 +46,7 @@ void Engine::drawImGui(const VkCommandBuffer& commandBuffer) {
 
     int desiredFps = desiredFrameRate;
 
-    if (ImGui::BeginTable("fps_table", 2)) { // Таблица на 2 колонки
+    if (ImGui::BeginTable("fps_table", 2)) {
         ImGui::TableNextRow();
 
         const auto label = "Desired FPS";
