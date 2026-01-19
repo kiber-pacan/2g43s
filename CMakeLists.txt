@@ -18,6 +18,29 @@ FetchContent_Declare(
         GIT_REPOSITORY https://github.com/jrouwe/JoltPhysics.git
         GIT_TAG        master
 )
+FetchContent_Declare(
+        glm
+        GIT_REPOSITORY https://github.com/g-truc/glm.git
+        GIT_TAG        master
+)
+FetchContent_Declare(
+        fastgltf
+        GIT_REPOSITORY https://github.com/spnda/fastgltf.git
+        GIT_TAG        main
+)
+FetchContent_Declare(
+        nlohmann_json
+        GIT_REPOSITORY https://github.com/nlohmann/json.git
+        GIT_TAG        develop
+)
+FetchContent_Declare(
+        imgui
+        GIT_REPOSITORY https://github.com/ocornut/imgui.git
+        GIT_TAG        docking
+)
+
+FetchContent_MakeAvailable(JoltPhysics glm fastgltf nlohmann_json imgui)
+
 
 # Jolt settings
 set(INTERACTIVE_SAMPLES OFF CACHE BOOL "" FORCE)
@@ -25,9 +48,6 @@ set(SAMPLES OFF CACHE BOOL "" FORCE)
 set(UNIT_TESTS OFF CACHE BOOL "" FORCE)
 set(GENERATE_DEBUG_SYMBOLS ON CACHE BOOL "" FORCE)
 set(USE_SSE4_2 ON CACHE BOOL "" FORCE)
-
-FetchContent_MakeAvailable(JoltPhysics)
-
 
 
 # Declaring project
