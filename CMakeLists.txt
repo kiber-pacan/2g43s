@@ -11,6 +11,16 @@ else()
     set(CMAKE_CXX_EXTENSIONS off)
 endif()
 
+set(SHADERC_SKIP_TESTS ON CACHE BOOL "" FORCE)
+set(SHADERC_SKIP_EXAMPLES ON CACHE BOOL "" FORCE)
+set(SHADERC_SKIP_COPYRIGHT_CHECK ON CACHE BOOL "" FORCE)
+
+set(SPIRV_SKIP_TESTS ON CACHE BOOL "" FORCE)
+set(SPIRV_SKIP_EXECUTABLES ON CACHE BOOL "" FORCE)
+
+set(SKIP_GLSLANG_INSTALL ON CACHE BOOL "" FORCE)
+set(SKIP_SPIRV_TOOLS_INSTALL ON CACHE BOOL "" FORCE)
+
 # Jolt
 include(FetchContent)
 FetchContent_Declare(SDL3   GIT_REPOSITORY https://github.com/libsdl-org/SDL.git  GIT_TAG main)
@@ -23,8 +33,18 @@ FetchContent_Declare(nlohmann_json  GIT_REPOSITORY https://github.com/nlohmann/j
 FetchContent_Declare(imgui  GIT_REPOSITORY https://github.com/ocornut/imgui.git  GIT_TAG docking)
 FetchContent_Declare(stb GIT_REPOSITORY https://github.com/nothings/stb.git GIT_TAG master)
 
+# Spirv
+FetchContent_Declare(spirv_headers GIT_REPOSITORY https://github.com/KhronosGroup/SPIRV-Headers GIT_TAG main)
+FetchContent_Declare(spirv_tools GIT_REPOSITORY https://github.com/KhronosGroup/SPIRV-Tools GIT_TAG main)
+FetchContent_Declare(glslang GIT_REPOSITORY https://github.com/KhronosGroup/glslang GIT_TAG main)
 
-FetchContent_MakeAvailable(SDL3 JoltPhysics glm fastgltf nlohmann_json imgui stb spirv gmock shaderc)
+# Shaderc
+FetchContent_Declare(gmock GIT_REPOSITORY https://github.com/google/googletest GIT_TAG main)
+FetchContent_Declare(shaderc GIT_REPOSITORY https://github.com/google/shaderc GIT_TAG main)
+
+
+
+FetchContent_MakeAvailable(SDL3 JoltPhysics glm fastgltf nlohmann_json imgui stb spirv_headers spirv_tools glslang gmock shaderc)
 
 FetchContent_GetProperties(stb)
 if(NOT stb_POPULATED)
@@ -202,33 +222,33 @@ string(STRIP "${MACHINE_ID}" MACHINE_ID)
 message(STATUS "Hardware ID: ${MACHINE_ID}")
 if(NOT MSVC AND ${MACHINE_ID} EQUAL "fe6032524c88414fb6b688ad7002a3b4")
     add_compile_options(
-        -stdlib=libc++ -std=c++2c -O3 -march=native -mtune=native
-        -ffast-math -fno-math-errno -fno-trapping-math -fassociative-math -freciprocal-math
-        -fno-signed-zeros -fno-rounding-math
-        -fopenmp -flto=full -fsplit-lto-unit
-        -fstrict-aliasing -fstrict-vtable-pointers -fwhole-program-vtables
-        -fno-semantic-interposition -fvisibility=hidden -fvisibility-inlines-hidden
-        -funroll-loops -fvectorize -fslp-vectorize
-        -fno-stack-protector -fno-stack-check -fno-plt
-        -fno-exceptions -fno-rtti -fno-ident
-        -fomit-frame-pointer -fmerge-all-constants
-        -fplugin=LLVMPolly.so
-        -mllvm -polly
-        -mllvm -polly-parallel
-        -mllvm -polly-vectorizer=stripmine
-        -mllvm -polly-invariant-load-hoisting
-        -mllvm -polly-run-dce
-        -mllvm -polly-check-parallel
-        -mllvm --polly-on-isl-error-abort=false
-        -mllvm -inline-threshold=2000
-        -mllvm -unroll-threshold=1000
-        -DNDEBUG)
+            -stdlib=libc++ -std=c++2c -O3 -march=native -mtune=native
+            -ffast-math -fno-math-errno -fno-trapping-math -fassociative-math -freciprocal-math
+            -fno-signed-zeros -fno-rounding-math
+            -fopenmp -flto=full -fsplit-lto-unit
+            -fstrict-aliasing -fstrict-vtable-pointers -fwhole-program-vtables
+            -fno-semantic-interposition -fvisibility=hidden -fvisibility-inlines-hidden
+            -funroll-loops -fvectorize -fslp-vectorize
+            -fno-stack-protector -fno-stack-check -fno-plt
+            -fno-exceptions -fno-rtti -fno-ident
+            -fomit-frame-pointer -fmerge-all-constants
+            -fplugin=LLVMPolly.so
+            -mllvm -polly
+            -mllvm -polly-parallel
+            -mllvm -polly-vectorizer=stripmine
+            -mllvm -polly-invariant-load-hoisting
+            -mllvm -polly-run-dce
+            -mllvm -polly-check-parallel
+            -mllvm --polly-on-isl-error-abort=false
+            -mllvm -inline-threshold=2000
+            -mllvm -unroll-threshold=1000
+            -DNDEBUG)
 
     add_link_options(
-        -fopenmp -flto=full -fuse-ld=mold
-        -Wl,-O3 -Wl,--gc-sections -Wl,--icf=all
-        -Wl,-Bsymbolic -Wl,-Bsymbolic-functions
-        -Wl,--strip-all -Wl,--as-needed)
+            -fopenmp -flto=full -fuse-ld=mold
+            -Wl,-O3 -Wl,--gc-sections -Wl,--icf=all
+            -Wl,-Bsymbolic -Wl,-Bsymbolic-functions
+            -Wl,--strip-all -Wl,--as-needed)
 else()
     add_compile_options(-stdlib=libc++ -std=c++2c -O3 -fopenmp -fexperimental-library )
     add_link_options(-fopenmp)
@@ -266,18 +286,18 @@ endif()
 
 target_link_libraries(${EXECUTABLE_NAME} PUBLIC
         ${Vulkan_LIBRARIES}
-        SDL3::SDL3
-        glm::glm
-        fastgltf::fastgltf
-        nlohmann_json::nlohmann_json
+        SPIRV-Headers SPIRV-Tools glslang
+        gmock shaderc
+        pthread
+        SDL3
+        glm
+        fastgltf
+        nlohmann_json
         stb
 )
 
 target_link_libraries(${EXECUTABLE_NAME} PRIVATE
-        shaderc_combined
-        ${GLSLANG_LIB}
-        ${SPIRV_TOOLS_OPT_LIB}
-        ${SPIRV_TOOLS_LIB}
+
 )
 target_compile_definitions(${EXECUTABLE_NAME} PUBLIC SDL_MAIN_USE_CALLBACKS)
 
