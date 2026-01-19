@@ -18,10 +18,12 @@ jobs:
         build_type: [Release]
         cpp_compiler: [clang++-21]
         include:
-          - os: windows-latest
-            cpp_compiler: clang++-21
           - os: ubuntu-latest
+            c_compiler: clang-21
             cpp_compiler: clang++-21
+          - os: windows-latest
+            c_compiler: clang
+            cpp_compiler: clang++
 
     steps:
       - uses: actions/checkout@v4
@@ -69,6 +71,7 @@ jobs:
       - name: Configure CMake
         run: >
           cmake -B build
+          -DCMAKE_C_COMPILER=${{ matrix.c_compiler }}
           -DCMAKE_CXX_COMPILER=${{ matrix.cpp_compiler }}
           -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
           -DINTERACTIVE_SAMPLES=OFF
