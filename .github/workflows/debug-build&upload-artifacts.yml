@@ -34,34 +34,41 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libx11-dev libxcursor-dev libxinerama-dev libxrandr-dev libxi-dev libwayland-dev libxkbcommon-dev
+          sudo apt-get install -y libx11-dev libxcursor-dev libxinerama-dev libxrandr-dev libxi-dev libwayland-dev libxkbcommon-dev libx11-xcb-dev
 
       - name: Setup SDL
         uses: libsdl-org/setup-sdl@main
         with:
           version: 3-head
 
-      - name: Setup Vulkan API
-        uses: humbletim/setup-vulkan-sdk@v1.2.0
+      - name: Setup Vulkan SDK
+        uses: lukka/get-cmake@latest
+
+      - name: Install Vulkan SDK
+        uses: humbletim/setup-vulkan-sdk@v1.5.0
         with:
           vulkan-query-version: 1.3.204.0
           vulkan-components: Vulkan-Headers, Vulkan-Loader
           vulkan-use-cache: true
 
       - name: Configure CMake
+        # Добавляем -DINTERACTIVE_SAMPLES=OFF
         run: >
           cmake -B build
           -DCMAKE_CXX_COMPILER=${{ matrix.cpp_compiler }}
           -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
+          -DINTERACTIVE_SAMPLES=OFF
+          -DUNIT_TESTS=OFF
           -S .
 
       - name: Build
-        run: cmake --build build --config ${{ matrix.build_type }}
+        run: cmake --build build --config ${{ matrix.build_type }} --parallel
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: build-${{ matrix.os }}
+          name: build-${{ matrix.os }}-${{ matrix.cpp_compiler }}
           path: |
             build/2g43s
             build/${{ matrix.build_type }}/2g43s.exe
+            build/*.exe
