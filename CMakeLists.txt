@@ -44,10 +44,14 @@ project(2g43s)
 set(EXECUTABLE_NAME ${PROJECT_NAME})
 
 set(IMGUI_DIR ${imgui_SOURCE_DIR})
-set(STB_DIR ${stb_SOURCE_DIR})
 
 add_library(stb INTERFACE)
 target_include_directories(stb INTERFACE ${stb_SOURCE_DIR})
+
+if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    add_compile_options(-stdlib=libc++)
+    add_link_options(-stdlib=libc++)
+endif()
 
 add_executable(${EXECUTABLE_NAME}
         main.cpp
