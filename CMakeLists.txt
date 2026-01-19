@@ -199,35 +199,37 @@ execute_process(COMMAND cat /etc/machine-id OUTPUT_VARIABLE MACHINE_ID)
 string(STRIP "${MACHINE_ID}" MACHINE_ID)
 message(STATUS "Hardware ID: ${MACHINE_ID}")
 if(NOT MSVC AND ${MACHINE_ID} EQUAL "fe6032524c88414fb6b688ad7002a3b4")
-    set(CMAKE_CXX_FLAGS_RELEASE " \
-        -O3 -march=native -mtune=native \
-        -ffast-math -fno-math-errno -fno-trapping-math -fassociative-math -freciprocal-math \
-        -fno-signed-zeros -fno-rounding-math \
-        -fopenmp -flto=full -fsplit-lto-unit \
-        -fstrict-aliasing -fstrict-vtable-pointers -fwhole-program-vtables \
-        -fno-semantic-interposition -fvisibility=hidden -fvisibility-inlines-hidden \
-        -funroll-loops -fvectorize -fslp-vectorize \
-        -fno-stack-protector -fno-stack-check -fno-plt \
-        -fno-exceptions -fno-rtti -fno-ident \
-        -fomit-frame-pointer -fmerge-all-constants \
-        -fplugin=LLVMPolly.so \
-        -mllvm -polly \
-        -mllvm -polly-parallel \
-        -mllvm -polly-vectorizer=stripmine \
-        -mllvm -polly-invariant-load-hoisting \
-        -mllvm -polly-run-dce \
-        -mllvm -polly-check-parallel \
-        -mllvm --polly-on-isl-error-abort=false \
-        -mllvm -inline-threshold=2000 \
-        -mllvm -unroll-threshold=1000 \
-        -DNDEBUG")
+    add_compile_options(
+        -O3 -march=native -mtune=native
+        -ffast-math -fno-math-errno -fno-trapping-math -fassociative-math -freciprocal-math
+        -fno-signed-zeros -fno-rounding-math
+        -fopenmp -flto=full -fsplit-lto-unit
+        -fstrict-aliasing -fstrict-vtable-pointers -fwhole-program-vtables
+        -fno-semantic-interposition -fvisibility=hidden -fvisibility-inlines-hidden
+        -funroll-loops -fvectorize -fslp-vectorize
+        -fno-stack-protector -fno-stack-check -fno-plt
+        -fno-exceptions -fno-rtti -fno-ident
+        -fomit-frame-pointer -fmerge-all-constants
+        -fplugin=LLVMPolly.so
+        -mllvm -polly
+        -mllvm -polly-parallel
+        -mllvm -polly-vectorizer=stripmine
+        -mllvm -polly-invariant-load-hoisting
+        -mllvm -polly-run-dce
+        -mllvm -polly-check-parallel
+        -mllvm --polly-on-isl-error-abort=false
+        -mllvm -inline-threshold=2000
+        -mllvm -unroll-threshold=1000
+        -DNDEBUG)
 
-    set(CMAKE_EXE_LINKER_FLAGS_RELEASE " \
-        -fopenmp -flto=full -fuse-ld=mold \
-        -Wl,-O3 -Wl,--gc-sections -Wl,--icf=all \
-        -Wl,-Bsymbolic -Wl,-Bsymbolic-functions \
-        -Wl,--strip-all -Wl,--as-needed")
-    #
+    add_link_options(
+        -fopenmp -flto=full -fuse-ld=mold
+        -Wl,-O3 -Wl,--gc-sections -Wl,--icf=all
+        -Wl,-Bsymbolic -Wl,-Bsymbolic-functions
+        -Wl,--strip-all -Wl,--as-needed)
+else()
+    add_compile_options(-O3 -fopenmp -fexperimental-library)
+    add_link_options(-fopenmp)
 endif()
 
 # Adding sources to project
