@@ -2,10 +2,14 @@
 cmake_minimum_required(VERSION 3.28)
 
 # Setting c++ 26 standard
-set(CMAKE_CXX_STANDARD 26)
-set(DCMAKE_CXX_STANDARD 26)
-set(CMAKE_CXX_STANDARD_REQUIRED on)
-set(CMAKE_CXX_EXTENSIONS off)
+if(MSVC)
+    add_compile_options(/std:c++latest /Zc:__cplusplus /utf-8)
+else()
+    set(CMAKE_CXX_STANDARD 26)
+    set(DCMAKE_CXX_STANDARD 26)
+    set(CMAKE_CXX_STANDARD_REQUIRED on)
+    set(CMAKE_CXX_EXTENSIONS off)
+endif()
 
 # Jolt
 include(FetchContent)
