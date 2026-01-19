@@ -262,6 +262,7 @@ target_link_libraries(${EXECUTABLE_NAME} PUBLIC
         SDL3::SDL3
         glm::glm
         fastgltf::fastgltf
+        stb
         nlohmann_json::nlohmann_json
 )
 
