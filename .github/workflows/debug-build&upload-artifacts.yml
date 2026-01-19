@@ -26,20 +26,25 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Clang 21 & Bleeding Edge Deps
+      - name: Dependencies (Linux)
         if: runner.os == 'Linux'
         run: |
-          wget https://apt.llvm.org/llvm.sh
-          chmod +x llvm.sh
-          sudo ./llvm.sh 21
           sudo apt-get update
           sudo apt-get install -y \
-            clang-21 lld-21 llvm-21-dev libpolly-21-dev \
-            libomp-dev \
-            libx11-dev libxcursor-dev libxinerama-dev libxrandr-dev \
-            libxi-dev libwayland-dev libxkbcommon-dev libx11-xcb-dev \
-            libxss-dev libasound2-dev libpulse-dev libdbus-1-dev \
-            libpipewire-0.3-dev libjack-dev libsndio-dev libudev-dev
+            build-essential git make \
+            pkg-config cmake ninja-build gnome-desktop-testing libasound2-dev libpulse-dev \
+            libaudio-dev libfribidi-dev libjack-dev libsndio-dev libx11-dev libxext-dev \
+            libxrandr-dev libxcursor-dev libxfixes-dev libxi-dev libxss-dev libxtst-dev \
+            libxkbcommon-dev libdrm-dev libgbm-dev libgl1-mesa-dev libgles2-mesa-dev \
+            libegl1-mesa-dev libdbus-1-dev libibus-1.0-dev libudev-dev libthai-dev \
+            libpipewire-0.3-dev libwayland-dev libdecor-0-dev liburing-dev \
+            libglm-dev libomp-dev
+
+      - name: Set up Clang
+        uses: egor-tensin/setup-clang@v2
+        with:
+          version: latest
+          platform: x64
 
       - name: Setup SDL
         uses: libsdl-org/setup-sdl@main

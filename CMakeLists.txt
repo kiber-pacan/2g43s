@@ -225,15 +225,16 @@ set(VULKAN_SDK_PATH $ENV{VULKAN_SDK})
 
 target_include_directories(${PROJECT_NAME} PRIVATE "${VULKAN_SDK_PATH}/include")
 
-
-
-
 include_directories("libs/stb")
 
+if(NOT MSVC AND CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    target_compile_options(${EXECUTABLE_NAME} PRIVATE "-fopenmp=libomp")
+    target_link_libraries(${EXECUTABLE_NAME} PRIVATE "omp")
 
-find_package(OpenMP REQUIRED)
-if(OpenMP_CXX_FOUND)
-    target_link_libraries(${EXECUTABLE_NAME} PRIVATE OpenMP::OpenMP_CXX)
+    message(STATUS "Clang 21: OpenMP forced via libomp")
+else()
+    find_package(OpenMP REQUIRED)
+    target_link_libraries(${EXECUTABLE_NAME} PUBLIC OpenMP::OpenMP_CXX)
 endif()
 
 # Finding Vulkan API and adding it to project
