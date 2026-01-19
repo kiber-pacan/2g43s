@@ -246,7 +246,7 @@ endif()
 
 target_link_libraries(${EXECUTABLE_NAME} PUBLIC
         ${Vulkan_LIBRARIES}
-        Jolt
+
         SDL3::SDL3
         glm::glm
         fastgltf::fastgltf
