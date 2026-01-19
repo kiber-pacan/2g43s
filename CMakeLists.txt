@@ -25,6 +25,7 @@ set(USE_SSE4_2 ON CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(JoltPhysics)
 
 
+
 # Declaring project
 project(2g43s)
 set(EXECUTABLE_NAME ${PROJECT_NAME})

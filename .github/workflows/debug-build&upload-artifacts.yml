@@ -40,6 +40,7 @@ jobs:
         uses: libsdl-org/setup-sdl@main
         with:
           version: 3-latest
+          cmake-arguments: -DSDL_X11_XSCRNSAVER=OFF
 
       - name: Setup Vulkan SDK
         uses: lukka/get-cmake@latest
