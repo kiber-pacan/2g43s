@@ -195,7 +195,6 @@ if(NOT MSVC)
         -fno-stack-protector -fno-stack-check -fno-plt \
         -fno-exceptions -fno-rtti -fno-ident \
         -fomit-frame-pointer -fmerge-all-constants \
-        -fplugin=LLVMPolly.so \
         -mllvm -polly \
         -mllvm -polly-parallel \
         -mllvm -polly-vectorizer=stripmine \
