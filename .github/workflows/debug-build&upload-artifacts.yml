@@ -63,13 +63,24 @@ jobs:
           stripdown: true
 
       - name: Configure CMake
-        run: >
-          cmake -B build
-          -DCMAKE_CXX_COMPILER=${{ matrix.cpp_compiler }}
-          -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
-          -DINTERACTIVE_SAMPLES=OFF
-          -DUNIT_TESTS=OFF
-          -S .
+        shell: bash
+        run: |
+          if [ "${{ runner.os }}" == "Linux" ]; then
+            export CC=clang-21
+            export CXX=clang++-21
+          else
+            export CC=clang
+            export CXX=clang++
+          fi
+          
+          cmake -B build \
+            -DCMAKE_C_COMPILER=$CC \
+            -DCMAKE_CXX_COMPILER=$CXX \
+            -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
+            -DSDL_X11_XSCRNSAVER=OFF \
+            -DINTERACTIVE_SAMPLES=OFF \
+            -DUNIT_TESTS=OFF \
+            -S .
 
       - name: Build
         run: cmake --build build --config ${{ matrix.build_type }} --parallel
@@ -77,7 +88,7 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: build-${{ matrix.os }}-${{ matrix.cpp_compiler }}
+          name: build-${{ matrix.os }}-clang-21
           path: |
             build/2g43s
             build/Release/2g43s.exe
