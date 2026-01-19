@@ -31,16 +31,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Clang 19 & Dependencies (Linux)
+      - name: Install Clang 21 & Dependencies (Linux)
         if: runner.os == 'Linux'
         run: |
-          # Установка свежего Clang 19 для C++26
           wget https://apt.llvm.org/llvm.sh
           chmod +x llvm.sh
-          sudo ./llvm.sh 19
+          sudo ./llvm.sh 21
           sudo apt-get update
           sudo apt-get install -y \
-            clang-19 libpolly-19-dev \
+            clang-21 libpolly-21-dev \
             build-essential git make \
             pkg-config cmake ninja-build gnome-desktop-testing libasound2-dev libpulse-dev \
             libaudio-dev libfribidi-dev libjack-dev libsndio-dev libx11-dev libxext-dev \
