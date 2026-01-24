@@ -3,6 +3,8 @@
 
 #include "Engine.hpp"
 
+#include "Random.hpp"
+
 #pragma region Main
 // Method for initializing and running engine
 void Engine::init(SDL_Window* window) {
@@ -392,6 +394,8 @@ void Engine::recordCommandBuffer(uint32_t imageIndex, VkPipeline postprocessPipe
 void Engine::drawFrame() {
     vkWaitForFences(device, 1, &inFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
 
+
+
     uint32_t imageIndex;
     VkResult result = vkAcquireNextImageKHR(device, swapchain, UINT64_MAX, imageAvailableSemaphores[currentFrame], VK_NULL_HANDLE, &imageIndex);
 
@@ -696,6 +700,27 @@ void Engine::updateModelBuffer(const std::vector<void*>& modelBuffersMapped, Mod
     }
 }
 
+void Engine::updateSingleModel(const uint32_t index, glm::mat4 matrix) {
+    const auto scale = mdlBus.groups_map["box_opt.glb"].instances[0].scl;
+    matrix[0] = glm::normalize(matrix[0]) * scale.x;
+    matrix[1] = glm::normalize(matrix[1]) * scale.y;
+    matrix[2] = glm::normalize(matrix[2]) * scale.z;
+    mbo.models[index] = matrix;
+    mcbo.cullingDatas[index].sphere = mdlBus.groups_map["box_opt.glb"].model->sphere + glm::vec4(matrix[3]);
+
+    const size_t matOffset = index * sizeof(glm::mat4);
+    const size_t sphereOffset = index * sizeof(CullingData);
+
+    for (void* mappedPtr : modelBuffersMapped) {
+        void* targetAddress = static_cast<char*>(mappedPtr) + matOffset;
+
+        memcpy(targetAddress, &matrix, sizeof(glm::mat4));
+    }
+
+    void* targetAddress = static_cast<char*>(modelCullingBufferMapped) + sphereOffset;
+    memcpy(targetAddress, &mcbo.cullingDatas[index], sizeof(CullingData));
+}
+
 
 // Culling
 void Engine::updateModelCullingBuffer(void*& modelCullingBufferMapped, ModelCullingBufferObject& mcbo, const ModelBus& mdlBus) {
@@ -708,7 +733,11 @@ void Engine::updateModelCullingBuffer(void*& modelCullingBufferMapped, ModelCull
         uint16_t index = 0;
         for (const auto& group : std::views::transform(std::views::values(mdlBus.groups_map), &ModelGroup::instances)) {
             for (const auto& instance : group) {
-                mcbo.cullingDatas.emplace_back(instance.sfr, index);
+                glm::vec4 sphere = instance.mdl.lock()->sphere + instance.pos;
+                sphere.w *= glm::compMax(instance.scl);
+                mcbo.cullingDatas.emplace_back(sphere, index);
+
+                std::cout << index << ": " << sphere.x << " " << sphere.y << " " << sphere.z << " " << sphere.w << std::endl;
             }
 
             index++;
@@ -1060,8 +1089,8 @@ void Engine::initializeVulkan() {
     Command::createCommandPool(device, physicalDevice, graphicsCommandPool, surface);
     Helper::createDepthResources(device, physicalDevice, depthImage, depthImageMemory, depthImageView, swapchainExtent);
 
-    Images::createTextureImage(device, graphicsCommandPool, graphicsQueue, physicalDevice, stagingBuffer, stagingBufferMemory, textureImage, textureImageMemory);
-    Images::createTextureImageView(device, textureImage, textureImageView);
+    Images::createTextureImage(device, graphicsCommandPool, graphicsQueue, physicalDevice, stagingBuffer, stagingBufferMemory, textureImage, textureImageMemory, "/home/down1/2g43s/core/textures/missingno.ktx2", VK_FORMAT_BC7_UNORM_BLOCK);
+    Images::createTextureImageView(device, textureImage, textureImageView, VK_FORMAT_BC7_UNORM_BLOCK);
     Images::createTextureSampler(device, physicalDevice, textureSampler);
 
     mdlBus.loadModels();
