@@ -8,11 +8,7 @@
 #include <stdexcept>
 #include <vector>
 #include <vulkan/vulkan_core.h>
-
-#include "Engine.hpp"
-#include "model/bus/ModelBus.hpp"
-#include "util/Color.hpp"
-#include "util/Queue.hpp"
+#include "Queue.hpp"
 
 
 struct Command {

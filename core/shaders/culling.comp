@@ -66,8 +66,9 @@ bool isSphereInFrustum(vec4 sphere, vec4 f[6]) {
     float radius = sphere.w;
     for (int i = 0; i < 6; ++i) {
         float dist = dot(f[i].xyz, center) + f[i].w;
-        if (dist < -radius) return false;
+        //if (dist < -radius) return false;
     }
+
     return true;
 }
 

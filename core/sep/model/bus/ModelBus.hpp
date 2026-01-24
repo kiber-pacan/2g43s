@@ -1,13 +1,16 @@
 #ifndef INC_2G43S_MODELBUS_HPP
 #define INC_2G43S_MODELBUS_HPP
+
 #include <map>
 #include <memory>
 #include <vector>
+#include <ranges>
 
-#include "util/Logger.hpp"
-#include "../ModelInstance.hpp"
-#include "../ParsedModel.hpp"
-#include "../../util/Random.hpp"
+#include "ModelInstance.hpp"
+#include "ParsedModel.hpp"
+#include "../../images/Images.hpp"
+#include "Random.hpp"
+
 
 struct ModelGroup {
     std::shared_ptr<ParsedModel> model{};
@@ -21,7 +24,7 @@ struct ModelGroup {
 };
 
 struct ModelBus {
-    ModelBus();
+    ModelBus() = default;
 
     #pragma region Variables
     constexpr static uint32_t MAX_MODELS = 4294967295;

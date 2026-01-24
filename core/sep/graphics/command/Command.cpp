@@ -4,8 +4,6 @@
 
 #include "Command.hpp"
 
-#include "Barrier.h"
-
 void Command::createCommandPool(const VkDevice& device, VkPhysicalDevice& physicalDevice, VkCommandPool& commandPool, VkSurfaceKHR& surface) {
     auto [graphicsFamily, presentFamily] = Queue::findQueueFamilies(physicalDevice, surface);
 

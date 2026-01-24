@@ -1,14 +1,4 @@
-#include <memory>
-#include <vector>
-
 #include "ModelBus.hpp"
-
-#include <ranges>
-
-#include "Images.hpp"
-
-ModelBus::ModelBus() : LOGGER(Logger("ModelBus")) {
-}
 
 
 #pragma region parsedModels
@@ -24,7 +14,7 @@ void ModelBus::loadModelTextures(const VkDevice& device, const VkCommandPool& co
     for (const auto& model : std::views::transform(groups_map | std::views::values, &ModelGroup::model)) {
         for (auto & texture : model->textures) {
             Images::createTextureImage(device, commandPool, graphicsQueue, physicalDevice, stagingBuffer, stagingBufferMemory, texture);
-            Images::createTextureImageView(device, texture.textureImage, texture.textureImageView);
+            Images::createTextureImageView(device, texture.textureImage, texture.textureImageView, VK_FORMAT_BC7_UNORM_BLOCK);
 
             texture.index = globalIndex;
             globalIndex++;
@@ -236,7 +226,7 @@ void ModelBus::randomVolume(size_t count, const std::string& file, const glm::ve
 
     #pragma omp parallel for schedule(static) default(none) shared(count, group, min, max)
     for (int x = 0; x < count; ++x) {
-        const glm::vec4 pos(Random::randomNum_T(min.x, max.x), Random::randomNum_T(min.y, max.y), Random::randomNum_T(min.y, max.z), 0);
+        const glm::vec4 pos(Random::randomNum_T(min.x, max.x), Random::randomNum_T(min.y, max.y), Random::randomNum_T(min.z, max.z), 0);
 
         group.instances[x] = ModelInstance(group.model, pos);
 
@@ -259,7 +249,7 @@ void ModelBus::square(size_t count, const std::string& file, const double gap) {
 
 void ModelBus::loadModels() {
     const auto start1 = std::chrono::high_resolution_clock::now();
-    loadModels("/home/down1/2g43s/core/models/", "land1.glb", "box.glb");
+    loadModels("/home/down1/2g43s/core/models/", "box_opt.glb", "land2_opt.glb");
     const auto end1 = std::chrono::high_resolution_clock::now();
     const std::chrono::duration<double> duration1 = end1 - start1;
 
@@ -267,8 +257,10 @@ void ModelBus::loadModels() {
 
     const auto start = std::chrono::high_resolution_clock::now();
 
-    randomVolume(1000000, "box.glb", -1000, 1000);
-    instance("land1.glb", glm::vec4(0, 0, -4, 1));
+    //square(10, "box_opt.glb", 2);
+    //instance("box_opt.glb", glm::vec4(0.0, 0.0, -1.0, 1.0));
+    //instance("box_opt.glb", glm::vec4(0.0, 0.0, -1.0, 1.0), glm::vec4(0, 0, 0, 1), glm::vec4(100.0, 100.0, 1.0, 1.0));
+    instance("land2_opt.glb");
 
     const auto end = std::chrono::high_resolution_clock::now();
     const std::chrono::duration<double> duration = end - start;

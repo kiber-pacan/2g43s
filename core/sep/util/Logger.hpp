@@ -5,6 +5,7 @@
 #include <iostream>
 
 #include "Color.hpp"
+#include <sstream>
 
 // Just look at names of class and file...
 class Logger {
@@ -31,19 +32,15 @@ public:
     // Main method for logging
     template<typename T, typename T1>
     void info(T1 str, T value, auto... args) {
-        start(severity::LOG);
-
         if constexpr (std::is_arithmetic_v<T1>)
-            log(std::to_string(str), value, args...);
+            log(severity::LOG, std::to_string(str), value, args...);
         else
-            log(str, value, args...);
+            log(severity::LOG, str, value, args...);
     }
 
     template<typename T1>
     void info(T1 str) {
-        start(severity::LOG);
-
-        log(str);
+        log(severity::LOG, str);
     }
     #pragma endregion
 
@@ -51,19 +48,15 @@ public:
     #pragma region warn
     template<typename T, typename T1>
     void warn(T1 str, T value, auto... args) {
-        start(severity::WARNING);
-
         if constexpr (std::is_arithmetic_v<T1>)
-            log(std::to_string(str), value, args...);
+            log(severity::WARNING, std::to_string(str), value, args...);
         else
-            log(str, value, args...);
+            log(severity::WARNING, str, value, args...);
     }
 
     template<typename T1>
     void warn(T1 str) {
-        start(severity::WARNING);
-
-        log(str);
+        log(severity::WARNING, str);
     }
     #pragma endregion
 
@@ -71,19 +64,15 @@ public:
     #pragma region error
     template<typename T, typename T1>
     void error(T1 str, T value, auto... args) {
-        start(severity::ERROR);
-
         if constexpr (std::is_arithmetic_v<T1>)
-            log(std::to_string(str), value, args...);
+            log(severity::ERROR,std::to_string(str), value, args...);
         else
-            log(str, value, args...);
+            log(severity::ERROR,str, value, args...);
     }
 
     template<typename T1>
     void error(T1 str) {
-        start(severity::ERROR);
-
-        log(str);
+        log(severity::ERROR, str);
     }
     #pragma endregion
 
@@ -91,78 +80,86 @@ public:
     #pragma region success
     template<typename T, typename T1>
     void success(T1 str, T value, auto... args) {
-        start(severity::SUCCESS);
-
         if constexpr (std::is_arithmetic_v<T1>)
-            log(std::to_string(str), value, args...);
+            log(severity::SUCCESS, std::to_string(str), value, args...);
         else
-            log(str, value, args...);
+            log(severity::SUCCESS, str, value, args...);
     }
 
     template<typename T1>
     void success(T1 str) {
-        start(severity::SUCCESS);
-
-        log(str);
+        log(severity::SUCCESS, str);
     }
     #pragma endregion
 
 private:
     // Stub methods
     template<typename T, typename T1>
-    void log(T1 str, T value, auto... args) {
-        // Printing
-        tempLog(str, value, args...);
+    void log(const Color& color, T1 str, T value, auto... args) {
+        std::stringstream ss{};
 
-        // Reset coloring
-        std::cout << "\033[0m" << std::endl;
+        start(ss, color); // Set formatting
+
+        buildString(ss, str, value, args...); // Replace ${}
+
+        end(ss); // Reset coloring and start from new line
+
+        // Print string
+        std::cout << ss.str();
+        std::cout.flush();
     }
 
-    template<typename T1>
-    void log(T1 str) {
-        // Printing
-        std::cout << str;
+    template<typename T>
+    void log(const Color& color, T str) {
+        std::stringstream ss{};
 
-        // Reset coloring
-        std::cout << "\033[0m" << std::endl;
+        start(ss, color);  // Set formatting
+        ss << str;
+        end(ss); // Reset coloring and start from new line
+
+        // Print string
+        std::cout << ss.str();
+        std::cout.flush();
     }
 
+    // Stub fella
+    void buildString(std::stringstream& ss, const char* str) {}
 
-
-    // Stub method for recursion
-    static void tempLog(const std::string& str) {
-        std::cout << "";
-    }
 
     // Method just for printing messages
     template<typename T>
-    void tempLog(const char* str, T value, auto... args) {
-        /*
-         *Basically erasing and printing char by char,
-         *also replacing $ with value and then doing recursion with value as args[0]
-        */
+    void buildString(std::stringstream& ss, const char* str, T value, auto... args) {
+        // Basically adding to ss char by char,
         for (; *str != '\0'; str++) {
+            // Also replacing ${} with value and then doing recursion with value as args[0]
             if (str[0] == '$' && str[1] == '{' && str[2] == '}') {
-                str += 3;
+                str += 3; // Skipping length of ${} aka 3, so the next char is after ${} construction
 
-                std::cout << value;
+                ss << value;
 
-                tempLog(str, args...);
-
-                return;
+                // Preventing from recursing with empty args and the end of str
+                if (sizeof...(args) > 0 || *str == '\0') {
+                    buildString(ss, str, args...);
+                    return;
+                }
             }
-            std::cout << *str;
+
+            ss << *str;
         }
     }
 
-    // Start of log (Color and name)
-    void start(Color color) {
-        std::cout
-        << "\033[38;2;"
-        << color.r << ";"
-        << color.g << ";"
-        << color.b << "m"
+    // Start of ss (Color and name)
+    void start(std::stringstream& ss, const Color& color) const {
+        ss << "\033[38;2;"
+        << static_cast<int>(color.r) << ";"
+        << static_cast<int>(color.g) << ";"
+        << static_cast<int>(color.b) << "m"
         << name << ": ";
+    }
+
+    // Resets coloring and starts from new line
+    void end(std::stringstream& ss) {
+        ss << "\033[0m\n";
     }
 };
 

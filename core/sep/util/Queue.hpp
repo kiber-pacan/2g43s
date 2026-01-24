@@ -1,7 +1,7 @@
 #ifndef QUEUE_H
 #define QUEUE_H
 
-#include <vulkan/vulkan.h>
+#include <vulkan/vulkan_core.h>
 #include <optional>
 
 //Queue families

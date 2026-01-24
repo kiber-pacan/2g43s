@@ -4,12 +4,11 @@
 
 #include "Images.hpp"
 
-#include <stdexcept>
-#include <stb_image.h>
+#include <cstring>
+#include <fstream>
 
-#include "Buffers.hpp"
-#include "../command/Command.hpp"
-#include "Helper.hpp"
+#include "basisu_transcoder.h"
+#include "Logger.hpp"
 
 void Images::createImage(const VkDevice& device, const VkPhysicalDevice& physicalDevice, const uint32_t width, const uint32_t height, const VkFormat format, const VkImageTiling tiling, const VkImageUsageFlags usage, const VkMemoryPropertyFlags properties, VkImage& image, VkDeviceMemory& imageMemory) {
     VkImageCreateInfo imageInfo{};
@@ -67,28 +66,60 @@ VkImageView Images::createImageView(const VkDevice& device, const VkImage& image
 }
 
 
-void Images::createTextureImage(const VkDevice& device, const VkCommandPool& commandPool, const VkQueue& graphicsQueue, const VkPhysicalDevice& physicalDevice, VkBuffer& stagingBuffer, VkDeviceMemory& stagingBufferMemory, VkImage& textureImage, VkDeviceMemory& textureImageMemory) {
-    int texWidth, texHeight, texChannels;
-    stbi_uc* pixels = stbi_load("/home/down1/2g43s/core/textures/missingno.png", &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
-    const VkDeviceSize imageSize = texWidth * texHeight * 4;
-
-    if (!pixels) {
-        throw std::runtime_error("failed to load texture image!");
+void Images::createTextureImage(const VkDevice& device, const VkCommandPool& commandPool, const VkQueue& graphicsQueue, const VkPhysicalDevice& physicalDevice, VkBuffer& stagingBuffer, VkDeviceMemory& stagingBufferMemory, VkImage& textureImage, VkDeviceMemory& textureImageMemory, std::string filePath, VkFormat format) {
+    std::ifstream file(filePath, std::ios::binary | std::ios::ate);
+    if (!file.is_open()) {
+        throw std::runtime_error("failed to open texture file: " + filePath);
     }
+
+    std::streamsize fileSize = file.tellg();
+    std::vector<uint8_t> ktx2Data(fileSize);
+    file.seekg(0);
+    file.read(reinterpret_cast<char*>(ktx2Data.data()), fileSize);
+    file.close();
+
+    basist::ktx2_transcoder transcoder;
+    if (!transcoder.init(ktx2Data.data(), ktx2Data.size())) {
+        throw std::runtime_error("file is not a valid KTX2/Basis: " + filePath);
+    }
+
+    uint32_t levelIndex = 0;
+    uint32_t layerIndex = 0;
+    uint32_t faceIndex = 0;
+
+    basist::ktx2_image_level_info info{};
+    transcoder.get_image_level_info(info, levelIndex, layerIndex, faceIndex);
+
+    auto targetBasisFormat = basist::transcoder_texture_format::cTFBC7_RGBA;
+
+    uint32_t bytesPerBlock = basist::basis_get_bytes_per_block_or_pixel(targetBasisFormat);
+    VkDeviceSize imageSize = info.m_total_blocks * bytesPerBlock;
+
 
     Buffers::createBuffer(device, physicalDevice, imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
 
-    void* data;
-    vkMapMemory(device, stagingBufferMemory, 0, imageSize, 0, &data);
-    memcpy(data, pixels, imageSize);
+    void* mappedData;
+    vkMapMemory(device, stagingBufferMemory, 0, imageSize, 0, &mappedData);
+
+    bool ok = transcoder.transcode_image_level(
+    levelIndex, layerIndex, faceIndex,
+       mappedData,
+       info.m_total_blocks,
+       targetBasisFormat
+    );
+
     vkUnmapMemory(device, stagingBufferMemory);
 
-    stbi_image_free(pixels);
+    if (!ok) {
+        vkDestroyBuffer(device, stagingBuffer, nullptr);
+        vkFreeMemory(device, stagingBufferMemory, nullptr);
+        throw std::runtime_error("failed to transcode KTX2 file!");
+    }
 
-    createImage(device, physicalDevice,texWidth, texHeight, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, textureImage, textureImageMemory);
+    createImage(device, physicalDevice, info.m_width, info.m_height, format, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, textureImage, textureImageMemory);
 
     transitionImageLayout(device, commandPool, graphicsQueue, textureImage, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-    copyBufferToImage(device, commandPool, graphicsQueue, stagingBuffer, textureImage, static_cast<uint32_t>(texWidth), static_cast<uint32_t>(texHeight));
+    copyBufferToImage(device, commandPool, graphicsQueue, stagingBuffer, textureImage, static_cast<uint32_t>(info.m_width), static_cast<uint32_t>(info.m_height));
     transitionImageLayout(device, commandPool, graphicsQueue, textureImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
     vkDestroyBuffer(device, stagingBuffer, nullptr);
@@ -96,22 +127,20 @@ void Images::createTextureImage(const VkDevice& device, const VkCommandPool& com
 }
 
 void Images::createTextureImage(const VkDevice& device, const VkCommandPool& commandPool, const VkQueue& graphicsQueue, const VkPhysicalDevice& physicalDevice, VkBuffer& stagingBuffer, VkDeviceMemory& stagingBufferMemory, Texture& texture) {
-    const VkDeviceSize imageSize = texture.texWidth * texture.texHeight * 4;
-
+    Logger LOGGER("createTextureImage()");
     if (!texture.pixels) {
-        throw std::runtime_error("failed to load texture image!");
+        LOGGER.error("No image provided!");
+        return;
     }
 
-    Buffers::createBuffer(device, physicalDevice, imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
+    Buffers::createBuffer(device, physicalDevice, texture.imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
 
     void* data;
-    vkMapMemory(device, stagingBufferMemory, 0, imageSize, 0, &data);
-    memcpy(data, texture.pixels, imageSize);
+    vkMapMemory(device, stagingBufferMemory, 0, texture.imageSize, 0, &data);
+    memcpy(data, texture.pixels, texture.imageSize);
     vkUnmapMemory(device, stagingBufferMemory);
 
-    stbi_image_free(texture.pixels);
-
-    createImage(device, physicalDevice, texture.texWidth, texture.texHeight, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, texture.textureImage, texture.textureImageMemory);
+    createImage(device, physicalDevice, texture.texWidth, texture.texHeight, texture.format, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, texture.textureImage, texture.textureImageMemory);
 
     transitionImageLayout(device, commandPool, graphicsQueue, texture.textureImage, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
     copyBufferToImage(device, commandPool, graphicsQueue, stagingBuffer, texture.textureImage, static_cast<uint32_t>(texture.texWidth), static_cast<uint32_t>(texture.texHeight));
@@ -119,10 +148,19 @@ void Images::createTextureImage(const VkDevice& device, const VkCommandPool& com
 
     vkDestroyBuffer(device, stagingBuffer, nullptr);
     vkFreeMemory(device, stagingBufferMemory, nullptr);
+
+    texture.deleteImage();
 }
 
-void Images::createTextureImageView(const VkDevice& device, const VkImage& textureImage, VkImageView& textureImageView) {
-    textureImageView = createImageView(device, textureImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_ASPECT_COLOR_BIT);
+void Images::createTextureImageView(const VkDevice& device, const VkImage& textureImage, VkImageView& textureImageView, VkFormat format) {
+    Logger LOGGER("createTextureImageView()");
+
+    if (textureImage == VK_NULL_HANDLE) {
+        LOGGER.error("textureImage is null!");
+        return;
+    }
+
+    textureImageView = createImageView(device, textureImage, format, VK_IMAGE_ASPECT_COLOR_BIT);
 }
 
 

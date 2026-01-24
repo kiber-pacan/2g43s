@@ -7,8 +7,13 @@
 
 #include <vector>
 #include <vulkan/vulkan_core.h>
-#include "command/Command.hpp"
 
+#include <stdexcept>
+
+#include "Command.hpp"
+#include "Helper.hpp"
+
+struct ModelBus;
 
 struct Buffers {
     // Generic

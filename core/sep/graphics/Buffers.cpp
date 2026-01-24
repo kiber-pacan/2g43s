@@ -3,8 +3,7 @@
 //
 
 #include "Buffers.hpp"
-
-
+#include "ModelBus.hpp"
 
 // Generic
 void Buffers::createBuffer(const VkDevice& device, const VkPhysicalDevice& physicalDevice, const VkDeviceSize size, const VkBufferUsageFlags usage, const VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory) {

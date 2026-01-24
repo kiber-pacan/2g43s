@@ -6,8 +6,9 @@
 #include <vector>
 #include <vulkan/vulkan.h>
 
-#include "../window/Swapchain.hpp"
-#include "../util/Queue.hpp"
+#include "Swapchain.hpp"
+#include "Queue.hpp"
+#include "Logger.hpp"
 
 const std::vector<const char*> deviceExtensions = {
     VK_KHR_SWAPCHAIN_EXTENSION_NAME,
@@ -54,8 +55,6 @@ struct PhysicalDevice {
         deviceProperties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
         deviceProperties.pNext = &subgroupProperties;
 
-        VkPhysicalDeviceFeatures deviceFeatures;
-
         vkGetPhysicalDeviceProperties2(device, &deviceProperties);
 
         return subgroupProperties;
@@ -79,6 +78,7 @@ struct PhysicalDevice {
         vkGetPhysicalDeviceProperties2(device, &deviceProperties);
         vkGetPhysicalDeviceFeatures(device, &deviceFeatures);
 
+        std::cout << deviceFeatures.textureCompressionBC << std::endl;
 
         int score = 0;
 

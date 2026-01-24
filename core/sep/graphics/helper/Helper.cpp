@@ -6,7 +6,7 @@
 
 #include <stdexcept>
 
-#include "Images.hpp"
+#include "../../images/Images.hpp"
 
 void Helper::createSyncObjects(const VkDevice& device, std::vector<VkSemaphore>& imageAvailableSemaphores, std::vector<VkSemaphore>& renderFinishedSemaphores, std::vector<VkFence>& inFlightFences, const int MAX_FRAMES_IN_FLIGHT) {
     imageAvailableSemaphores.resize(MAX_FRAMES_IN_FLIGHT);

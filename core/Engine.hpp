@@ -23,27 +23,21 @@
 #include "graphics/shaders/constants/PostprocessPushConstants.hpp"
 #include "graphics/shaders/constants/VertexPushConstants.hpp"
 #include "graphics/shaders/constants/CullingPushConstants.hpp"
-#include "model/bus/ModelBus.hpp"
 #include "util/Color.hpp"
-
-
-
 #include "graphics/command/Barrier.h"
 #include "imgui_internal.h"
 #include <ranges>
-
 #include "graphics/helper/Helper.hpp"
-#include "graphics/helper/Images.hpp"
+#include "sep/images/Images.hpp"
 #include "graphics/pipeline/Descriptor.hpp"
 #include "graphics/pipeline/PipelineCreation.hpp"
 #include "sep/graphics/command/Command.hpp"
 #include "util/Tools.hpp"
-
 #include "imgui_impl_sdl3.h"
 #include "imgui_impl_vulkan.h"
-#include "device/LogicalDevice.hpp"
-#include "device/PhysicalDevice.hpp"
-#include "graphics/Buffers.hpp"
+#include "LogicalDevice.hpp"
+#include "PhysicalDevice.hpp"
+#include "Buffers.hpp"
 #include "window/Surface.hpp"
 #include "sep/graphics/shaders/Shaders.hpp"
 
@@ -90,6 +84,7 @@ public:
 
     static void updateModelBuffer(const std::vector<void*>& modelBuffersMapped, ModelBufferObject& mbo, ModelBus& mdlBus);
 
+    void updateSingleModel(uint32_t index, glm::mat4 matrix);
 
     // Culling
     static void updateModelCullingBuffer(void*& modelCullingBufferMapped, ModelCullingBufferObject& mcbo, const ModelBus& mdlBus);
@@ -111,7 +106,7 @@ public:
     uint64_t sid{};
 
 
-    Color clear_color = Color::hex(0x000000);
+    Color clear_color = Color::hex(0x9c9c9c);
 
     // Devices
     VkPhysicalDevice physicalDevice{};

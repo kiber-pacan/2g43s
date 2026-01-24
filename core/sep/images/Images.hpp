@@ -9,6 +9,11 @@
 #include <vulkan/vulkan_core.h>
 
 #include "Texture.hpp"
+#include <stdexcept>
+
+#include "Buffers.hpp"
+#include "Command.hpp"
+#include "../graphics/helper/Helper.hpp"
 
 
 struct Images {
@@ -18,11 +23,11 @@ struct Images {
     static VkImageView createImageView(const VkDevice& device, const VkImage& image, const VkFormat& format, const VkImageAspectFlags& aspectFlags);
 
     // Texture
-    static void createTextureImage(const VkDevice& device, const VkCommandPool& commandPool, const VkQueue& graphicsQueue, const VkPhysicalDevice& physicalDevice, VkBuffer& stagingBuffer, VkDeviceMemory& stagingBufferMemory, VkImage& textureImage, VkDeviceMemory& textureImageMemory);
+    static void createTextureImage(const VkDevice& device, const VkCommandPool& commandPool, const VkQueue& graphicsQueue, const VkPhysicalDevice& physicalDevice, VkBuffer& stagingBuffer, VkDeviceMemory& stagingBufferMemory, VkImage& textureImage, VkDeviceMemory& textureImageMemory, std::string filePath, VkFormat format);
 
     static void createTextureImage(const VkDevice& device, const VkCommandPool& commandPool, const VkQueue& graphicsQueue, const VkPhysicalDevice& physicalDevice, VkBuffer& stagingBuffer, VkDeviceMemory& stagingBufferMemory, Texture& texture);
 
-    static void createTextureImageView(const VkDevice& device, const VkImage& textureImage, VkImageView& textureImageView);
+    static void createTextureImageView(const VkDevice& device, const VkImage& textureImage, VkImageView& textureImageView, VkFormat format);
 
     static void createTextureSampler(const VkDevice& device, const VkPhysicalDevice& physicalDevice, VkSampler& textureSampler);
 

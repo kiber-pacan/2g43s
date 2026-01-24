@@ -3,7 +3,7 @@
 #include <utility>
 
 #include "ParsedModel.hpp"
-#include "../entity/Entity.hpp"
+#include "Entity.hpp"
 
 struct ModelInstance final : Entity {
     std::weak_ptr<ParsedModel> mdl;

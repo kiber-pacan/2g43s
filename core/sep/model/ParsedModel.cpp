@@ -1,39 +1,55 @@
 #include "ParsedModel.hpp"
 
-#include <numeric>
-#include <ranges>
-
-#include "Images.hpp"
-#include "Logger.hpp"
-#include <stb_image.h>
-#include "fastgltf/tools.hpp"
 
 
-fastgltf::Asset ParsedModel::loadAsset(const std::filesystem::path& path) {
-     auto LOGGER = Logger("ParsedModel.h");
+inline static std::unordered_map<fastgltf::MimeType, std::string> mimeTypes = {
+    {fastgltf::MimeType::None, "none"},
+    {fastgltf::MimeType::JPEG, "jpeg"},
+    {fastgltf::MimeType::PNG, "png"},
+    {fastgltf::MimeType::KTX2, "ktx2"},
+    {fastgltf::MimeType::DDS, "dds"},
+    {fastgltf::MimeType::GltfBuffer, "gltfBuffer"},
+    {fastgltf::MimeType::OctetStream, "octecStream"},
+    {fastgltf::MimeType::WEBP, "webp"},
+};
 
-     constexpr auto options = fastgltf::Options::DontRequireValidAssetMember | fastgltf::Options::AllowDouble | fastgltf::Options::LoadExternalBuffers | fastgltf::Options::LoadExternalImages | fastgltf::Options::GenerateMeshIndices;
-     static constexpr auto extensions = fastgltf::Extensions::KHR_mesh_quantization | fastgltf::Extensions::KHR_texture_transform | fastgltf::Extensions::KHR_materials_variants | fastgltf::Extensions::KHR_materials_specular;
+void ParsedModel::loadModel(const std::filesystem::path& path) {
+    auto LOGGER = Logger("loadModel()");
 
-     fastgltf::Parser parser(extensions);
-     auto buffer = fastgltf::GltfDataBuffer::FromPath(path);
+    // Basically all the necessary options and extensions
+    static constexpr auto options =
+        fastgltf::Options::DontRequireValidAssetMember |
+        fastgltf::Options::AllowDouble |
+        fastgltf::Options::LoadExternalBuffers |
+        fastgltf::Options::LoadExternalImages |
+        fastgltf::Options::GenerateMeshIndices |
+        fastgltf::Options::DecomposeNodeMatrices;
 
-     if (!static_cast<bool>(buffer)) {
-         LOGGER.error("Failed to open glTF file: ${}", fastgltf::getErrorMessage(buffer.error()));
-     }
+    static constexpr auto extensions =
+        fastgltf::Extensions::KHR_texture_basisu |
+        fastgltf::Extensions::EXT_meshopt_compression |
+        fastgltf::Extensions::KHR_mesh_quantization |
+        fastgltf::Extensions::KHR_texture_transform |
+        fastgltf::Extensions::KHR_materials_variants |
+        fastgltf::Extensions::KHR_materials_specular;
 
-     auto asset = parser.loadGltf(buffer.get(), path.parent_path(), options);
+    fastgltf::Parser parser(extensions);
+    auto buffer = fastgltf::GltfDataBuffer::FromPath(path); // Trying to LOAD model FILE
 
-     if (asset.error() != fastgltf::Error::None) {
-         LOGGER.error("Error loading model: ${}", fastgltf::getErrorMessage(asset.error()));
-     }
+    if (!static_cast<bool>(buffer)) {
+        LOGGER.error("Failed to open glTF file: ${}", fastgltf::getErrorMessage(buffer.error()));
+    }
 
-     return std::move(asset.get());
- }
+    auto raw_asset = parser.loadGltf(buffer.get(), path.parent_path(), options); // Trying to PARSE model FILE
 
-void ParsedModel::loadModel(fastgltf::Asset asset) {
-    auto lastIndex = -1;
+    if (raw_asset.error() != fastgltf::Error::None) {
+        LOGGER.error("Error loading model: ${}", fastgltf::getErrorMessage(raw_asset.error()));
+    }
 
+    auto& asset = raw_asset.get(); // Getting final gltf asset after parsing model
+
+    // Dirty hacks to make things run in parallel
+    #pragma region Hacks
     std::vector<uint32_t> primitiveSizes{};
     primitiveSizes.resize(asset.meshes.size());
 
@@ -42,21 +58,34 @@ void ParsedModel::loadModel(fastgltf::Asset asset) {
     }
 
     std::vector<uint32_t> indicesCount{};
+    indicesCount.emplace_back(0);
     indicesCount.resize(std::reduce(primitiveSizes.begin(), primitiveSizes.end()) + 1); // + 1 for zero index
-    indicesCount[0] = 0;
+
+    std::vector<uint32_t> baseVertices{};
+    baseVertices.emplace_back(0);
 
     uint32_t idx = 1;
     for (int i = 0; i < primitiveSizes.size(); ++i) {
         for (int i1 = 0; i1 < primitiveSizes[i]; ++i1) {
-            indicesCount[idx++] = asset.accessors[*asset.meshes[i].primitives[i1].indicesAccessor].count + indicesCount[glm::max<int>(idx - 1, 0)];
+            const auto& primitive = asset.meshes[i].primitives[i1];
+            baseVertices.emplace_back(baseVertices.back() + asset.accessors[primitive.findAttribute("POSITION")->accessorIndex].count);
+            indicesCount[idx++] = asset.accessors[*primitive.indicesAccessor].count + indicesCount[glm::max<int>(idx - 1, 0)];  // Narrowing from uint_32t to int so we wont have to deal with crazy numbers if idx == 0
         }
     }
+    #pragma endregion
 
     this->indices.resize(indicesCount.back());
 
+    std::vector<std::pair<size_t, size_t>> textureIndices{};
+    std::vector<size_t> globalIndices{};
+
+    double totalGeometryTime = 0;
     uint32_t globalIndex = 0;
+    auto lastIndex = -1;
     for (int i = 0; i < primitiveSizes.size(); ++i) {
         for (int i1 = 0; i1 < primitiveSizes[i]; ++i1) {
+            const auto start = std::chrono::high_resolution_clock::now();
+
             const auto& primitive = asset.meshes[i].primitives[i1];
 
             // POS
@@ -88,101 +117,192 @@ void ParsedModel::loadModel(fastgltf::Asset asset) {
                 }
             }
 
-            // INDICES
-            uint32_t baseVertex = 0;
-            for (auto& m : this->meshes) {
-                baseVertex += static_cast<uint32_t>(m.size());
-            }
-
             if (primitive.indicesAccessor.has_value()) {
                 auto& accessor = asset.accessors[primitive.indicesAccessor.value()];
 
                 uint32_t idx = 0;
                 fastgltf::iterateAccessor<std::uint32_t>(asset, accessor, [&](const std::uint32_t index) {
-                    this->indices[indicesCount[globalIndex] + idx] = index + baseVertex;
+                    this->indices[indicesCount[globalIndex] + idx] = index + baseVertices[globalIndex];
                     idx++;
                 });
-
-                globalIndex++;
             }
+
+            const auto end = std::chrono::high_resolution_clock::now();
+            const std::chrono::duration<double> duration = end - start;
+
+            totalGeometryTime += duration.count();
 
             this->meshes.emplace_back(std::move(tempMesh));
 
-
             if (primitive.materialIndex.has_value()) {
-                const auto start = std::chrono::high_resolution_clock::now();
-
                 auto& accessor = asset.materials[primitive.materialIndex.value()];
-
                 if (accessor.pbrData.baseColorTexture.has_value()) {
                     const auto& texture = asset.textures[accessor.pbrData.baseColorTexture.value().textureIndex];
 
-                    if (texture.imageIndex.has_value() && lastIndex != texture.imageIndex.value()) {
-                        auto& image = asset.images[texture.imageIndex.value()];
-                        processImageData(image, asset);
+                    if (texture.basisuImageIndex.has_value() && lastIndex != texture.basisuImageIndex.value()) {
+                        textureIndices.emplace_back(i, i1);
+                        lastIndex = texture.basisuImageIndex.value();
+                        globalIndices.emplace_back(globalIndex);
 
-                        this->textures.back().indexOffset = baseVertex;
-
-                        lastIndex = texture.imageIndex.value();
-
-                        const auto end = std::chrono::high_resolution_clock::now();
-                        const std::chrono::duration<double> duration = end - start;
-
-                        std::cout << "Loaded texture in: " << duration.count() << std::endl;
+                        Texture modelTexture{};
+                        modelTexture.indexOffset = baseVertices[globalIndex];
+                        this->textures.emplace_back(modelTexture);
                     }
                 }
             }
+
+            globalIndex++;
+        }
+    }
+
+    const auto start = std::chrono::high_resolution_clock::now();
+    #pragma omp parallel for schedule(static) default(none) shared(textureIndices, asset, baseVertices, globalIndices)
+    for (int i = 0; i < textureIndices.size(); ++i) {
+        const auto& pair = textureIndices[i];
+        const auto& primitive = asset.meshes[pair.first].primitives[pair.second];
+
+        const auto& texture = asset.textures[asset.materials[primitive.materialIndex.value()].pbrData.baseColorTexture.value().textureIndex];
+
+        auto& image = asset.images[texture.basisuImageIndex.value()];
+        processImageData(image, asset, baseVertices[globalIndices[i]], i);
+    }
+    const auto end = std::chrono::high_resolution_clock::now();
+    const std::chrono::duration<double> totalTextureTime = end - start;
+
+    LOGGER.success("Loaded model textures in: ${}", totalTextureTime.count());
+    LOGGER.success("Loaded model geometry in: ${}", totalGeometryTime);
+}
+
+
+void ParsedModel::processImageData(fastgltf::Image& image, fastgltf::Asset& asset, size_t index, size_t textureIndex) {
+    auto LOGGER = Logger("processImageData()");
+
+    const auto& data = image.data;
+    if (const auto* view = std::get_if<fastgltf::sources::BufferView>(&data)) {
+        const auto& bufferView = asset.bufferViews[view->bufferViewIndex];
+        const auto& buffer = asset.buffers[bufferView.bufferIndex];
+
+        if (const auto* array = std::get_if<fastgltf::sources::Array>(&buffer.data)) {
+            basist::ktx2_transcoder transcoder;
+
+            const auto* ktx2Ptr = reinterpret_cast<const uint8_t*>(array->bytes.data()) + bufferView.byteOffset;
+            const auto ktx2Size = static_cast<uint32_t>(bufferView.byteLength);
+
+            if (!transcoder.init(ktx2Ptr, ktx2Size)) {
+                LOGGER.error("Bad ktx2 texture in your .glb model");
+                return;
+            }
+
+            basist::ktx2_image_level_info info{};
+            uint32_t level_index = 0;
+            uint32_t layer_index = 0;
+            uint32_t face_index = 0;
+            transcoder.get_image_level_info(info, level_index, layer_index, face_index);
+
+            constexpr auto targetBasisFormat = basist::transcoder_texture_format::cTFBC7_RGBA;
+
+            uint32_t bytesPerBlock = basist::basis_get_bytes_per_block_or_pixel(targetBasisFormat);
+            uint32_t totalSizeBytes = info.m_total_blocks * bytesPerBlock;
+
+            std::vector<uint8_t> transcodedData(totalSizeBytes);
+
+            const bool success = transcoder.transcode_image_level(
+            level_index, layer_index, face_index,
+            transcodedData.data(),
+            info.m_total_blocks,
+            targetBasisFormat
+            );
+
+            if (!success) {
+                LOGGER.error("Failed to transcode image!");
+                return;
+            }
+
+            Texture& texture = this->textures[textureIndex];
+
+            texture.texWidth = info.m_width;
+            texture.texHeight = info.m_height;
+            texture.imageSize = transcodedData.size();
+            texture.format = VK_FORMAT_BC7_UNORM_BLOCK;
+
+            texture.pixels = new uint8_t[transcodedData.size()];
+            std::memcpy(texture.pixels, transcodedData.data(), transcodedData.size());
         }
     }
 }
 
-
-void ParsedModel::processImageData(fastgltf::Image& image, fastgltf::Asset& asset) {
-    std::visit(fastgltf::visitor {
-        [](auto& arg) {},
-        [&](fastgltf::sources::BufferView& view) {
-            auto& bufferView = asset.bufferViews[view.bufferViewIndex];
-            auto& buffer = asset.buffers[bufferView.bufferIndex];
-
-            std::visit(fastgltf::visitor {
-                [&](fastgltf::sources::Array& array) {
-                    const uint8_t* startPtr = reinterpret_cast<const uint8_t*>(array.bytes.data()) + bufferView.byteOffset;
-
-                    Texture texture{};
-
-                    texture.pixels = stbi_load_from_memory(startPtr, buffer.byteLength, &texture.texWidth, &texture.texHeight, &texture.texChannels, STBI_rgb_alpha);
-
-                    textures.emplace_back(std::move(texture));
-                },
-                [](auto&) {}
-            }, buffer.data);
-        },
-    }, image.data);
-
-}
-
-
+// TODO GET THIS SHIT OUTTA HERE IN MODEL GROUPS
 void ParsedModel::calcOcclusionSphere() {
-    std::vector<Vertex> vertices;
-    #if __cpp_lib_containers_ranges >= 202202L
-    vertices.append_range(std::views::join(meshes));
-    #else
-    auto vector = std::views::join(meshes);
-    vertices.insert(vertices.end(), vector.begin(), vector.end());
-    #endif
-
-
     glm::vec3 modelCenter(0.0f);
-    for (const Vertex& p : vertices) {
-        modelCenter += p.pos;
+    size_t totalVertices = 0;
+
+    for (const auto& mesh : meshes) {
+        for (const auto& v : mesh) {
+            modelCenter += v.pos;
+        }
+        totalVertices += mesh.size();
     }
-    modelCenter /= static_cast<float>(vertices.size());
+    if (totalVertices > 0) modelCenter /= static_cast<float>(totalVertices);
 
     float radius = 0.0f;
-    for (const Vertex& p : vertices) {
-        radius = std::max(radius, glm::length(p.pos - modelCenter));
+    for (const auto& mesh : meshes) {
+        for (const auto& v : mesh) {
+            radius = std::max(radius, glm::length(v.pos - modelCenter));
+        }
+    }
+    sphere = glm::vec4(modelCenter, radius);
+}
+
+JPH::ShapeRefC ParsedModel::createJoltMesh() const {
+    JPH::VertexList joltVertices;
+    JPH::IndexedTriangleList joltTriangles;
+
+    // 1. Считаем общее количество вершин для резервации памяти
+    size_t totalVertices = 0;
+    for (const auto& mesh : meshes) {
+        totalVertices += mesh.size();
     }
 
-    sphere = glm::vec4(modelCenter, radius);
+    if (totalVertices == 0 || indices.empty()) {
+        return nullptr;
+    }
 
+    joltVertices.reserve(totalVertices);
+    joltTriangles.reserve(indices.size() / 3);
+
+    // 2. Копируем вершины с ПРАВИЛЬНЫМ свопом осей для Z-up
+    // Если в твоей модели (GLTF) Y - это вверх, а ты хочешь в Jolt Z - это вверх:
+    // Модель(X, Y, Z) -> Jolt(X, -Z, Y) - это сохраняет ориентацию (Right-Handed)
+    for (const auto& mesh : meshes) {
+        for (const auto& v : mesh) {
+            // Мапим: GLTF.Y в Jolt.Z (высота), GLTF.Z в Jolt.-Y (глубина)
+            joltVertices.push_back(JPH::Float3(v.pos.x, v.pos.y, v.pos.z));
+        }
+    }
+
+    // 3. Копируем индексы (Jolt ждет IndexedTriangle)
+    // Важно: если при свопе осей сфера пролетает меш, значит winding order инвертировался.
+    // settings.mAllowBackFaceCollision ниже решает эту проблему глобально.
+    for (size_t i = 0; i < indices.size(); i += 3) {
+        joltTriangles.push_back(JPH::IndexedTriangle(
+            indices[i],
+            indices[i + 1],
+            indices[i + 2]
+        ));
+    }
+
+    // 4. Настройка параметров меша
+    JPH::MeshShapeSettings settings(joltVertices, joltTriangles);
+    settings.mActiveEdgeCosThresholdAngle = -1.0f;
+
+    // Генерируем форму
+    JPH::Shape::ShapeResult result = settings.Create();
+
+    if (result.HasError()) {
+        // Если у тебя есть доступ к логгеру здесь:
+        // LOGGER.error("Jolt Mesh Error: ${}", result.GetError().c_str());
+        return nullptr;
+    }
+
+    return result.Get();
 }

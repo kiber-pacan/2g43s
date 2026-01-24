@@ -28,7 +28,7 @@ float linearizeDepth(float d) {
 const float exposure = 1.5;      // Общая яркость
 const float bloomThreshold = 0.7; // С какого порога начинаем "светить"
 const float bloomScale = 0.8;     // Мощность свечения
-const float gamma = 2.2;          // Коррекция под монитор
+const float gamma = 1.2;          // Коррекция под монитор
 
 void main() {
     vec2 uv = fragTexCoord;

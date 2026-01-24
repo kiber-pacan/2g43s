@@ -60,6 +60,7 @@ struct LogicalDevice {
         VkPhysicalDeviceFeatures deviceFeatures{};
         deviceFeatures.samplerAnisotropy = VK_TRUE;
         deviceFeatures.multiDrawIndirect = VK_TRUE;
+        deviceFeatures.textureCompressionBC = VK_TRUE;
 
 
         VkDeviceCreateInfo createInfo{};
