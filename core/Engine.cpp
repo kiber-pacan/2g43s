@@ -109,8 +109,23 @@ void Engine::recordCommandBuffer(uint32_t imageIndex, VkPipeline postprocessPipe
     #pragma region Cleanup
     vkCmdFillBuffer(commandBuffer, atomicCounterBuffers[currentFrame], 0, sizeof(uint32_t), 0); // Clear atomic counter
     for (int i = 0; i < mdlBus.getTotalModelCount(); i++) {
-        vkCmdFillBuffer(commandBuffer, drawCommandsBuffer, offsetof(VkDrawIndexedIndirectCommand, instanceCount) + sizeof(VkDrawIndexedIndirectCommand) * i, 4, 0); // Clear 4 bites with offset of 4
+        vkCmdFillBuffer(commandBuffer, drawCommandsSourceBuffers[currentFrame], offsetof(VkDrawIndexedIndirectCommand, instanceCount) + sizeof(VkDrawIndexedIndirectCommand) * i, 4, 0); // Clear 4 bites with offset of 4
     }
+
+    Barrier fillBarrier(commandBuffer);
+    fillBarrier.buffer(
+        atomicCounterBuffers[currentFrame],
+        VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED,
+        VK_ACCESS_2_TRANSFER_WRITE_BIT, VK_ACCESS_2_SHADER_WRITE_BIT | VK_ACCESS_2_SHADER_READ_BIT,
+        VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+        0, VK_WHOLE_SIZE
+    ).buffer(
+        drawCommandsSourceBuffers[currentFrame],
+        VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED,
+        VK_ACCESS_2_TRANSFER_WRITE_BIT, VK_ACCESS_2_SHADER_WRITE_BIT | VK_ACCESS_2_SHADER_READ_BIT,
+        VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+        0, VK_WHOLE_SIZE
+    ).apply();
     #pragma endregion
 
     std::array<VkClearValue, 2> clearValues{};
@@ -175,7 +190,8 @@ void Engine::recordCommandBuffer(uint32_t imageIndex, VkPipeline postprocessPipe
         CullingPushConstants cullingConstants{};
         cullingConstants.mcb = modelCullingConstant;
         cullingConstants.vib = visibleIndicesConstants[currentFrame];
-        cullingConstants.dcb = drawCommandsConstant;
+        cullingConstants.dcsb = drawCommandsSourceConstants[currentFrame];
+        cullingConstants.dcb = drawCommandsConstants[currentFrame];
         cullingConstants.ucbo = uniformCullingConstants[currentFrame];
         cullingConstants.counter = atomicCounterConstants[currentFrame];
 
@@ -195,17 +211,23 @@ void Engine::recordCommandBuffer(uint32_t imageIndex, VkPipeline postprocessPipe
         vkCmdDispatch(commandBuffer, groupCount, 1, 1);
         Barrier vibBarrier(commandBuffer);
         vibBarrier.buffer(
-        atomicCounterBuffers[currentFrame],
-        VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED,
-        VK_ACCESS_2_SHADER_WRITE_BIT, VK_ACCESS_INDIRECT_COMMAND_READ_BIT,
-        VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_2_DRAW_INDIRECT_BIT | VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT,
-        0, VK_WHOLE_SIZE
+            atomicCounterBuffers[currentFrame],
+            VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED,
+            VK_ACCESS_2_SHADER_WRITE_BIT, VK_ACCESS_INDIRECT_COMMAND_READ_BIT,
+            VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_2_DRAW_INDIRECT_BIT | VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT,
+            0, VK_WHOLE_SIZE
         ).buffer(
-        visibleIndicesBuffers[currentFrame],
-        VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED,
-        VK_ACCESS_2_SHADER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT,
-        VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_2_DRAW_INDIRECT_BIT | VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT,
-        0, VK_WHOLE_SIZE
+            visibleIndicesBuffers[currentFrame],
+            VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED,
+            VK_ACCESS_2_SHADER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT,
+            VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_2_DRAW_INDIRECT_BIT | VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT,
+            0, VK_WHOLE_SIZE
+        ).buffer(
+            drawCommandsSourceBuffers[currentFrame],
+            VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED,
+            VK_ACCESS_2_SHADER_WRITE_BIT, VK_ACCESS_INDIRECT_COMMAND_READ_BIT,
+            VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_2_DRAW_INDIRECT_BIT,
+            0, VK_WHOLE_SIZE
         ).apply();
     }
     frame1++;
@@ -301,7 +323,8 @@ void Engine::recordCommandBuffer(uint32_t imageIndex, VkPipeline postprocessPipe
 
     vkCmdBindIndexBuffer(commandBuffer, indexBuffer, 0, VK_INDEX_TYPE_UINT32);
 
-    vkCmdDrawIndexedIndirectCount(commandBuffer, drawCommandsBuffer, 0, atomicCounterBuffers[currentFrame], 0, 1024, sizeof(VkDrawIndexedIndirectCommand));
+    //vkCmdDrawIndexedIndirectCount(commandBuffer, drawCommandsBuffer, 0, atomicCounterBuffers[currentFrame], 0, 1024, sizeof(VkDrawIndexedIndirectCommand));
+    vkCmdDrawIndexedIndirect(commandBuffer, drawCommandsSourceBuffers[currentFrame], 0, static_cast<uint32_t>(mdlBus.getTotalModelCount()), sizeof(VkDrawIndexedIndirectCommand));
 
     vkCmdEndRendering(commandBuffer);
     #pragma endregion
@@ -412,7 +435,7 @@ void Engine::drawFrame() {
     updateModelCullingBuffer(modelCullingBufferMapped, mcbo, mdlBus);
     updateModelDataBuffer(currentFrame, modelDataBuffersMapped, mdlBus);
     updateModelBuffer(modelBuffersMapped, mbo, mdlBus);
-    updateTextureIndexBuffer(textureIndexMapped, textureIndexOffsetMapped, tio, tioo, mdlBus);
+    updateTextureIndexBuffer(textureIndexBufferMapped, textureIndexOffsetBufferMapped, tio, tioo, mdlBus);
 
     std::function<void(VkCommandBuffer&)> imGui = [this](const VkCommandBuffer& commandBuffer) { drawImGui(commandBuffer); };
 
@@ -517,7 +540,7 @@ void Engine::cleanup() const {
 
     for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
         vkDestroyBuffer(device, visibleIndicesBuffers[i], nullptr);
-        vkFreeMemory(device, visibleIndicesMemory[i], nullptr);
+        vkFreeMemory(device, visibleIndicesBuffersMemory[i], nullptr);
     }
 
     vkDestroyBuffer(device, modelCullingBuffer, nullptr);
@@ -548,10 +571,10 @@ void Engine::cleanup() const {
     vkFreeMemory(device, indexBufferMemory, nullptr);
 
     vkDestroyBuffer(device, textureIndexBuffer, nullptr);
-    vkFreeMemory(device, textureIndexMemory, nullptr);
+    vkFreeMemory(device, textureIndexBufferMemory, nullptr);
 
     vkDestroyBuffer(device, textureIndexOffsetBuffer, nullptr);
-    vkFreeMemory(device, textureIndexOffsetMemory, nullptr);
+    vkFreeMemory(device, textureIndexOffsetBufferMemory, nullptr);
 
     for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
         vkDestroySemaphore(device, renderFinishedSemaphores[i], nullptr);
@@ -582,9 +605,15 @@ void Engine::cleanup() const {
 
     vkDestroyCommandPool(device, postprocessCommandPool, nullptr);
 
+    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+        vkDestroyBuffer(device, drawCommandsBuffers[i], nullptr);
+        vkFreeMemory(device, drawCommandsBuffersMemory[i], nullptr);
+    }
 
-    vkDestroyBuffer(device, drawCommandsBuffer, nullptr);
-    vkFreeMemory(device, drawCommandsBufferMemory, nullptr);
+    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+        vkDestroyBuffer(device, drawCommandsSourceBuffers[i], nullptr);
+        vkFreeMemory(device, drawCommandsSourceBuffersMemory[i], nullptr);
+    }
 
     vkDestroyDevice(device, nullptr);
 
@@ -760,8 +789,8 @@ void Engine::updateVisibleIndicesBuffer(const std::vector<void*>& visibleIndices
     }
 }
 
-void Engine::updateDrawCommands(void* drawCommandsBufferMapped, DrawCommandsBufferObject& dc, ModelBus& mdlBus) {
-    dc.commands.clear();
+void Engine::updateDrawCommands() {
+    dcs.commands.clear();
 
     uint32_t firstIndex = 0;
     int32_t vertexOffset = 0;
@@ -783,7 +812,7 @@ void Engine::updateDrawCommands(void* drawCommandsBufferMapped, DrawCommandsBuff
         firstIndex += indexCount;
         vertexOffset += ModelBus::getVertexCount(group.model);
         firstInstance += instanceCount;
-        dc.commands.emplace_back(command);
+        dcs.commands.emplace_back(command);
     }
 }
 
@@ -1110,16 +1139,21 @@ void Engine::initializeVulkan() {
 
     // Culling
     Buffers::createGenericBuffers(device, physicalDevice, uniformCullingConstants, uniformCullingBuffers, uniformCullingBuffersMemory, uniformCullingBuffersMapped, MAX_FRAMES_IN_FLIGHT, sizeof(UniformCullingBufferObject), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_2_SHADER_DEVICE_ADDRESS_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-    Buffers::createGenericBuffers(device, physicalDevice, visibleIndicesConstants, visibleIndicesBuffers, visibleIndicesMemory, visibleIndicesMapped, MAX_FRAMES_IN_FLIGHT, sizeof(uint32_t) * mdlBus.getTotalInstanceCount(), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_2_SHADER_DEVICE_ADDRESS_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+    Buffers::createGenericBuffers(device, physicalDevice, visibleIndicesConstants, visibleIndicesBuffers, visibleIndicesBuffersMemory, visibleIndicesBuffersMapped, MAX_FRAMES_IN_FLIGHT, sizeof(uint32_t) * mdlBus.getTotalInstanceCount(), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_2_SHADER_DEVICE_ADDRESS_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
     Buffers::createGenericBuffer(device, physicalDevice, modelCullingConstant, modelCullingBuffer, modelCullingBufferMemory, modelCullingBufferMapped, sizeof(CullingData) * mdlBus.getTotalInstanceCount(), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_2_SHADER_DEVICE_ADDRESS_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
-    updateDrawCommands(drawCommandsBufferMapped, dc, mdlBus);
-    Buffers::createGenericBuffer(device, physicalDevice, drawCommandsConstant, drawCommandsBuffer, drawCommandsBufferMemory, drawCommandsBufferMapped, sizeof(VkDrawIndexedIndirectCommand) * 1024, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_2_SHADER_DEVICE_ADDRESS_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-    memcpy(drawCommandsBufferMapped, dc.commands.data(), sizeof(VkDrawIndexedIndirectCommand) * dc.commands.size());
+    updateDrawCommands();
+    Buffers::createGenericBuffers(device, physicalDevice, drawCommandsSourceConstants, drawCommandsSourceBuffers, drawCommandsSourceBuffersMemory, drawCommandsSourceBuffersMapped, MAX_FRAMES_IN_FLIGHT, sizeof(VkDrawIndexedIndirectCommand) * 1024, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_2_SHADER_DEVICE_ADDRESS_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+    Buffers::createGenericBuffers(device, physicalDevice, drawCommandsConstants, drawCommandsBuffers, drawCommandsBuffersMemory, drawCommandsBuffersMapped, MAX_FRAMES_IN_FLIGHT, sizeof(VkDrawIndexedIndirectCommand) * 1024, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_2_SHADER_DEVICE_ADDRESS_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+    for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i) {
+        memcpy(drawCommandsSourceBuffersMapped[i], dcs.commands.data(), sizeof(VkDrawIndexedIndirectCommand) * dcs.commands.size());
+        memcpy(drawCommandsBuffersMapped[i], dc.commands.data(), sizeof(VkDrawIndexedIndirectCommand) * dc.commands.size());
+    }
 
-    Buffers::createGenericBuffer(device, physicalDevice, textureIndexConstant, textureIndexBuffer, textureIndexMemory, textureIndexMapped, sizeof(uint32_t) * 4 * 128, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_2_SHADER_DEVICE_ADDRESS_BIT, VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
-    Buffers::createGenericBuffer(device, physicalDevice, textureIndexOffsetConstant, textureIndexOffsetBuffer, textureIndexOffsetMemory, textureIndexOffsetMapped, sizeof(uint32_t) * 128, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_2_SHADER_DEVICE_ADDRESS_BIT, VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
+
+    Buffers::createGenericBuffer(device, physicalDevice, textureIndexConstant, textureIndexBuffer, textureIndexBufferMemory, textureIndexBufferMapped, sizeof(uint32_t) * 4 * 128, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_2_SHADER_DEVICE_ADDRESS_BIT, VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
+    Buffers::createGenericBuffer(device, physicalDevice, textureIndexOffsetConstant, textureIndexOffsetBuffer, textureIndexOffsetBufferMemory, textureIndexOffsetBufferMapped, sizeof(uint32_t) * 128, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_2_SHADER_DEVICE_ADDRESS_BIT, VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
 
     // Descriptor
     Descriptor::createGraphicsDescriptorPool(device, MAX_FRAMES_IN_FLIGHT, graphicsDescriptorPool);

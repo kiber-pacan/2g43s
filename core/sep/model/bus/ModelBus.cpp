@@ -259,7 +259,7 @@ void ModelBus::loadModels() {
 
     //square(10, "box_opt.glb", 2);
     //instance("box_opt.glb", glm::vec4(0.0, 0.0, -1.0, 1.0));
-    //instance("box_opt.glb", glm::vec4(0.0, 0.0, -1.0, 1.0), glm::vec4(0, 0, 0, 1), glm::vec4(100.0, 100.0, 1.0, 1.0));
+    instance("box_opt.glb", glm::vec4(0.0, 0.0, -1.0, 1.0), glm::vec4(0, 0, 0, 1), glm::vec4(10.0));
     instance("land2_opt.glb");
 
     const auto end = std::chrono::high_resolution_clock::now();

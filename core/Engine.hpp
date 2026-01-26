@@ -91,7 +91,7 @@ public:
 
     static void updateVisibleIndicesBuffer(const std::vector<void*>& visibleIndicesBuffersMapped, VisibleIndicesBufferObject& vio);
 
-    static void updateDrawCommands(void* drawCommandsBufferMapped, DrawCommandsBufferObject& dc, ModelBus& mdlBus);
+    void updateDrawCommands();
 
     static void updateTextureIndexBuffer(void* TextureIndexBufferMapped, void* TextureIndexOffsetBufferMapped, TextureIndexObject& tio, TextureIndexOffsetObject& tioo, ModelBus& mdlBus);
     #pragma endregion
@@ -122,6 +122,7 @@ public:
     UniformPostprocessingBufferObject upbo{};
     AtomicCounterObject atomic_counter{};
     DrawCommandsBufferObject dc{};
+    DrawCommandsBufferObject dcs{};
 
     // Matrices
     ModelDataBufferObject mdbo{};
@@ -233,10 +234,15 @@ private:
     VkBuffer stagingBuffer{};
     VkDeviceMemory stagingBufferMemory{};
 
-    VkBuffer drawCommandsBuffer{};
-    VkDeviceMemory drawCommandsBufferMemory{};
-    void* drawCommandsBufferMapped{};
-    uint64_t drawCommandsConstant{};
+    std::vector<VkBuffer> drawCommandsSourceBuffers;
+    std::vector<VkDeviceMemory> drawCommandsSourceBuffersMemory;
+    std::vector<void*> drawCommandsSourceBuffersMapped{};
+    std::vector<uint64_t> drawCommandsSourceConstants;
+
+    std::vector<VkBuffer> drawCommandsBuffers;
+    std::vector<VkDeviceMemory> drawCommandsBuffersMemory;
+    std::vector<void*> drawCommandsBuffersMapped{};
+    std::vector<uint64_t> drawCommandsConstants;
 
     // Generic
     std::vector<VkBuffer> uniformBuffers{};
@@ -279,8 +285,8 @@ private:
 
     // Culling
     std::vector<VkBuffer> visibleIndicesBuffers{};
-    std::vector<VkDeviceMemory> visibleIndicesMemory{};
-    std::vector<void*> visibleIndicesMapped{};
+    std::vector<VkDeviceMemory> visibleIndicesBuffersMemory{};
+    std::vector<void*> visibleIndicesBuffersMapped{};
     std::vector<uint64_t> visibleIndicesConstants{};
 
     VkBuffer modelCullingBuffer{};
@@ -290,13 +296,13 @@ private:
 
     // Index
     VkBuffer textureIndexBuffer{};
-    VkDeviceMemory textureIndexMemory{};
-    void* textureIndexMapped{};
+    VkDeviceMemory textureIndexBufferMemory{};
+    void* textureIndexBufferMapped{};
     uint64_t textureIndexConstant{};
 
     VkBuffer textureIndexOffsetBuffer{};
-    VkDeviceMemory textureIndexOffsetMemory{};
-    void* textureIndexOffsetMapped{};
+    VkDeviceMemory textureIndexOffsetBufferMemory{};
+    void* textureIndexOffsetBufferMapped{};
     uint64_t textureIndexOffsetConstant{};
 
     // Image
@@ -317,7 +323,7 @@ private:
 
     // Constants
 
-    // modelCullingBuffer, visibleIndicesBuffers, drawCommandsBuffer, uniformCullingBuffers, atomicCounterBuffers
+    // modelCullingBuffer, visibleIndicesBuffers, drawCommandsSourceBuffer, uniformCullingBuffers, atomicCounterBuffers
     //std::array<CullingPushConstants, MAX_FRAMES_IN_FLIGHT> cullingAddress;
     #pragma endregion
 

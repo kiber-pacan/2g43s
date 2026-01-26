@@ -178,7 +178,6 @@ struct AppContext {
     ObjectVsBroadPhaseLayerFilterImpl* obj_bp_filter{};
     ObjectLayerPairFilterImpl* obj_obj_filter{};
 
-    // Листенеры тоже должны жить долго!
     MyBodyActivationListener* body_activation_listener{};
     MyContactListener* contact_listener{};
 
@@ -253,7 +252,7 @@ void initializeJPH(AppContext* app) {
 	//JPH::ShapeSettings::ShapeResult floor_shape_result = floor_shape_settings.Create();
 	//JPH::ShapeRefC floor_shape = floor_shape_result.Get(); // We don't expect an error here, but you can check floor_shape_result for HasError() / GetError()
     auto floor_shape = app->engine.mdlBus.groups_map["land2_opt.glb"].model.get()->createJoltMesh();
-	JPH::BodyCreationSettings floor_settings(floor_shape, JPH::RVec3(0.0, 0.0, -16.0), JPH::Quat::sIdentity(), JPH::EMotionType::Static, Layers::NON_MOVING);
+	JPH::BodyCreationSettings floor_settings(floor_shape, JPH::RVec3(0.0, 0.0, 0.0), JPH::Quat::sIdentity(), JPH::EMotionType::Static, Layers::NON_MOVING);
 	// Create the actual rigid body
 	JPH::Body *floor = body_interface.CreateBody(floor_settings); // Note that if we run out of bodies this can return nullptr
 
@@ -274,12 +273,13 @@ void initializeJPH(AppContext* app) {
 
 	// Now you can interact with the dynamic body, in this case we're going to give it a velocity.
 	// (note that if we had used CreateBody then we could have set the velocity straight on the body before adding it to the physics system)
-	//body_interface.SetLinearVelocity(sphere_id, JPH::Vec3(4.0f, 12.0f, 1.0f));
+	body_interface.SetLinearVelocity(sphere_id, JPH::Vec3(12.0f, 32.0f, 0.0f));
     #pragma endregion
 
 	app->physics_system->OptimizeBroadPhase();
     app->physics_system->SetGravity(JPH::Vec3(0.0f, 0.0f, -9.8f));
 }
+
 constexpr uint TICK_RATE = 256;
 constexpr float cDeltaTime = 1.0f / TICK_RATE;
 
@@ -305,7 +305,6 @@ void iterateJPH(AppContext* app) {
 void shutdownJPH(const AppContext* app) {
     JPH::BodyInterface &body_interface = app->physics_system->GetBodyInterface();
 
-    // Destroy the sphere. After this the sphere ID is no longer valid.
     JPH::BodyIDVector bodies;
     app->physics_system->GetBodies(bodies);
 
@@ -314,10 +313,8 @@ void shutdownJPH(const AppContext* app) {
         body_interface.DestroyBody(id);
     }
 
-    // Unregisters all types with the factory and cleans up the default material
     JPH::UnregisterTypes();
 
-    // Destroy the factory
     delete JPH::Factory::sInstance;
     JPH::Factory::sInstance = nullptr;
 }

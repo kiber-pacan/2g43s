@@ -41,6 +41,10 @@ layout(scalar, buffer_reference, buffer_reference_align = 4) writeonly buffer VI
     VIBO objects[];
 };
 
+layout(scalar, buffer_reference) buffer DCSB {
+    DCO objects[];
+};
+
 layout(scalar, buffer_reference) buffer DCB {
     DCO objects[];
 };
@@ -56,6 +60,7 @@ layout(scalar, buffer_reference) buffer Counter {
 layout(push_constant) uniform Push {
     MCB mcb;
     VIB vib;
+    DCSB dcsb;
     DCB dcb;
     UCB ucbo;
     Counter counter;
@@ -66,7 +71,7 @@ bool isSphereInFrustum(vec4 sphere, vec4 f[6]) {
     float radius = sphere.w;
     for (int i = 0; i < 6; ++i) {
         float dist = dot(f[i].xyz, center) + f[i].w;
-        //if (dist < -radius) return false;
+        if (dist < -radius) return false;
     }
 
     return true;
@@ -76,7 +81,7 @@ void main() {
     uint index = gl_GlobalInvocationID.x;
     if (index >= pc.ucbo.data.totalObjects) return;
 
-    // 1. Проверка видимости
+    // 1. Checking if current instance is actually visible
     bool visible = isSphereInFrustum(pc.mcb.objects[index].sphere, pc.ucbo.data.frustumPlanes);
 
     // 2. Получаем маску всех видимых потоков в подгруппе
@@ -85,35 +90,36 @@ void main() {
     // Если в подгруппе вообще никто ничего не видит — выходим сразу
     if (!subgroupAny(visible)) return;
 
-    uint drawCommandIndex = pc.mcb.objects[index].index;
+    uint modelIndex = pc.mcb.objects[index].index;
 
-    // --- ОПТИМИЗАЦИЯ: СКАЛЯРИЗАЦИЯ ---
-    // Перебираем все уникальные DrawCommandIndex внутри подгруппы
+    // Work until all the subgroups stop working
     uvec4 processedBallot = uvec4(0);
-
-    // Пока не обработаем все видимые потоки в подгруппе
-    while (subgroupAny((ballot.x ^ processedBallot.x) != 0 || (ballot.y ^ processedBallot.y) != 0 ||
-    (ballot.z ^ processedBallot.z) != 0 || (ballot.w ^ processedBallot.w) != 0)) {
+    while (any(notEqual(ballot, processedBallot))) {
 
         // Находим первый необработанный поток
         uint firstUnprocessed = subgroupBallotFindLSB(ballot ^ processedBallot);
 
         // Получаем ID модели, которую этот поток хочет отрисовать
-        uint candidateID = subgroupBroadcast(drawCommandIndex, firstUnprocessed);
+        uint candidateID = subgroupBroadcast(modelIndex, firstUnprocessed);
 
         // Находим все потоки в подгруппе, которые хотят рисовать ЭТУ ЖЕ модель
-        uvec4 sameModelBallot = subgroupBallot(visible && (drawCommandIndex == candidateID));
+        uvec4 sameModelBallot = subgroupBallot(visible && (modelIndex == candidateID));
         uint countForThisModel = subgroupBallotBitCount(sameModelBallot);
 
         uint baseIdx = 0;
 
         // Только один поток (лидер этой группы в подгруппе) делает атомарную операцию
         if (gl_SubgroupInvocationID == firstUnprocessed) {
-            baseIdx = atomicAdd(pc.dcb.objects[candidateID].instanceCount, countForThisModel);
+            baseIdx = atomicAdd(pc.dcsb.objects[candidateID].instanceCount, countForThisModel);
 
             // Если это первые инстансы этой модели — увеличиваем счетчик команд
             if (baseIdx == 0) {
-                atomicAdd(pc.counter.count, 1);
+                uint count = atomicAdd(pc.counter.count, 1);
+                pc.dcb.objects[count].indexCount = pc.dcsb.objects[candidateID].indexCount;
+                pc.dcb.objects[count].instanceCount = pc.dcsb.objects[candidateID].instanceCount;
+                pc.dcb.objects[count].firstIndex = pc.dcsb.objects[candidateID].firstIndex;
+                pc.dcb.objects[count].vertexOffset = pc.dcsb.objects[candidateID].vertexOffset;
+                pc.dcb.objects[count].firstInstance = pc.dcsb.objects[candidateID].firstInstance;
             }
         }
 
@@ -121,9 +127,9 @@ void main() {
         baseIdx = subgroupBroadcast(baseIdx, firstUnprocessed);
 
         // Если текущий поток относится к этой модели — пишем результат
-        if (visible && (drawCommandIndex == candidateID)) {
+        if (visible && (modelIndex == candidateID)) {
             uint localOffset = subgroupBallotExclusiveBitCount(sameModelBallot);
-            uint firstInstance = pc.dcb.objects[candidateID].firstInstance;
+            uint firstInstance = pc.dcsb.objects[candidateID].firstInstance;
 
             pc.vib.objects[baseIdx + localOffset + firstInstance].index = index;
         }

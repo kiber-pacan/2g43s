@@ -9,6 +9,7 @@
 struct CullingPushConstants {
     uint64_t mcb;
     uint64_t vib;
+    uint64_t dcsb;
     uint64_t dcb;
     uint64_t ucbo;
     uint64_t counter;
