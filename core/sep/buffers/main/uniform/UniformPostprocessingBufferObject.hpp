@@ -5,7 +5,8 @@
 
 struct UniformPostprocessingBufferObject {
     glm::vec2 resolution;
-    double time = 0;
+    float time = 0;
+    float padding;
 };
 
 #endif //INC_2G43S_UNIFORMPOSTPROCESSINGBUFFEROBJECT_H

@@ -3,7 +3,9 @@
 //
 
 #include "Buffers.hpp"
-#include "ModelBus.hpp"
+
+#include "Vertex.hpp"
+#include "ModelEntityManager.hpp"
 
 // Generic
 void Buffers::createBuffer(const VkDevice& device, const VkPhysicalDevice& physicalDevice, const VkDeviceSize size, const VkBufferUsageFlags usage, const VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory) {
@@ -111,7 +113,7 @@ void Buffers::createCommandBuffer(const VkDevice& device, const VkCommandPool& c
     }
 }
 
-void Buffers::createVertexBuffer(const VkDevice& device, const VkPhysicalDevice& physicalDevice, const VkCommandPool& commandPool, const VkQueue& graphicsQueue, VkBuffer& vertexBuffer, VkDeviceMemory& vertexBufferMemory, const ModelBus& mdlBus) {
+void Buffers::createVertexBuffer(const VkDevice& device, const VkPhysicalDevice& physicalDevice, const VkCommandPool& commandPool, const VkQueue& graphicsQueue, VkBuffer& vertexBuffer, VkDeviceMemory& vertexBufferMemory, const ModelEntityManager& mdlBus) {
     const VkDeviceSize bufferSize = mdlBus.getVertexBufferSize();
 
     VkBuffer stagingBuffer;
@@ -133,14 +135,14 @@ void Buffers::createVertexBuffer(const VkDevice& device, const VkPhysicalDevice&
     vkFreeMemory(device, stagingBufferMemory, nullptr);
 }
 
-void Buffers::createIndexBuffer(const VkDevice& device, const VkPhysicalDevice& physicalDevice, const VkCommandPool& commandPool, const VkQueue& graphicsQueue, VkBuffer &indexBuffer, VkDeviceMemory& indexBufferMemory, const ModelBus& mdlBus) {
-    const VkDeviceSize bufferSize = mdlBus.getIndexBufferSize();
+void Buffers::createIndexBuffer(const VkDevice& device, const VkPhysicalDevice& physicalDevice, const VkCommandPool& commandPool, const VkQueue& graphicsQueue, VkBuffer &indexBuffer, VkDeviceMemory& indexBufferMemory, const ModelEntityManager& mem) {
+    const VkDeviceSize bufferSize = mem.getIndexBufferSize();
 
     VkBuffer stagingBuffer;
     VkDeviceMemory stagingBufferMemory;
     createBuffer(device, physicalDevice, bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
 
-    const std::vector<u_int32_t> indices = mdlBus.getAllIndices();
+    const std::vector<u_int32_t> indices = mem.getAllIndices();
     void* data;
     vkMapMemory(device, stagingBufferMemory, 0, bufferSize, 0, &data);
     memcpy(data, indices.data(), bufferSize);

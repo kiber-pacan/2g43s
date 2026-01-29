@@ -4,7 +4,7 @@
 #include <atomic>
 #include <glm/mat4x4.hpp>
 
-struct AtomicCounterObject {
+struct AtomicCounterBufferObject {
     uint32_t counter;
 };
 

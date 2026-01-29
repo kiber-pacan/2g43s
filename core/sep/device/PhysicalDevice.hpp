@@ -15,7 +15,8 @@ const std::vector<const char*> deviceExtensions = {
     VK_KHR_DRAW_INDIRECT_COUNT_EXTENSION_NAME,
     VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME,
     VK_KHR_SHADER_DRAW_PARAMETERS_EXTENSION_NAME,
-    VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME
+    VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME,
+    VK_EXT_SWAPCHAIN_MAINTENANCE_1_EXTENSION_NAME,
 };
 
 
@@ -73,7 +74,6 @@ struct PhysicalDevice {
         deviceProperties.pNext = &subgroupProperties;
 
         VkPhysicalDeviceFeatures deviceFeatures;
-
 
         vkGetPhysicalDeviceProperties2(device, &deviceProperties);
         vkGetPhysicalDeviceFeatures(device, &deviceFeatures);

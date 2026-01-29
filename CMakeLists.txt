@@ -3,11 +3,13 @@ cmake_minimum_required(VERSION 3.28)
 
 # Setting c++ 26 standard
 set(CMAKE_CXX_STANDARD 26)
+set(DCMAKE_CXX_STANDARD 26)
 set(CMAKE_CXX_STANDARD_REQUIRED on)
 set(CMAKE_CXX_EXTENSIONS off)
 
 # Declaring project
 project(2g43s)
+cmake_policy(SET CMP0167 OLD)
 
 # Jolt settings
 set(CMAKE_CONFIGURATION_TYPES "Debug;Release;Distribution")
@@ -45,8 +47,9 @@ FetchContent_Declare(fastgltf   GIT_REPOSITORY https://github.com/spnda/fastgltf
 FetchContent_Declare(nlohmann_json  GIT_REPOSITORY https://github.com/nlohmann/json.git  GIT_TAG develop)
 FetchContent_Declare(imgui  GIT_REPOSITORY https://github.com/ocornut/imgui.git GIT_TAG  docking)
 FetchContent_Declare(basis  GIT_REPOSITORY https://github.com/BinomialLLC/basis_universal.git  GIT_TAG master)
+#FetchContent_Declare(boost  GIT_REPOSITORY https://github.com/boostorg/boost.git  GIT_TAG master)
 
-FetchContent_MakeAvailable(jolt_physics SDL3 glm fastgltf nlohmann_json imgui basis )
+FetchContent_MakeAvailable(jolt_physics SDL3 glm fastgltf nlohmann_json imgui basis)
 
 # IMGUI
 add_library(imgui_lib STATIC
@@ -136,13 +139,13 @@ add_executable(${EXECUTABLE_NAME}
         core/sep/buffers/culling/ModelCullingBufferObject.hpp
         core/sep/buffers/culling/VisibleIndicesBufferObject.hpp
 
-        core/sep/buffers/main/AtomicCounterObject.hpp
+        core/sep/buffers/main/AtomicCounterBufferObject.hpp
         core/sep/buffers/main/DrawCommandsBufferObject.hpp
         core/sep/buffers/main/uniform/UniformBufferObject.hpp
         core/sep/buffers/main/uniform/UniformPostprocessingBufferObject.hpp
         core/sep/buffers/main/uniform/UniformCullingBufferObject.hpp
-        core/sep/buffers/main/indices/TextureIndexOffsetObject.hpp
-        core/sep/buffers/main/indices/TextureIndexObject.h
+        core/sep/buffers/main/indices/TextureIndexOffsetBufferObject.hpp
+        core/sep/buffers/main/indices/TextureIndexBufferObject.h
 
         core/sep/buffers/matrices/ModelBufferObject.hpp
         core/sep/buffers/matrices/ModelDataBufferObject.hpp
@@ -172,6 +175,13 @@ add_executable(${EXECUTABLE_NAME}
         core/sep/entity/PlayerEntity.h
 
         core/sep/images/Texture.hpp
+        core/sep/model/managing/PhysicsBus.cpp
+        core/sep/model/managing/PhysicsBus.h
+        core/sep/model/managing/PhysicsBus.h
+        core/sep/graphics/helper/Sync.hpp
+        core/sep/model/managing/ModelEntityManager.hpp
+        core/sep/model/managing/ModelEntityManager.cpp
+        core/sep/model/managing/ModelGroup.h
 )
 
 target_include_directories(${EXECUTABLE_NAME} PRIVATE
@@ -193,13 +203,19 @@ target_include_directories(${EXECUTABLE_NAME} PRIVATE
         core/sep/buffers/matrices
         core/sep/model/
         core/sep/model/bus
+        core/sep/model/managing
         core/sep/model/primitives
         core/sep/util/
         core/sep/window/
+        core/sep/graphics/shaders/constants/
+        core/sep/images/
+        core/sep/graphics/shaders/
 )
 
+find_package(Boost REQUIRED)
 target_include_directories(${EXECUTABLE_NAME} SYSTEM PRIVATE
         ${jolt_physics_SOURCE_DIR}
+        ${Boost_INCLUDE_DIRS}
 )
 
 
@@ -264,6 +280,7 @@ target_link_libraries(${EXECUTABLE_NAME} PUBLIC
         imgui_lib
         basis_transcoder
         OpenMP::OpenMP_CXX
+        Boost::boost
 )
 
 target_compile_definitions(${EXECUTABLE_NAME} PUBLIC SDL_MAIN_USE_CALLBACKS)

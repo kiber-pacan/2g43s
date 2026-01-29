@@ -15,7 +15,7 @@ struct alignas(16) Index {
 };
 
 
-struct TextureIndexObject {
+struct TextureIndexBufferObject {
     std::vector<Index> indices;
 };
 #endif //INC_2G43S_TEXTUREINDEXOBJECT_H

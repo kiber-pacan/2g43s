@@ -6,8 +6,7 @@
 
 #include <ranges>
 
-#include "../../buffers/main/uniform/UniformBufferObject.hpp"
-#include "UniformCullingBufferObject.hpp"
+#include "ModelEntityManager.hpp"
 #include "UniformPostprocessingBufferObject.hpp"
 
 #pragma region Graphics
@@ -46,7 +45,7 @@ void Descriptor::createGraphicsDescriptorPool(const VkDevice& device, const int&
     }
 }
 
-void Descriptor::createGraphicsDescriptorSets(const VkDevice& device, const int& MAX_FRAMES_IN_FLIGHT, const VkDescriptorSetLayout& graphicsDescriptorSetLayout, const VkDescriptorPool& graphicsDescriptorPool, std::vector<VkDescriptorSet>& graphicsDescriptorSets, const std::vector<VkBuffer>& uniformBuffers, const VkSampler& textureSampler, const std::vector<VkBuffer>& modelBuffers, const std::vector<VkBuffer>& visibleIndicesBuffers, const ModelBus& mdlBus, const VkImageView& textureImageView, const VkBuffer& textureIndexBuffer, const VkBuffer& textureIndexOffsetBuffer) {
+void Descriptor::createGraphicsDescriptorSets(const VkDevice& device, const int& MAX_FRAMES_IN_FLIGHT, const VkDescriptorSetLayout& graphicsDescriptorSetLayout, const VkDescriptorPool& graphicsDescriptorPool, std::vector<VkDescriptorSet>& graphicsDescriptorSets, const std::vector<VkBuffer>& uniformBuffers, const VkSampler& textureSampler, const std::vector<VkBuffer>& modelBuffers, const std::vector<VkBuffer>& visibleIndicesBuffers, const ModelEntityManager& mem, const VkImageView& textureImageView, const VkBuffer& textureIndexBuffer, const VkBuffer& textureIndexOffsetBuffer) {
     const std::vector layouts(MAX_FRAMES_IN_FLIGHT, graphicsDescriptorSetLayout);
     VkDescriptorSetAllocateInfo allocInfo{};
     allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
@@ -69,7 +68,7 @@ void Descriptor::createGraphicsDescriptorSets(const VkDevice& device, const int&
         imageInfo.emplace_back(missingno);
 
         size_t index = 0;
-        for (auto& textures : mdlBus.groups_map
+        for (auto& textures : mem.groups
         | std::views::values
         | std::views::transform(&ModelGroup::model)
         | std::views::transform(&ParsedModel::textures)

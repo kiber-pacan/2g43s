@@ -7,8 +7,6 @@
 
 struct ModelInstance final : Entity {
     std::weak_ptr<ParsedModel> mdl;
-    glm::vec4 sfr{};
-
     ModelInstance() = default;
 
     explicit ModelInstance(const std::shared_ptr<ParsedModel>& mdl,
@@ -19,7 +17,6 @@ struct ModelInstance final : Entity {
         this->pos = pos;
         this->rot = rot;
         this->scl = scl;
-        this->sfr = glm::vec4(pos.x + mdl->sphere.x, pos.y + mdl->sphere.y, pos.z + mdl->sphere.z, mdl->sphere.w);
     }
 };
 

@@ -27,9 +27,15 @@ struct LogicalDevice {
             queueCreateInfos.push_back(queueCreateInfo);
         }
 
+        VkPhysicalDeviceSwapchainMaintenance1FeaturesKHR maintenanceFeatures{};
+        maintenanceFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SWAPCHAIN_MAINTENANCE_1_FEATURES_KHR;
+        maintenanceFeatures.swapchainMaintenance1 = VK_TRUE;
+
+
         VkPhysicalDeviceSynchronization2Features sync2{};
         sync2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SYNCHRONIZATION_2_FEATURES;
         sync2.synchronization2 = VK_TRUE;
+        sync2.pNext = &maintenanceFeatures;
 
         VkPhysicalDeviceVulkan12Features features12{};
         features12.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;

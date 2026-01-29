@@ -5,8 +5,10 @@
 #include <vector>
 #include <SDL3/SDL_events.h>
 #include "KeyBinding.hpp"
-#include "../../Engine.hpp"
+#include "Engine.hpp"
 #include "cmath"
+#include "Shaders.hpp"
+#include "Tools.hpp"
 
 struct KeyListener {
     std::unordered_map<SDL_Scancode, KeyBinding> keyMap{};
@@ -17,42 +19,42 @@ struct KeyListener {
         keyMap.emplace(SDL_SCANCODE_W, KeyBinding(
         [](Engine &engine) {
             if (!SDL_GetWindowRelativeMouseMode(engine.window)) return;
-            engine.camera.pos += engine.camera.speed * engine.camera.look * (float) engine.delta.deltaTime;
+            engine.camera.pos += engine.camera.speed * engine.camera.look * static_cast<float>(engine.delta.deltaTime);
         }));
 
         // Backward
         keyMap.emplace(SDL_SCANCODE_S, KeyBinding(
         [](Engine &engine) {
             if (!SDL_GetWindowRelativeMouseMode(engine.window)) return;
-            engine.camera.pos -= engine.camera.speed * engine.camera.look * (float) engine.delta.deltaTime;
+            engine.camera.pos -= engine.camera.speed * engine.camera.look * static_cast<float>(engine.delta.deltaTime);
         }));
 
         // Strafe right
         keyMap.emplace(SDL_SCANCODE_A, KeyBinding([](Engine &engine) {
             if (!SDL_GetWindowRelativeMouseMode(engine.window)) return;
-            glm::vec3 right = glm::normalize(glm::cross(engine.camera.look, glm::vec3(0.0f, 0.0f, 1.0f)));
-            engine.camera.pos -= right * engine.camera.speed * (float) engine.delta.deltaTime;
+            const glm::vec3 right = glm::normalize(glm::cross(engine.camera.look, glm::vec3(0.0f, 0.0f, 1.0f)));
+            engine.camera.pos -= right * engine.camera.speed * static_cast<float>(engine.delta.deltaTime);
         }));
 
         // Strafe left
         keyMap.emplace(SDL_SCANCODE_D, KeyBinding([](Engine &engine) {
             if (!SDL_GetWindowRelativeMouseMode(engine.window)) return;
-            glm::vec3 right = glm::normalize(glm::cross(engine.camera.look, glm::vec3(0.0f, 0.0f, 1.0f)));
-            engine.camera.pos += right * engine.camera.speed * (float) engine.delta.deltaTime;
+            const glm::vec3 right = glm::normalize(glm::cross(engine.camera.look, glm::vec3(0.0f, 0.0f, 1.0f)));
+            engine.camera.pos += right * engine.camera.speed * static_cast<float>(engine.delta.deltaTime);
         }));
 
         // Up
         keyMap.emplace(SDL_SCANCODE_SPACE, KeyBinding(
         [](Engine &engine) {
             if (!SDL_GetWindowRelativeMouseMode(engine.window)) return;
-            engine.camera.pos.z += engine.camera.speed * (float) engine.delta.deltaTime;
+            engine.camera.pos.z += engine.camera.speed * static_cast<float>(engine.delta.deltaTime);
         }));
 
         // Down
         keyMap.emplace(SDL_SCANCODE_LCTRL, KeyBinding(
         [](Engine &engine) {
             if (!SDL_GetWindowRelativeMouseMode(engine.window)) return;
-            engine.camera.pos.z -= engine.camera.speed * (float) engine.delta.deltaTime;
+            engine.camera.pos.z -= engine.camera.speed * static_cast<float>(engine.delta.deltaTime);
         }));
 
         // Run
@@ -80,7 +82,7 @@ struct KeyListener {
         // Escape mouse
         keyMap.emplace(SDL_SCANCODE_F2, KeyBinding(nullptr,
         [](Engine &engine) {
-            bool enabled = SDL_GetWindowRelativeMouseMode(engine.window);
+            const bool enabled = SDL_GetWindowRelativeMouseMode(engine.window);
 
             glm::vec2 pos;
             SDL_GetGlobalMouseState(&pos.x, &pos.y);
@@ -113,7 +115,7 @@ struct KeyListener {
         // Reload shaders
         keyMap.emplace(SDL_SCANCODE_F3, KeyBinding(
         [](Engine &engine) {
-            std::vector<std::filesystem::path> dirtyShaders = Shaders::getShadersToCompile();
+            const std::vector<std::filesystem::path> dirtyShaders = Shaders::getShadersToCompile();
             for (auto& dirtyShader : dirtyShaders) {
                 auto shader = Shaders::compileShader(dirtyShader);
                 vkDeviceWaitIdle(engine.device);
@@ -123,8 +125,8 @@ struct KeyListener {
         }));
     }
 
-    void listen(SDL_Event *event) {
-        auto it = keyMap.find(event->key.scancode);
+    void listen(const SDL_Event *event) {
+        const auto it = keyMap.find(event->key.scancode);
 
         if (it != keyMap.end()) {
             auto& key = it->second;

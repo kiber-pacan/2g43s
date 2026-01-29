@@ -1,5 +1,6 @@
 #include "ParsedModel.hpp"
 
+#include "Jolt/Physics/Collision/Shape/ConvexHullShape.h"
 
 
 inline static std::unordered_map<fastgltf::MimeType, std::string> mimeTypes = {
@@ -169,8 +170,8 @@ void ParsedModel::loadModel(const std::filesystem::path& path) {
     const auto end = std::chrono::high_resolution_clock::now();
     const std::chrono::duration<double> totalTextureTime = end - start;
 
-    LOGGER.success("Loaded model textures in: ${}", totalTextureTime.count());
-    LOGGER.success("Loaded model geometry in: ${}", totalGeometryTime);
+    LOGGER.success("LOADED model textures in: ${}", totalTextureTime.count());
+    LOGGER.success("LOADED model geometry in: ${}", totalGeometryTime);
 }
 
 
@@ -254,8 +255,8 @@ void ParsedModel::calcOcclusionSphere() {
 }
 
 JPH::ShapeRefC ParsedModel::createJoltMesh() const {
-    JPH::VertexList joltVertices;
-    JPH::IndexedTriangleList joltTriangles;
+    JPH::VertexList joltVertices{};
+    JPH::IndexedTriangleList joltTriangles{};
 
     // 1. Считаем общее количество вершин для резервации памяти
     size_t totalVertices = 0;
@@ -304,5 +305,19 @@ JPH::ShapeRefC ParsedModel::createJoltMesh() const {
         return nullptr;
     }
 
+    return result.Get();
+}
+
+JPH::ShapeRefC ParsedModel::createJoltConvexHull() const {
+    JPH::Array<JPH::Vec3> points;
+    // Собираем все вершины в один массив
+    for (const auto& mesh : meshes) {
+        for (const auto& v : mesh) {
+            points.push_back(JPH::Vec3(v.pos.x, v.pos.y, v.pos.z));
+        }
+    }
+
+    JPH::ConvexHullShapeSettings settings(points);
+    JPH::Shape::ShapeResult result = settings.Create();
     return result.Get();
 }

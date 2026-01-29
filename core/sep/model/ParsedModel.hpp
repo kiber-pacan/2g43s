@@ -47,6 +47,8 @@ class ParsedModel {
     void calcOcclusionSphere();
 
     [[nodiscard]] JPH::ShapeRefC createJoltMesh() const;
+
+    JPH::ShapeRefC  createJoltConvexHull() const;
 };
 
 #endif //PARSEDMODEL_H

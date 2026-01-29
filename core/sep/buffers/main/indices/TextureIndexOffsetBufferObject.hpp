@@ -7,7 +7,7 @@
 #include <cstdint>
 #include <vector>
 
-struct TextureIndexOffsetObject {
+struct TextureIndexOffsetBufferObject {
     std::vector<uint32_t> indexOffsets;
 };
 #endif //INC_2G43S_INDEXOFFSETOBJECT_H

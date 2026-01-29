@@ -13,7 +13,8 @@
 #include "Command.hpp"
 #include "Helper.hpp"
 
-struct ModelBus;
+
+struct ModelEntityManager;
 
 struct Buffers {
     // Generic
@@ -34,9 +35,9 @@ struct Buffers {
     // Main
     static void createCommandBuffer(const VkDevice& device, const VkCommandPool& commandPool, std::vector<VkCommandBuffer>& commandBuffers, const int& MAX_FRAMES_IN_FLIGHT);
 
-    static void createVertexBuffer(const VkDevice& device, const VkPhysicalDevice& physicalDevice, const VkCommandPool& commandPool, const VkQueue& graphicsQueue, VkBuffer& vertexBuffer, VkDeviceMemory& vertexBufferMemory, const ModelBus& mdlBus);
+    static void createVertexBuffer(const VkDevice& device, const VkPhysicalDevice& physicalDevice, const VkCommandPool& commandPool, const VkQueue& graphicsQueue, VkBuffer& vertexBuffer, VkDeviceMemory& vertexBufferMemory, const ModelEntityManager& mem);
 
-    static void createIndexBuffer(const VkDevice& device, const VkPhysicalDevice& physicalDevice, const VkCommandPool& commandPool, const VkQueue& graphicsQueue, VkBuffer &indexBuffer, VkDeviceMemory& indexBufferMemory, const ModelBus& mdlBus);
+    static void createIndexBuffer(const VkDevice& device, const VkPhysicalDevice& physicalDevice, const VkCommandPool& commandPool, const VkQueue& graphicsQueue, VkBuffer &indexBuffer, VkDeviceMemory& indexBufferMemory, const ModelEntityManager& mem);
 };
 
 

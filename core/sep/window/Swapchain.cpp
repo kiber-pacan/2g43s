@@ -10,11 +10,8 @@
 #include <limits>
 #include <stdexcept>
 #include <vector>
-
-#include "../images/Images.hpp"
+#include "Images.hpp"
 #include "Queue.hpp"
-
-
 
 // Main method for creating swapchain
 void Swapchain::createSwapchain(const VkDevice& device, VkPhysicalDevice& physicalDevice, VkSurfaceKHR& surface, SDL_Window* window, VkSwapchainKHR& swapchain, std::vector<VkImage>& swapchainImages, VkFormat& swapchainImageFormat, VkExtent2D& swapchainExtent) {
@@ -27,6 +24,7 @@ void Swapchain::createSwapchain(const VkDevice& device, VkPhysicalDevice& physic
     const VkExtent2D extent = chooseSwapExtent(swapchainSupport.capabilities, window);
 
     uint32_t imageCount = swapchainSupport.capabilities.minImageCount + 1;
+
     if (swapchainSupport.capabilities.maxImageCount > 0 && imageCount > swapchainSupport.capabilities.maxImageCount) {
         imageCount = swapchainSupport.capabilities.maxImageCount;
     }

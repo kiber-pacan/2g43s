@@ -1,45 +1,29 @@
 #ifndef ENGINE_HPP
 #define ENGINE_HPP
-#include <glm/fwd.hpp>
-#include <glm/vec4.hpp>
-#include <SDL3/SDL_video.h>
 
+#include <SDL3/SDL_video.h>
 #include <vulkan/vulkan_core.h>
 
-#include "buffers/culling/ModelCullingBufferObject.hpp"
-#include "buffers/culling/VisibleIndicesBufferObject.hpp"
-#include "buffers/main/AtomicCounterObject.hpp"
-#include "buffers/main/DrawCommandsBufferObject.hpp"
-#include "buffers/main/indices/TextureIndexObject.h"
-#include "buffers/main/indices/TextureIndexOffsetObject.hpp"
-#include "buffers/main/uniform/UniformBufferObject.hpp"
-#include "buffers/main/uniform/UniformCullingBufferObject.hpp"
-#include "buffers/main/uniform/UniformPostprocessingBufferObject.hpp"
-#include "buffers/matrices/ModelBufferObject.hpp"
-#include "buffers/matrices/ModelDataBufferObject.hpp"
-#include "camera/Camera.hpp"
-#include "graphics/DeltaManager.hpp"
-#include "graphics/shaders/constants/MatrixPushConstants.hpp"
-#include "graphics/shaders/constants/PostprocessPushConstants.hpp"
-#include "graphics/shaders/constants/VertexPushConstants.hpp"
-#include "graphics/shaders/constants/CullingPushConstants.hpp"
-#include "util/Color.hpp"
-#include "graphics/command/Barrier.h"
-#include "imgui_internal.h"
-#include <ranges>
-#include "graphics/helper/Helper.hpp"
-#include "sep/images/Images.hpp"
-#include "graphics/pipeline/Descriptor.hpp"
-#include "graphics/pipeline/PipelineCreation.hpp"
-#include "sep/graphics/command/Command.hpp"
-#include "util/Tools.hpp"
-#include "imgui_impl_sdl3.h"
-#include "imgui_impl_vulkan.h"
-#include "LogicalDevice.hpp"
-#include "PhysicalDevice.hpp"
-#include "Buffers.hpp"
-#include "window/Surface.hpp"
-#include "sep/graphics/shaders/Shaders.hpp"
+#include "UniformBufferObject.hpp"
+#include "UniformCullingBufferObject.hpp"
+#include "UniformPostprocessingBufferObject.hpp"
+#include "DrawCommandsBufferObject.hpp"
+#include "ModelCullingBufferObject.hpp"
+#include "VisibleIndicesBufferObject.hpp"
+#include "AtomicCounterBufferObject.hpp"
+#include "ModelBufferObject.hpp"
+#include "ModelDataBufferObject.hpp"
+#include "TextureIndexBufferObject.h"
+#include "TextureIndexOffsetBufferObject.hpp"
+
+#include "Camera.hpp"
+#include "DeltaManager.hpp"
+#include "Color.hpp"
+#include "ModelBus.hpp"
+#include "ModelEntityManager.hpp"
+#include "PhysicsBus.h"
+
+
 
 
 struct CullingPushConstants;
@@ -51,11 +35,14 @@ class Engine {
 public:
     // Method for initializing and running engine
     #pragma region Main
-    void init(SDL_Window* window);
+    void init(SDL_Window* sdl_window);
 
     void drawImGui(const VkCommandBuffer& commandBuffer);
 
     void recordCommandBuffer(uint32_t imageIndex, VkPipeline postprocessPipeline);
+
+
+    void waitForFences(const VkFence& fence) const;
 
     // Draw
     void drawFrame();
@@ -67,33 +54,33 @@ public:
 
     #pragma region Buffers
     // Generic
-    static void updateUniformBuffer(uint32_t currentFrame, const VkExtent2D& swapchainExtent, const std::vector<void*>& uniformBuffersMapped, const std::vector<void*>& uniformMatrixBuffersMapped, UniformBufferObject& ubo, UniformBufferObject& umbo, const Camera& camera, const ModelBus& mdlBus);
+    void updateUniformBuffer();
 
-    static void updateUniformPostprocessingBuffer(uint32_t currentFrame, const std::vector<void*>& uniformBuffersMapped, UniformPostprocessingBufferObject& upbo, DeltaManager& delta, const VkExtent2D& swapchainExtent);
+    void updateUniformPostprocessingBuffer();
 
 
     static void normalizePlane(glm::vec4& plane);
 
     static glm::vec4 extractPlane(glm::mat4 viewProjection, int a, float sign);
 
-    static void updateCullingUniformBuffer(uint32_t currentFrame, const VkExtent2D& swapchainExtent, const std::vector<void*>& uniformCullingBuffersMapped, UniformCullingBufferObject& ucbo, const Camera& camera, const ModelBus& mdlBus);
+    void updateCullingUniformBuffer();
 
 
     // Matrices
-    static void updateModelDataBuffer(uint32_t currentFrame, const std::vector<void*>& modelDataBuffersMapped, const ModelBus& mdlBus);
+    void updateModelDataBuffer();
 
-    static void updateModelBuffer(const std::vector<void*>& modelBuffersMapped, ModelBufferObject& mbo, ModelBus& mdlBus);
+    void updateModelBuffer();
 
-    void updateSingleModel(uint32_t index, glm::mat4 matrix);
+    void updateSingleModel(const std::string &name, uint32_t instanceIndex, glm::mat4 matrix);
 
     // Culling
-    static void updateModelCullingBuffer(void*& modelCullingBufferMapped, ModelCullingBufferObject& mcbo, const ModelBus& mdlBus);
+    void updateModelCullingBuffer();
 
-    static void updateVisibleIndicesBuffer(const std::vector<void*>& visibleIndicesBuffersMapped, VisibleIndicesBufferObject& vio);
+    void updateVisibleIndicesBuffer();
 
     void updateDrawCommands();
 
-    static void updateTextureIndexBuffer(void* TextureIndexBufferMapped, void* TextureIndexOffsetBufferMapped, TextureIndexObject& tio, TextureIndexOffsetObject& tioo, ModelBus& mdlBus);
+    void updateTextureIndexBuffer();
     #pragma endregion
 
     void recreatePostprocessingPipeline(const std::string& filename);
@@ -120,7 +107,7 @@ public:
     UniformBufferObject umbo{};
     UniformCullingBufferObject ucbo{};
     UniformPostprocessingBufferObject upbo{};
-    AtomicCounterObject atomic_counter{};
+    AtomicCounterBufferObject atomic_counter{};
     DrawCommandsBufferObject dc{};
     DrawCommandsBufferObject dcs{};
 
@@ -136,17 +123,18 @@ public:
     Camera camera{};
 
     // Texture index
-    TextureIndexOffsetObject tioo{};
-    TextureIndexObject tio{};
+    TextureIndexOffsetBufferObject tioo{};
+    TextureIndexBufferObject tio{};
 
     DeltaManager delta;
 
-    ModelBus mdlBus{};
+    ModelEntityManager mem{};
 
     double desiredFrameRate;
     double sleepTimeTotalSeconds;
 
     bool depth = false;
+    bool initialized = false;
 
     glm::vec2 mousePosition;
     glm::vec2 mousePointerPosition;
@@ -312,14 +300,15 @@ private:
 
     VkSampler textureSampler{};
 
-    // Fences
     std::vector<VkSemaphore> imageAvailableSemaphores{};
     std::vector<VkSemaphore> renderFinishedSemaphores{};
     std::vector<VkFence> inFlightFences{};
+    std::vector<VkFence> imageFences{};
 
     // Frames
-    static constexpr int MAX_FRAMES_IN_FLIGHT = 4;
+    static constexpr size_t MAX_FRAMES_IN_FLIGHT = 3;
     uint32_t currentFrame = 0;
+    static inline bool initializedMbo = false;
 
     // Constants
 
@@ -334,14 +323,14 @@ private:
     // Creating Vulkan instance
     void createInstance();
 
-    void initializeOffscreenImages(int width, int height);
+    void initializeOffscreenImages(uint32_t width, uint32_t height);
 
     void initializePostprocessPipelines();
     // Vulkan related stuff
     void initializeVulkan();
 
     // ImGui Stuff
-    void initializeImGui(SDL_Window* window);
+    void initializeImGui(SDL_Window* sdl_window);
 
     #pragma endregion
 

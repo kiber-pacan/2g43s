@@ -1,14 +1,38 @@
 #ifndef ENGINE_CPP
 #define ENGINE_CPP
-
+#include <vulkan/vulkan_core.h>
 #include "Engine.hpp"
 
+#include "imgui_internal.h"
+#include "imgui_impl_sdl3.h"
+#include "imgui_impl_vulkan.h"
+
 #include "Random.hpp"
+#include "MatrixPushConstants.hpp"
+#include "PostprocessPushConstants.hpp"
+#include "VertexPushConstants.hpp"
+#include "CullingPushConstants.hpp"
+
+#include "Descriptor.hpp"
+#include "Tools.hpp"
+#include "Surface.hpp"
+#include "Color.hpp"
+#include "Barrier.h"
+#include "Helper.hpp"
+#include "Images.hpp"
+#include "PipelineCreation.hpp"
+#include "Command.hpp"
+#include "LogicalDevice.hpp"
+#include "PhysicalDevice.hpp"
+#include "Buffers.hpp"
+#include "sep/model/managing/PhysicsBus.h"
+#include "Shaders.hpp"
+#include "Sync.hpp"
 
 #pragma region Main
 // Method for initializing and running engine
-void Engine::init(SDL_Window* window) {
-    initialize(window);
+void Engine::init(SDL_Window* sdl_window) {
+    initialize(sdl_window);
 }
 
 void Engine::drawImGui(const VkCommandBuffer& commandBuffer) {
@@ -17,23 +41,23 @@ void Engine::drawImGui(const VkCommandBuffer& commandBuffer) {
 
     ImGui::NewFrame();
 
-    ImGuiID dockspace_id = ImGui::GetID("My Dockspace");
-    ImGuiViewport* viewport = ImGui::GetMainViewport();
+    //ImGuiID dockspace_id = ImGui::GetID("My Dockspace");
+    const ImGuiViewport* viewport = ImGui::GetMainViewport();
 
     ImGui::SetNextWindowSizeConstraints(ImVec2(0, 0), viewport->Size);
 
     ImGui::Begin("Stats");
 
-    ImVec2 pos = ImGui::GetWindowPos();
-    ImVec2 size = ImGui::GetWindowSize();
+    const ImVec2 pos = ImGui::GetWindowPos();
+    const ImVec2 size = ImGui::GetWindowSize();
 
-    float minX = viewport->Pos.x;
-    float minY = viewport->Pos.y;
-    float maxX = std::max(minX, viewport->Pos.x + viewport->Size.x - size.x);
-    float maxY = std::max(minY, viewport->Pos.y + viewport->Size.y - size.y);
+    const float minX = viewport->Pos.x;
+    const float minY = viewport->Pos.y;
+    const float maxX = std::max(minX, viewport->Pos.x + viewport->Size.x - size.x);
+    const float maxY = std::max(minY, viewport->Pos.y + viewport->Size.y - size.y);
 
-    float clampedX = std::clamp(pos.x, minX, maxX);
-    float clampedY = std::clamp(pos.y, minY, maxY);
+    const float clampedX = std::clamp(pos.x, minX, maxX);
+    const float clampedY = std::clamp(pos.y, minY, maxY);
 
     if (pos.x != clampedX || pos.y != clampedY) {
         ImGui::SetWindowPos(ImVec2(clampedX, clampedY));
@@ -43,10 +67,10 @@ void Engine::drawImGui(const VkCommandBuffer& commandBuffer) {
 
     // FPS
     ImGui::Value("Framerate", static_cast<int>(delta.frameRate));
-    ImGui::Value("Total models", static_cast<int>(mdlBus.modelsCount()));
-    ImGui::Value("Total instances", static_cast<int>(mdlBus.getTotalInstanceCount()));
+    ImGui::Value("Total models", static_cast<int>(mem.modelsCount()));
+    ImGui::Value("Total instances", static_cast<int>(mem.getTotalInstanceCount()));
 
-    int desiredFps = desiredFrameRate;
+    int desiredFps = static_cast<int>(desiredFrameRate);
 
     if (ImGui::BeginTable("fps_table", 2)) {
         ImGui::TableNextRow();
@@ -70,11 +94,11 @@ void Engine::drawImGui(const VkCommandBuffer& commandBuffer) {
         ImGui::EndTable();
     }
 
-    std::string selectedShader1 = selectedShader;
+    const std::string selectedShader1 = selectedShader;
     if (ImGui::BeginCombo("shaders", selectedShader1.c_str())) {
         for (const std::string& shader : postprocessPipelines | std::views::keys) {
 
-            bool is_selected = shader == selectedShader;
+            const bool is_selected = shader == selectedShader;
 
             if (ImGui::Selectable(shader.c_str(), is_selected)) {
                 selectedShader = shader;
@@ -108,24 +132,9 @@ void Engine::recordCommandBuffer(uint32_t imageIndex, VkPipeline postprocessPipe
 
     #pragma region Cleanup
     vkCmdFillBuffer(commandBuffer, atomicCounterBuffers[currentFrame], 0, sizeof(uint32_t), 0); // Clear atomic counter
-    for (int i = 0; i < mdlBus.getTotalModelCount(); i++) {
+    for (int i = 0; i < mem.getTotalModelCount(); i++) {
         vkCmdFillBuffer(commandBuffer, drawCommandsSourceBuffers[currentFrame], offsetof(VkDrawIndexedIndirectCommand, instanceCount) + sizeof(VkDrawIndexedIndirectCommand) * i, 4, 0); // Clear 4 bites with offset of 4
     }
-
-    Barrier fillBarrier(commandBuffer);
-    fillBarrier.buffer(
-        atomicCounterBuffers[currentFrame],
-        VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED,
-        VK_ACCESS_2_TRANSFER_WRITE_BIT, VK_ACCESS_2_SHADER_WRITE_BIT | VK_ACCESS_2_SHADER_READ_BIT,
-        VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-        0, VK_WHOLE_SIZE
-    ).buffer(
-        drawCommandsSourceBuffers[currentFrame],
-        VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED,
-        VK_ACCESS_2_TRANSFER_WRITE_BIT, VK_ACCESS_2_SHADER_WRITE_BIT | VK_ACCESS_2_SHADER_READ_BIT,
-        VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-        0, VK_WHOLE_SIZE
-    ).apply();
     #pragma endregion
 
     std::array<VkClearValue, 2> clearValues{};
@@ -166,7 +175,7 @@ void Engine::recordCommandBuffer(uint32_t imageIndex, VkPipeline postprocessPipe
             frame = 0;
         }
 
-        const size_t totalInstances = mdlBus.getTotalInstanceCount();
+        const size_t totalInstances = mem.getTotalInstanceCount();
         uint32_t groupCount = (totalInstances + workgroupSize - 1) / workgroupSize;
 
         vkCmdDispatch(commandBuffer, groupCount, 1, 1);
@@ -205,7 +214,7 @@ void Engine::recordCommandBuffer(uint32_t imageIndex, VkPipeline postprocessPipe
         );
 
         constexpr uint32_t workgroupSize1 = 128;
-        const size_t totalInstances = mdlBus.getTotalInstanceCount();
+        const size_t totalInstances = mem.getTotalInstanceCount();
         uint32_t groupCount = (totalInstances + workgroupSize1 - 1) / workgroupSize1;
 
         vkCmdDispatch(commandBuffer, groupCount, 1, 1);
@@ -323,8 +332,8 @@ void Engine::recordCommandBuffer(uint32_t imageIndex, VkPipeline postprocessPipe
 
     vkCmdBindIndexBuffer(commandBuffer, indexBuffer, 0, VK_INDEX_TYPE_UINT32);
 
-    //vkCmdDrawIndexedIndirectCount(commandBuffer, drawCommandsBuffer, 0, atomicCounterBuffers[currentFrame], 0, 1024, sizeof(VkDrawIndexedIndirectCommand));
-    vkCmdDrawIndexedIndirect(commandBuffer, drawCommandsSourceBuffers[currentFrame], 0, static_cast<uint32_t>(mdlBus.getTotalModelCount()), sizeof(VkDrawIndexedIndirectCommand));
+    vkCmdDrawIndexedIndirectCount(commandBuffer, drawCommandsSourceBuffers[currentFrame], 0, atomicCounterBuffers[currentFrame], 0, 1024, sizeof(VkDrawIndexedIndirectCommand));
+    //vkCmdDrawIndexedIndirect(commandBuffer, drawCommandsSourceBuffers[currentFrame], 0, static_cast<uint32_t>(mdlBus.getTotalModelCount()), sizeof(VkDrawIndexedIndirectCommand));
 
     vkCmdEndRendering(commandBuffer);
     #pragma endregion
@@ -413,11 +422,22 @@ void Engine::recordCommandBuffer(uint32_t imageIndex, VkPipeline postprocessPipe
     }
 }
 
+void Engine::waitForFences(const VkFence& fence) const {
+    Logger logger("waitForFences()");
+
+    const auto result = vkWaitForFences(device, 1, &fence, VK_TRUE, UINT64_MAX);
+
+    if (result != VK_SUCCESS) {
+        logger.error("ERROR!");
+    } else {
+        vkResetFences(device, 1, &fence);
+    }
+}
+
 // Draw
 void Engine::drawFrame() {
-    vkWaitForFences(device, 1, &inFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
-
-
+    waitForFences(imageFences[currentFrame]);
+    waitForFences(inFlightFences[currentFrame]);
 
     uint32_t imageIndex;
     VkResult result = vkAcquireNextImageKHR(device, swapchain, UINT64_MAX, imageAvailableSemaphores[currentFrame], VK_NULL_HANDLE, &imageIndex);
@@ -429,25 +449,23 @@ void Engine::drawFrame() {
         throw std::runtime_error("failed to acquire swap chain image!");
     }
 
-    updateUniformBuffer(currentFrame, swapchainExtent, uniformBuffersMapped, uniformMatrixBuffersMapped, ubo, umbo, camera, mdlBus);
-    updateUniformPostprocessingBuffer(currentFrame, uniformPostprocessingBuffersMapped, upbo, delta, swapchainExtent);
-    updateCullingUniformBuffer(currentFrame, swapchainExtent, uniformCullingBuffersMapped, ucbo, camera, mdlBus);
-    updateModelCullingBuffer(modelCullingBufferMapped, mcbo, mdlBus);
-    updateModelDataBuffer(currentFrame, modelDataBuffersMapped, mdlBus);
-    updateModelBuffer(modelBuffersMapped, mbo, mdlBus);
-    updateTextureIndexBuffer(textureIndexBufferMapped, textureIndexOffsetBufferMapped, tio, tioo, mdlBus);
+    updateUniformBuffer();
+    updateUniformPostprocessingBuffer();
+    updateCullingUniformBuffer();
+    updateModelCullingBuffer();
+    updateModelDataBuffer();
+    updateModelBuffer();
+    updateTextureIndexBuffer();
 
     std::function<void(VkCommandBuffer&)> imGui = [this](const VkCommandBuffer& commandBuffer) { drawImGui(commandBuffer); };
 
     recordCommandBuffer(imageIndex, postprocessPipelines[selectedShader]);
 
-    vkResetFences(device, 1, &inFlightFences[currentFrame]);
-
     VkSubmitInfo submitInfo{};
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 
-    VkSemaphore waitSemaphores[] = {imageAvailableSemaphores[currentFrame]};
-    VkPipelineStageFlags waitStages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
+    const VkSemaphore waitSemaphores[] = {imageAvailableSemaphores[currentFrame]};
+    constexpr VkPipelineStageFlags waitStages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
     submitInfo.waitSemaphoreCount = 1;
     submitInfo.pWaitSemaphores = waitSemaphores;
     submitInfo.pWaitDstStageMask = waitStages;
@@ -455,7 +473,7 @@ void Engine::drawFrame() {
     submitInfo.commandBufferCount = 1;
     submitInfo.pCommandBuffers = &commandBuffers[currentFrame];
 
-    VkSemaphore signalSemaphores[] = {renderFinishedSemaphores[currentFrame]};
+    const VkSemaphore signalSemaphores[] = {renderFinishedSemaphores[currentFrame]};
     submitInfo.signalSemaphoreCount = 1;
     submitInfo.pSignalSemaphores = signalSemaphores;
 
@@ -463,17 +481,20 @@ void Engine::drawFrame() {
         throw std::runtime_error("failed to submit draw command buffer!");
     }
 
+    VkSwapchainPresentFenceInfoKHR imageFenceInfo{};
+    imageFenceInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_PRESENT_FENCE_INFO_KHR;
+    imageFenceInfo.pFences = &imageFences[currentFrame];
+    imageFenceInfo.swapchainCount = 1;
+
+    const VkSwapchainKHR swapchains[] = { swapchain };
     VkPresentInfoKHR presentInfo{};
     presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-
     presentInfo.waitSemaphoreCount = 1;
     presentInfo.pWaitSemaphores = signalSemaphores;
-
-    VkSwapchainKHR swapchains[] = { swapchain };
     presentInfo.swapchainCount = 1;
     presentInfo.pSwapchains = swapchains;
-
     presentInfo.pImageIndices = &imageIndex;
+    presentInfo.pNext = &imageFenceInfo;
 
     result = vkQueuePresentKHR(presentQueue, &presentInfo);
 
@@ -501,7 +522,7 @@ void Engine::cleanup() const {
     vkDestroyImage(device, textureImage, nullptr);
     vkFreeMemory(device, textureImageMemory, nullptr);
 
-    for (auto& textures : mdlBus.groups_map
+    for (auto& textures : mem.groups
     | std::views::values
     | std::views::transform(&ModelGroup::model)
     | std::views::transform(&ParsedModel::textures)
@@ -579,6 +600,7 @@ void Engine::cleanup() const {
     for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
         vkDestroySemaphore(device, renderFinishedSemaphores[i], nullptr);
         vkDestroySemaphore(device, imageAvailableSemaphores[i], nullptr);
+        vkDestroyFence(device, imageFences[i], nullptr);
         vkDestroyFence(device, inFlightFences[i], nullptr);
     }
 
@@ -617,7 +639,7 @@ void Engine::cleanup() const {
 
     vkDestroyDevice(device, nullptr);
 
-    if (enableValidationLayers) {
+    if constexpr (enableValidationLayers) {
         Debug::DestroyDebugUtilsMessengerEXT(instance, debugMessenger, nullptr);
     }
 
@@ -629,37 +651,37 @@ void Engine::cleanup() const {
 
 #pragma region Buffers
 // Generic
-void Engine::updateUniformBuffer(uint32_t currentFrame, const VkExtent2D& swapchainExtent, const std::vector<void*>& uniformBuffersMapped, const std::vector<void*>& uniformMatrixBuffersMapped, UniformBufferObject& ubo, UniformBufferObject& umbo, const Camera& camera, const ModelBus& mdlBus) {
+void Engine::updateUniformBuffer() {
     const glm::mat4 view = glm::lookAt(camera.pos + glm::vec3(0), camera.pos + camera.look, glm::vec3(0.0f, 0.0f, 1.0f));
     glm::mat4 proj = glm::perspective(camera.fov,  static_cast<float>(swapchainExtent.width) / static_cast<float>(swapchainExtent.height), 0.1f, 4096.0f);
     proj[1][1] *= -1;
 
     ubo.view = view;
     ubo.proj = proj;
-    ubo.count = mdlBus.getTotalModelCount();
+    ubo.count = mem.getTotalModelCount();
 
     umbo.view = view;
     umbo.proj = proj;
-    umbo.count = mdlBus.getTotalInstanceCount();
+    umbo.count = mem.getTotalInstanceCount();
 
     memcpy(uniformBuffersMapped[currentFrame], &ubo, sizeof(ubo));
     memcpy(uniformMatrixBuffersMapped[currentFrame], &umbo, sizeof(umbo));
 }
 
-void Engine::updateUniformPostprocessingBuffer(const uint32_t currentFrame, const std::vector<void*>& uniformPostprocessingBuffersMapped, UniformPostprocessingBufferObject& upbo, DeltaManager& delta, const VkExtent2D& swapchainExtent) {
-    upbo.time += delta.deltaTime;
+void Engine::updateUniformPostprocessingBuffer() {
+    upbo.time += static_cast<float>(delta.deltaTime);
     upbo.resolution = glm::vec2(swapchainExtent.width, swapchainExtent.height);
     memcpy(uniformPostprocessingBuffersMapped[currentFrame], &upbo, sizeof(upbo));
 }
 
 void Engine::normalizePlane(glm::vec4& plane) {
-    float length = glm::length(glm::vec3(plane));
+    const float length = glm::length(glm::vec3(plane));
     if (length > 0.0f) {
         plane /= length;
     }
 }
 
-glm::vec4 Engine::extractPlane(glm::mat4 viewProjection, int a, float sign) {
+glm::vec4 Engine::extractPlane(glm::mat4 viewProjection, const int a, const float sign) {
     glm::vec4 plane(
         viewProjection[0][3] - sign * viewProjection[0][a],
         viewProjection[1][3] - sign * viewProjection[1][a],
@@ -667,20 +689,20 @@ glm::vec4 Engine::extractPlane(glm::mat4 viewProjection, int a, float sign) {
         viewProjection[3][3] - sign * viewProjection[3][a]
     );
 
-    float length = glm::length(glm::vec3(plane));
+    const float length = glm::length(glm::vec3(plane));
     if (length > 0.0f) plane /= length;
 
     return plane;
 }
 
-void Engine::updateCullingUniformBuffer(const uint32_t currentFrame, const VkExtent2D& swapchainExtent, const std::vector<void*>& uniformCullingBuffersMapped, UniformCullingBufferObject& ucbo, const Camera& camera, const ModelBus& mdlBus) {
-    ucbo.totalObjects = mdlBus.getTotalInstanceCount();
+void Engine::updateCullingUniformBuffer() {
+    ucbo.totalObjects = mem.getTotalInstanceCount();
 
-    glm::mat4 view = glm::lookAt(camera.pos, camera.pos + camera.look, glm::vec3(0.0f, 0.0f, 1.0f)); // z-up
+    const glm::mat4 view = glm::lookAt(camera.pos, camera.pos + camera.look, glm::vec3(0.0f, 0.0f, 1.0f)); // z-up
     glm::mat4 proj = glm::perspective(camera.fov, static_cast<float>(swapchainExtent.width) / static_cast<float>(swapchainExtent.height), 0.1f, 4096.0f);
     proj[1][1] *= -1;
 
-    glm::mat4 viewProjection = proj * view;
+    const glm::mat4 viewProjection = proj * view;
 
     ucbo.planes[0] = extractPlane(viewProjection, 0, +1); // right
     ucbo.planes[1] = extractPlane(viewProjection, 0, -1); // left
@@ -694,51 +716,55 @@ void Engine::updateCullingUniformBuffer(const uint32_t currentFrame, const VkExt
 
 
 // Matrices
-void Engine::updateModelDataBuffer(const uint32_t currentFrame, const std::vector<void*>& modelDataBuffersMapped, const ModelBus& mdlBus) {
-    static bool dirtyMDBO = true;
+void Engine::updateModelDataBuffer() {
     static size_t frame = 0;
 
-    if (dirtyMDBO) {
+    if (mem.dirty[2]) {
         auto* dst = static_cast<glm::vec4*>(modelDataBuffersMapped[currentFrame]);
         size_t i = 0;
-        for (const auto& group : std::views::transform(std::views::values(mdlBus.groups_map), &ModelGroup::instances)) {
-            for (const auto& instance : group) {
-                dst[i * 3 + 0] = instance.pos;
-                dst[i * 3 + 1] = instance.rot;
-                dst[i * 3 + 2] = instance.scl;
+        for (const auto& group : std::views::transform(std::views::values(mem.groups), &ModelGroup::instances)) {
+            for (const auto& model_instance : group) {
+                dst[i * 3 + 0] = model_instance.pos;
+                dst[i * 3 + 1] = model_instance.rot;
+                dst[i * 3 + 2] = model_instance.scl;
                 i++;
             }
         }
 
         frame++;
-        if (frame == MAX_FRAMES_IN_FLIGHT) dirtyMDBO = false;
+        if (frame == MAX_FRAMES_IN_FLIGHT) mem.dirty[2] = false;
     }
 }
 
-void Engine::updateModelBuffer(const std::vector<void*>& modelBuffersMapped, ModelBufferObject& mbo, ModelBus& mdlBus) {
-    static bool initialized = false;
-
-    if (!initialized) {
+void Engine::updateModelBuffer() {
+    if (!initializedMbo) {
         mbo.models.clear();
-        mbo.models.resize(mdlBus.getTotalInstanceCount());
-        for (auto& object : modelBuffersMapped) {
+        mbo.models.resize(mem.getTotalInstanceCount());
+        for (const auto& object : modelBuffersMapped) {
             memcpy(object, mbo.models.data(), sizeof(glm::mat4) * mbo.models.size());
         }
 
-        initialized = true;
+        initializedMbo = true;
     }
 }
 
-void Engine::updateSingleModel(const uint32_t index, glm::mat4 matrix) {
-    const auto scale = mdlBus.groups_map["box_opt.glb"].instances[0].scl;
+void Engine::updateSingleModel(const std::string &name, const uint32_t instanceIndex, glm::mat4 matrix) {
+    if (!initializedMbo) return;
+
+    const auto scale = mem.groups[name].instances[instanceIndex].scl;
     matrix[0] = glm::normalize(matrix[0]) * scale.x;
     matrix[1] = glm::normalize(matrix[1]) * scale.y;
     matrix[2] = glm::normalize(matrix[2]) * scale.z;
-    mbo.models[index] = matrix;
-    mcbo.cullingDatas[index].sphere = mdlBus.groups_map["box_opt.glb"].model->sphere + glm::vec4(matrix[3]);
+    mbo.models[instanceIndex] = matrix;
 
-    const size_t matOffset = index * sizeof(glm::mat4);
-    const size_t sphereOffset = index * sizeof(CullingData);
+    size_t modelIndex = 0;
+    for (int i = 0; i < mem.indexedFiles.size(); ++i) {
+        if (mem.indexedFiles[i] == name) modelIndex = mem.indexedFiles.size() - (i + 1);
+    }
+
+    const size_t matOffset = (modelIndex + instanceIndex) * sizeof(glm::mat4);
+    const size_t sphereOffset = (modelIndex + instanceIndex) * sizeof(CullingData);
+
 
     for (void* mappedPtr : modelBuffersMapped) {
         void* targetAddress = static_cast<char*>(mappedPtr) + matOffset;
@@ -746,27 +772,24 @@ void Engine::updateSingleModel(const uint32_t index, glm::mat4 matrix) {
         memcpy(targetAddress, &matrix, sizeof(glm::mat4));
     }
 
+    mcbo.cullingDatas[modelIndex].sphere = mem.groups[name].model->sphere + glm::vec4(matrix[3]);
     void* targetAddress = static_cast<char*>(modelCullingBufferMapped) + sphereOffset;
-    memcpy(targetAddress, &mcbo.cullingDatas[index], sizeof(CullingData));
+    memcpy(targetAddress, &mcbo.cullingDatas[modelIndex], sizeof(CullingData));
 }
 
 
 // Culling
-void Engine::updateModelCullingBuffer(void*& modelCullingBufferMapped, ModelCullingBufferObject& mcbo, const ModelBus& mdlBus) {
-    static bool initialized = false;
-
-    if (!initialized) {
+void Engine::updateModelCullingBuffer() {
+    if (mem.dirty[1]) {
         mcbo.cullingDatas.clear();
-        mcbo.cullingDatas.reserve(mdlBus.getTotalInstanceCount());
+        mcbo.cullingDatas.reserve(mem.getTotalInstanceCount());
 
         uint16_t index = 0;
-        for (const auto& group : std::views::transform(std::views::values(mdlBus.groups_map), &ModelGroup::instances)) {
-            for (const auto& instance : group) {
-                glm::vec4 sphere = instance.mdl.lock()->sphere + instance.pos;
-                sphere.w *= glm::compMax(instance.scl);
+        for (const auto& group : std::views::transform(std::views::values(mem.groups), &ModelGroup::instances)) {
+            for (const auto& model_instance : group) {
+                glm::vec4 sphere = model_instance.mdl.lock()->sphere + model_instance.pos;
+                sphere.w *= glm::compMax(model_instance.scl);
                 mcbo.cullingDatas.emplace_back(sphere, index);
-
-                std::cout << index << ": " << sphere.x << " " << sphere.y << " " << sphere.z << " " << sphere.w << std::endl;
             }
 
             index++;
@@ -774,16 +797,16 @@ void Engine::updateModelCullingBuffer(void*& modelCullingBufferMapped, ModelCull
 
         memcpy(modelCullingBufferMapped, mcbo.cullingDatas.data(), mcbo.cullingDatas.size() * sizeof(CullingData));
 
-        initialized = true;
+        mem.dirty[1] = false;
     }
 }
 
-void Engine::updateVisibleIndicesBuffer(const std::vector<void*>& visibleIndicesBuffersMapped, VisibleIndicesBufferObject& vio) {
+void Engine::updateVisibleIndicesBuffer() {
     static bool initialized = false;
 
     if (!initialized) {
         vio.vi.clear();
-        for (auto& object : visibleIndicesBuffersMapped) {
+        for (const auto& object : visibleIndicesBuffersMapped) {
             memcpy(object, vio.vi.data(), vio.vi.size() * sizeof(uint32_t));
         }
     }
@@ -796,11 +819,11 @@ void Engine::updateDrawCommands() {
     int32_t vertexOffset = 0;
     uint32_t firstInstance = 0;
 
-    for (const auto& group : std::views::values(mdlBus.groups_map)) {
+    for (const auto& group : std::views::values(mem.groups)) {
         VkDrawIndexedIndirectCommand command{};
 
         const size_t instanceCount = group.instances.size();
-        const uint32_t indexCount = ModelBus::getIndexCount(group.model);
+        const uint32_t indexCount = ModelEntityManager::getIndexCount(group.model);
 
         command.firstInstance = firstInstance;
         command.instanceCount = instanceCount;
@@ -810,23 +833,23 @@ void Engine::updateDrawCommands() {
         command.vertexOffset = vertexOffset;
 
         firstIndex += indexCount;
-        vertexOffset += ModelBus::getVertexCount(group.model);
+        vertexOffset += ModelEntityManager::getVertexCount(group.model);
         firstInstance += instanceCount;
         dcs.commands.emplace_back(command);
     }
 }
 
-void Engine::updateTextureIndexBuffer(void* TextureIndexBufferMapped, void* TextureIndexOffsetBufferMapped, TextureIndexObject& tio, TextureIndexOffsetObject& tioo, ModelBus& mdlBus) {
+void Engine::updateTextureIndexBuffer() {
     static bool initialized = false;
 
     if (!initialized) {
         size_t i = 0;
-        const size_t count = mdlBus.getTotalModelCount();
+        const size_t count = mem.getTotalModelCount();
         uint32_t currentGlobalVertexOffset = 0;
 
         tio.indices.resize(count);
 
-        for (auto& model : mdlBus.groups_map | std::views::values | std::views::transform(&ModelGroup::model)) {
+        for (const auto& model : mem.groups | std::views::values | std::views::transform(&ModelGroup::model)) {
             auto& textures = model->textures;
 
             if (textures.empty()) {
@@ -842,8 +865,8 @@ void Engine::updateTextureIndexBuffer(void* TextureIndexBufferMapped, void* Text
                 //std::cout << "Tex count: " << tio.indices[i].indexCount << std::endl;
                 //std::cout << "Padding index: " << tio.indices[i].pad1 << std::endl;
                 //std::cout << "==================" << std::endl;
-                for (size_t i1 = 0; i1 < textures.size(); i1++) {
-                    const uint32_t offset = textures[i1].indexOffset;
+                for (const auto & texture : textures) {
+                    const uint32_t offset = texture.indexOffset;
                     tioo.indexOffsets.emplace_back(offset);
                     //std::cout << "Tex offset: " << offset << std::endl;
                 }
@@ -861,8 +884,8 @@ void Engine::updateTextureIndexBuffer(void* TextureIndexBufferMapped, void* Text
         //std::cout << "Index offsets count: " << tioo.indexOffsets.size() << std::endl;
         //std::cout << "Index offsets2 count: " << tio.indices.size() << std::endl;
 
-        memcpy(TextureIndexBufferMapped, tio.indices.data(), sizeof(Index) * tio.indices.size());
-        memcpy(TextureIndexOffsetBufferMapped, tioo.indexOffsets.data(), tioo.indexOffsets.size() * sizeof(uint32_t));
+        memcpy(textureIndexBufferMapped, tio.indices.data(), sizeof(Index) * tio.indices.size());
+        memcpy(textureIndexOffsetBufferMapped, tioo.indexOffsets.data(), tioo.indexOffsets.size() * sizeof(uint32_t));
 
         initialized = true;
     }
@@ -875,7 +898,7 @@ void Engine::recreatePostprocessingPipeline(const std::string& filename) {
 
 #pragma region Initialization
 // Initialization of engine and its counterparts
-void Engine::initialize(SDL_Window* window) {
+void Engine::initialize(SDL_Window* sdl_window) {
     const auto start = std::chrono::high_resolution_clock::now();
 
     std::vector<std::filesystem::path> dirtyShaders = Shaders::getShadersToCompile();
@@ -884,14 +907,14 @@ void Engine::initialize(SDL_Window* window) {
         Shaders::saveShaderToFile(Tools::getShaderPath() + "compiled/" + dirtyShader.lexically_relative(Tools::getShaderPath()).replace_extension(".spv").string(), shader);
     }
 
-    this->window = window;
+    this->window = sdl_window;
 
     // Engine related stuff
     sid = Random::randomNum<uint64_t>(1000000000,9999999999);
     LOGGER = Logger("engine.hpp");
 
     initializeVulkan();
-    initializeImGui(window);
+    initializeImGui(sdl_window);
 
     const auto end = std::chrono::high_resolution_clock::now();
     const std::chrono::duration<double> duration = end - start;
@@ -900,7 +923,8 @@ void Engine::initialize(SDL_Window* window) {
     sleepTimeTotalSeconds = 1.0 / desiredFrameRate;
 
     // Success!?
-    LOGGER.success("2g43s engine started successfully in ${} seconds!", duration.count());
+    LOGGER.success("2g43s engine STARTED successfully in ${} seconds!", duration.count());
+    initialized = true;
 }
 
 // Creating Vulkan instance
@@ -916,7 +940,7 @@ void Engine::createInstance() {
     appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
     appInfo.pEngineName = "2g43s Engine";
     appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
-    appInfo.apiVersion = VK_API_VERSION_1_3;
+    appInfo.apiVersion = VK_API_VERSION_1_4;
 
     // Instance info
     VkInstanceCreateInfo createInfo{};
@@ -924,13 +948,13 @@ void Engine::createInstance() {
     createInfo.pApplicationInfo = &appInfo;
 
     // Vulkan extensions
-    auto extensions = getRequiredExtensions();
+    const auto extensions = getRequiredExtensions();
     createInfo.enabledExtensionCount = static_cast<uint32_t>(extensions.size());
     createInfo.ppEnabledExtensionNames = extensions.data();
 
     // Validation layers initialization
     VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo{};
-    if (enableValidationLayers) {
+    if constexpr (enableValidationLayers) {
         VkValidationFeaturesEXT validationFeatures = {};
         VkValidationFeatureEnableEXT enables[] = {VK_VALIDATION_FEATURE_ENABLE_DEBUG_PRINTF_EXT};
         validationFeatures.pEnabledValidationFeatures = enables;
@@ -956,10 +980,10 @@ void Engine::createInstance() {
     }
 }
 
-void Engine::initializeImGui(SDL_Window* window) {
+void Engine::initializeImGui(SDL_Window* sdl_window) {
     ImGui::CreateContext();
 
-        ImGuiStyle& style = ImGui::GetStyle();
+    ImGuiStyle& style = ImGui::GetStyle();
     ImVec4* colors = style.Colors;
 
     // Скругляем углы для более современного вида
@@ -1019,9 +1043,9 @@ void Engine::initializeImGui(SDL_Window* window) {
     io.Fonts->AddFontFromFileTTF((Tools::getCorePath() + "fonts/opensans.ttf").c_str(), 18.0f);
     io.FontGlobalScale = 1.0f;
 
-    ImGui_ImplSDL3_InitForVulkan(window);
+    ImGui_ImplSDL3_InitForVulkan(sdl_window);
 
-    QueueFamilyIndices indices = Queue::findQueueFamilies(physicalDevice, surface);
+    const QueueFamilyIndices indices = Queue::findQueueFamilies(physicalDevice, surface);
 
     ImGui_ImplVulkan_InitInfo info{};
 
@@ -1047,14 +1071,9 @@ void Engine::initializeImGui(SDL_Window* window) {
     info.PipelineInfoMain = pipeline_info;
 
     ImGui_ImplVulkan_Init(&info);
-
-    VkCommandBuffer commandBuffer = Command::beginSingleTimeCommands(device, graphicsCommandPool);
-    Command::endSingleTimeCommands(device, commandBuffer, graphicsCommandPool, graphicsQueue);
-
-    vkDeviceWaitIdle(device);
 }
 
-void Engine::initializeOffscreenImages(const int width, const int height) {
+void Engine::initializeOffscreenImages(const uint32_t width, const uint32_t height) {
     offscreenImages.resize(MAX_FRAMES_IN_FLIGHT);
     offscreenImageViews.resize(MAX_FRAMES_IN_FLIGHT);
     offscreenImagesMemory.resize(MAX_FRAMES_IN_FLIGHT);
@@ -1088,7 +1107,7 @@ void Engine::initializeVulkan() {
     setupDebugMessenger();
 
     // SDL3 surface
-    Surface::createSurface(Engine::surface, window, instance);
+    Surface::createSurface(surface, window, instance);
 
     // Devices
     PhysicalDevice::pickPhysicalDevice(physicalDevice, instance, surface);
@@ -1122,11 +1141,11 @@ void Engine::initializeVulkan() {
     Images::createTextureImageView(device, textureImage, textureImageView, VK_FORMAT_BC7_UNORM_BLOCK);
     Images::createTextureSampler(device, physicalDevice, textureSampler);
 
-    mdlBus.loadModels();
-    mdlBus.loadModelTextures(device, graphicsCommandPool, graphicsQueue, physicalDevice, stagingBuffer, stagingBufferMemory);
+    mem.scene();
+    ModelBus::loadModelTextures(mem.groups, device, graphicsCommandPool, graphicsQueue, physicalDevice, stagingBuffer, stagingBufferMemory);
 
-    Buffers::createVertexBuffer(device, physicalDevice, graphicsCommandPool, graphicsQueue, vertexBuffer, vertexBufferMemory, mdlBus);
-    Buffers::createIndexBuffer(device, physicalDevice, graphicsCommandPool, graphicsQueue, indexBuffer, indexBufferMemory, mdlBus);
+    Buffers::createVertexBuffer(device, physicalDevice, graphicsCommandPool, graphicsQueue, vertexBuffer, vertexBufferMemory, mem);
+    Buffers::createIndexBuffer(device, physicalDevice, graphicsCommandPool, graphicsQueue, indexBuffer, indexBufferMemory, mem);
 
     // Generic
     Buffers::createGenericBuffers(device, physicalDevice, uniformConstants, uniformBuffers, uniformBuffersMemory, uniformBuffersMapped, MAX_FRAMES_IN_FLIGHT, sizeof(UniformBufferObject), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_2_SHADER_DEVICE_ADDRESS_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
@@ -1134,21 +1153,21 @@ void Engine::initializeVulkan() {
     Buffers::createGenericBuffers(device, physicalDevice, atomicCounterConstants, atomicCounterBuffers, atomicCounterBuffersMemory, atomicCounterBuffersMapped, MAX_FRAMES_IN_FLIGHT, sizeof(uint32_t), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_2_SHADER_DEVICE_ADDRESS_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
     // Matrices
-    Buffers::createGenericBuffers(device, physicalDevice, modelConstants, modelBuffers, modelBuffersMemory, modelBuffersMapped, MAX_FRAMES_IN_FLIGHT, mdlBus.getModelBufferSize(), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_2_SHADER_DEVICE_ADDRESS_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-    Buffers::createGenericBuffers(device, physicalDevice, modelDataConstants, modelDataBuffers, modelDataBuffersMemory, modelDataBuffersMapped, MAX_FRAMES_IN_FLIGHT, mdlBus.getModelDataBufferSize(), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_2_SHADER_DEVICE_ADDRESS_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+    Buffers::createGenericBuffers(device, physicalDevice, modelConstants, modelBuffers, modelBuffersMemory, modelBuffersMapped, MAX_FRAMES_IN_FLIGHT, mem.getModelBufferSize(), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_2_SHADER_DEVICE_ADDRESS_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+    Buffers::createGenericBuffers(device, physicalDevice, modelDataConstants, modelDataBuffers, modelDataBuffersMemory, modelDataBuffersMapped, MAX_FRAMES_IN_FLIGHT, mem.getModelDataBufferSize(), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_2_SHADER_DEVICE_ADDRESS_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
     // Culling
     Buffers::createGenericBuffers(device, physicalDevice, uniformCullingConstants, uniformCullingBuffers, uniformCullingBuffersMemory, uniformCullingBuffersMapped, MAX_FRAMES_IN_FLIGHT, sizeof(UniformCullingBufferObject), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_2_SHADER_DEVICE_ADDRESS_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-    Buffers::createGenericBuffers(device, physicalDevice, visibleIndicesConstants, visibleIndicesBuffers, visibleIndicesBuffersMemory, visibleIndicesBuffersMapped, MAX_FRAMES_IN_FLIGHT, sizeof(uint32_t) * mdlBus.getTotalInstanceCount(), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_2_SHADER_DEVICE_ADDRESS_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+    Buffers::createGenericBuffers(device, physicalDevice, visibleIndicesConstants, visibleIndicesBuffers, visibleIndicesBuffersMemory, visibleIndicesBuffersMapped, MAX_FRAMES_IN_FLIGHT, sizeof(uint32_t) * mem.getTotalInstanceCount(), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_2_SHADER_DEVICE_ADDRESS_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
-    Buffers::createGenericBuffer(device, physicalDevice, modelCullingConstant, modelCullingBuffer, modelCullingBufferMemory, modelCullingBufferMapped, sizeof(CullingData) * mdlBus.getTotalInstanceCount(), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_2_SHADER_DEVICE_ADDRESS_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+    Buffers::createGenericBuffer(device, physicalDevice, modelCullingConstant, modelCullingBuffer, modelCullingBufferMemory, modelCullingBufferMapped, sizeof(CullingData) * mem.getTotalInstanceCount(), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_2_SHADER_DEVICE_ADDRESS_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
     updateDrawCommands();
     Buffers::createGenericBuffers(device, physicalDevice, drawCommandsSourceConstants, drawCommandsSourceBuffers, drawCommandsSourceBuffersMemory, drawCommandsSourceBuffersMapped, MAX_FRAMES_IN_FLIGHT, sizeof(VkDrawIndexedIndirectCommand) * 1024, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_2_SHADER_DEVICE_ADDRESS_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
     Buffers::createGenericBuffers(device, physicalDevice, drawCommandsConstants, drawCommandsBuffers, drawCommandsBuffersMemory, drawCommandsBuffersMapped, MAX_FRAMES_IN_FLIGHT, sizeof(VkDrawIndexedIndirectCommand) * 1024, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_2_SHADER_DEVICE_ADDRESS_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
     for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i) {
         memcpy(drawCommandsSourceBuffersMapped[i], dcs.commands.data(), sizeof(VkDrawIndexedIndirectCommand) * dcs.commands.size());
-        memcpy(drawCommandsBuffersMapped[i], dc.commands.data(), sizeof(VkDrawIndexedIndirectCommand) * dc.commands.size());
+        //memcpy(drawCommandsBuffersMapped[i], dc.commands.data(), sizeof(VkDrawIndexedIndirectCommand) * dc.commands.size());
     }
 
 
@@ -1157,13 +1176,14 @@ void Engine::initializeVulkan() {
 
     // Descriptor
     Descriptor::createGraphicsDescriptorPool(device, MAX_FRAMES_IN_FLIGHT, graphicsDescriptorPool);
-    Descriptor::createGraphicsDescriptorSets(device, MAX_FRAMES_IN_FLIGHT, graphicsDescriptorSetLayout, graphicsDescriptorPool, graphicsDescriptorSets, uniformBuffers, textureSampler, modelBuffers, visibleIndicesBuffers, mdlBus, textureImageView, textureIndexBuffer, textureIndexOffsetBuffer);
+    Descriptor::createGraphicsDescriptorSets(device, MAX_FRAMES_IN_FLIGHT, graphicsDescriptorSetLayout, graphicsDescriptorPool, graphicsDescriptorSets, uniformBuffers, textureSampler, modelBuffers, visibleIndicesBuffers, mem, textureImageView, textureIndexBuffer, textureIndexOffsetBuffer);
 
     Descriptor::createPostprocessDescriptorPool(device, MAX_FRAMES_IN_FLIGHT, postprocessDescriptorPool);
     Descriptor::createPostprocessDescriptorSets(device, MAX_FRAMES_IN_FLIGHT, postprocessDescriptorSetLayout, postprocessDescriptorPool, postprocessDescriptorSets, offscreenImageViews, depthImageView, textureSampler, uniformPostprocessingBuffers);
 
     Buffers::createCommandBuffer(device, graphicsCommandPool, commandBuffers, MAX_FRAMES_IN_FLIGHT);
-    Helper::createSyncObjects(device, imageAvailableSemaphores, renderFinishedSemaphores, inFlightFences, MAX_FRAMES_IN_FLIGHT);
+    Sync::createSemaphores(device, MAX_FRAMES_IN_FLIGHT, imageAvailableSemaphores, renderFinishedSemaphores);
+    Sync::createFences(device, MAX_FRAMES_IN_FLIGHT, imageFences, inFlightFences);
 }
 #pragma endregion
 
@@ -1183,7 +1203,7 @@ void Engine::cleanupSwapchain() const {
     vkFreeMemory(device, depthImageMemory, nullptr);
     vkDestroyImageView(device, depthImageView, nullptr);
 
-    for (auto & swapchainImageView : swapchainImageViews) {
+    for (auto& swapchainImageView : swapchainImageViews) {
         vkDestroyImageView(device, swapchainImageView, nullptr);
     }
 
@@ -1213,7 +1233,7 @@ void Engine::recreateSwapchain() {
 #pragma region Helper
 // Setup debug messenger
 void Engine::setupDebugMessenger() {
-    if (!enableValidationLayers) return;
+    if constexpr (!enableValidationLayers) return;
 
     VkDebugUtilsMessengerCreateInfoEXT createInfo;
     Debug::populateDebugMessengerCreateInfo(createInfo);
@@ -1226,15 +1246,17 @@ void Engine::setupDebugMessenger() {
 // Get SDL extensions
 std::vector<const char*> Engine::getRequiredExtensions() {
     uint32_t extensionCount = 0;
-    auto SDLextensions = SDL_Vulkan_GetInstanceExtensions(&extensionCount);
+    auto SDL_extensions = SDL_Vulkan_GetInstanceExtensions(&extensionCount);
 
-    std::vector extensions(SDLextensions, SDLextensions + extensionCount);
+    std::vector extensions(SDL_extensions, SDL_extensions + extensionCount);
 
     // If validation layers enabled when add them to extensions vector
-    if (enableValidationLayers) {
+    if constexpr (enableValidationLayers) {
         extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
     }
-    //extensions.push_back(VK_KHR_SURFACE_EXTENSION_NAME);
+
+    extensions.push_back(VK_KHR_GET_SURFACE_CAPABILITIES_2_EXTENSION_NAME);
+    extensions.push_back(VK_EXT_SURFACE_MAINTENANCE_1_EXTENSION_NAME);
 
     return extensions;
 }

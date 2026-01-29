@@ -8,7 +8,7 @@
 #include <vector>
 #include <vulkan/vulkan_core.h>
 
-#include "ModelBus.hpp"
+struct ModelEntityManager;
 
 struct Descriptor {
     // Graphics
@@ -16,7 +16,11 @@ struct Descriptor {
 
     static void createGraphicsDescriptorPool(const VkDevice& device, const int& MAX_FRAMES_IN_FLIGHT, VkDescriptorPool& graphicsDescriptorPool);
 
-    static void createGraphicsDescriptorSets(const VkDevice& device, const int& MAX_FRAMES_IN_FLIGHT, const VkDescriptorSetLayout& graphicsDescriptorSetLayout, const VkDescriptorPool& graphicsDescriptorPool, std::vector<VkDescriptorSet>& graphicsDescriptorSets, const std::vector<VkBuffer>& uniformBuffers, const VkSampler& textureSampler, const std::vector<VkBuffer>& modelBuffers, const std::vector<VkBuffer>& visibleIndicesBuffers, const ModelBus& mdlBus, const VkImageView& textureImageView, const VkBuffer& textureIndexBuffer, const VkBuffer& textureIndexOffsetBuffer);
+    static void createGraphicsDescriptorSets(const VkDevice& device, const int& MAX_FRAMES_IN_FLIGHT, const VkDescriptorSetLayout& graphicsDescriptorSetLayout,
+                                             const VkDescriptorPool& graphicsDescriptorPool, std::vector<VkDescriptorSet>& graphicsDescriptorSets,
+                                             const std::vector<VkBuffer>& uniformBuffers, const VkSampler& textureSampler, const std::vector<VkBuffer>& modelBuffers,
+                                             const std::vector<VkBuffer>& visibleIndicesBuffers, const ModelEntityManager& mem, const VkImageView& textureImageView,
+                                             const VkBuffer& textureIndexBuffer, const VkBuffer& textureIndexOffsetBuffer);
 
 
     // Postprocess
@@ -26,10 +30,11 @@ struct Descriptor {
 
     static void createPostprocessDescriptorSets(const VkDevice &device, const int &MAX_FRAMES_IN_FLIGHT, const VkDescriptorSetLayout &postProcessingDescriptorSetLayout, const
                                                 VkDescriptorPool &postProcessingDescriptorPool, std::vector<VkDescriptorSet> &postProcessingDescriptorSets, const std::
-                                                vector<VkImageView> &offscreenImageViews, const VkImageView& depthImage, const VkSampler &textureSampler, const std::vector<VkBuffer> &
+                                                vector<VkImageView> &offscreenImageViews, const VkImageView& depthImage, const VkSampler &textureSampler, const std::vector<VkBuffer>&
                                                 uniformPostprocessingBuffers);
 
-    static void updatePostprocessDescriptorSets(const VkDevice &device, const int &MAX_FRAMES_IN_FLIGHT, const std::vector<VkDescriptorSet> &postProcessingDescriptorSets, const std::vector<VkImageView> &offscreenImageViews, const VkImageView& ImageView, const VkSampler &textureSampler);
+    static void updatePostprocessDescriptorSets(const VkDevice &device, const int &MAX_FRAMES_IN_FLIGHT, const std::vector<VkDescriptorSet> &postProcessingDescriptorSets,
+                                                const std::vector<VkImageView> &offscreenImageViews, const VkImageView& ImageView, const VkSampler &textureSampler);
 
 };
 
