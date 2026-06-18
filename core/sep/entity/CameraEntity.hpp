@@ -3,7 +3,7 @@
 #include <string>
 #include <utility>
 
-#include "glm/vec3.hpp"
+#include "glmMath.h"
 
 struct CameraEntity {
     virtual ~CameraEntity() = default;

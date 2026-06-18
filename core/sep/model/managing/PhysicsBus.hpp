@@ -26,7 +26,7 @@
 #include <imgui_impl_sdl3.h>
 #include <glm/glm.hpp>
 
-#include "ModelGroup.h"
+#include "ModelGroup.hpp"
 #pragma endregion
 
 #pragma region Generic
@@ -116,21 +116,21 @@ class MyContactListener final : public JPH::ContactListener {
 public:
     // See: ContactListener
     JPH::ValidateResult	OnContactValidate(const JPH::Body &inBody1, const JPH::Body &inBody2, JPH::RVec3Arg inBaseOffset, const JPH::CollideShapeResult &inCollisionResult) override {
-        //LOGGER.info("Contact validate callback");
+        //logger.info("Contact validate callback");
 
         return JPH::ValidateResult::AcceptAllContactsForThisBodyPair;
     }
 
     void OnContactAdded(const JPH::Body &inBody1, const JPH::Body &inBody2, const JPH::ContactManifold &inManifold, JPH::ContactSettings &ioSettings) override {
-        //LOGGER.info("A contact was added");
+        //logger.info("A contact was added");
     }
 
     void OnContactPersisted(const JPH::Body &inBody1, const JPH::Body &inBody2, const JPH::ContactManifold &inManifold, JPH::ContactSettings &ioSettings) override {
-        //LOGGER.info("A contact was persisted");
+        //logger.info("A contact was persisted");
     }
 
     void OnContactRemoved(const JPH::SubShapeIDPair &inSubShapePair) override {
-        //LOGGER.info("A contact was removed");
+        //logger.info("A contact was removed");
     }
 };
 
@@ -139,11 +139,11 @@ class MyBodyActivationListener final : public JPH::BodyActivationListener {
     Logger LOGGER = Logger("BodyActivationListener");
 public:
     void OnBodyActivated(const JPH::BodyID &inBodyID, JPH::uint64 inBodyUserData) override {
-        //LOGGER.info("A body got activated");
+        //logger.info("A body got activated");
     }
 
     void OnBodyDeactivated(const JPH::BodyID &inBodyID, JPH::uint64 inBodyUserData) override {
-        //LOGGER.info("A body went to sleep");
+        //logger.info("A body went to sleep");
     }
 };
 

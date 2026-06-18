@@ -21,8 +21,7 @@
 // Jolt includes
 #include <Jolt/Physics/PhysicsSystem.h>
 #include <Jolt/Physics/Body/BodyCreationSettings.h>
-
-#include "../../../cmake-build-debug/_deps/jolt_physics-src/Jolt/Physics/Collision/Shape/MeshShape.h"
+#include "Jolt/Physics/Collision/Shape/MeshShape.h"
 
 class ParsedModel {
     public:

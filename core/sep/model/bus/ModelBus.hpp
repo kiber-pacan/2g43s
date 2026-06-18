@@ -7,7 +7,7 @@
 #include <vulkan/vulkan_core.h>
 
 #include "Logger.hpp"
-#include "ModelGroup.h"
+#include "ModelGroup.hpp"
 #include "ModelInstance.hpp"
 
 class ParsedModel;
@@ -23,21 +23,8 @@ struct ModelBus {
 
     #pragma region parsedModels
 
-    template<std::convertible_to<std::string>... T>
-    static void loadModels(std::unordered_map<std::string, ModelGroup>& groups, const std::string& location, const T&... files) {
-        static_assert(sizeof...(files) > 0, "You must provide at least one file to load!");
-        ((std::cout << files << std::endl), ...);
-        (groups.insert({files, ModelGroup(std::make_shared<ParsedModel>(location + files))}),...);
-    }
 
-    template<std::convertible_to<std::string>... T>
-    static void destroyModels(std::unordered_map<std::string, ModelGroup>& groups, const T&... files) {
-        static_assert(sizeof...(files) > 0, "You must provide at least one file to destroy!");
-
-        (groups.erase(files), ...);
-    }
-
-    static void loadModelTextures(std::unordered_map<std::string, ModelGroup>& groups, const VkDevice& device, const VkCommandPool& commandPool, const VkQueue& graphicsQueue, const VkPhysicalDevice& physicalDevice, VkBuffer& stagingBuffer, VkDeviceMemory& stagingBufferMemory);
+    static void loadModelTextures(std::vector<ModelGroup>& groups, const VkDevice& device, const VkCommandPool& commandPool, const VkQueue& graphicsQueue, const VkPhysicalDevice& physicalDevice, VkBuffer& stagingBuffer, VkDeviceMemory& stagingBufferMemory);
 
     static std::shared_ptr<ParsedModel> getModel(std::unordered_map<std::string, ModelGroup>& groups, const std::string& file);
     #pragma endregion

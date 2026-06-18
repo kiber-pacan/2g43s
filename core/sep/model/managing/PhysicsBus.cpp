@@ -2,7 +2,7 @@
 // Created by down1 on 26.01.2026.
 //
 
-#include "PhysicsBus.h"
+#include "PhysicsBus.hpp"
 
 #include "Engine.hpp"
 
@@ -21,12 +21,10 @@ static void JoltTraceImpl(const char* inFMT, ...) {
 	std::cout << "[Jolt Trace]: " << buffer << std::endl;
 }
 
-// Функцию для ассертов можно оставить лямбдой (там нет "...", поэтому Clang не ноет),
-// но для красоты можно тоже вынести
 static bool JoltAssertFailedImpl(const char* inExpression, const char* inMessage, const char* inFile, uint inLine) {
 	std::cerr << "[Jolt Assert]: " << inExpression << " | Msg: " << (inMessage ? inMessage : "")
 			  << " | File: " << inFile << ":" << inLine << std::endl;
-	return true; // true = прервать выполнение
+	return true;
 }
 
 #pragma region Main
@@ -87,14 +85,13 @@ void PhysicsBus::initializeJPH() {
 	// The main way to interact with the bodies in the physics system is through the body interface. There is a locking and a non-locking
 	// variant of this. We're going to use the locking version (even though we're not planning to access bodies from multiple threads)
 
-	physics_system->OptimizeBroadPhase();
-	physics_system->SetGravity(JPH::Vec3(0.0f, 0.0f, -9.8f));
+	physics_system->SetGravity(JPH::Vec3(0.0f, 0.0f, -13.8f));
 }
 
 void PhysicsBus::iterateJPH(Engine& engine) const {
 	// ШАГ 1: Обновляем физический мир (ОДИН РАЗ за вызов функции)
 	// 1 — это количество подшагов (collision steps)
-	physics_system->Update(cDeltaTime, 1, temp_allocator, job_system);
+	physics_system->Update(cDeltaTime, 4, temp_allocator, job_system);
 
 	// ШАГ 2: Получаем активные тела для синхронизации графики
 	JPH::BodyIDVector activeBodies;
@@ -107,10 +104,10 @@ void PhysicsBus::iterateJPH(Engine& engine) const {
 		// и Update уже завершен. Это быстрее и безопаснее.
 		JPH::RMat44 transform = body_interface.GetWorldTransform(id);
 
-		// Проверяем, есть ли тело в нашем маппинге
-		if (engine.mem.bodyID.contains(id)) {
-			auto& data = engine.mem.bodyID[id];
-			engine.updateSingleModel(data.first, data.second, JoltToGlm(transform));
+		auto it = engine.modelEntityManager.bodyID.find(id);
+		if (it != engine.modelEntityManager.bodyID.end()) {
+			auto& data = it->second;
+			engine.bufferManager.updateSingleModel(data.first, data.second, JoltToGlm(transform));
 		}
 	}
 }
@@ -125,6 +122,15 @@ void PhysicsBus::shutdownJPH() const {
 		body_interface.RemoveBody(id);
 		body_interface.DestroyBody(id);
 	}
+
+	delete physics_system;
+	delete bp_interface;
+	delete obj_bp_filter;
+	delete obj_obj_filter;
+	delete temp_allocator;
+	delete job_system;
+	delete body_activation_listener;
+	delete contact_listener;
 
 	JPH::UnregisterTypes();
 

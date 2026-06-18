@@ -120,7 +120,7 @@ struct KeyListener {
                 auto shader = Shaders::compileShader(dirtyShader);
                 vkDeviceWaitIdle(engine.device);
                 Shaders::saveShaderToFile(Tools::getShaderPath() + "compiled/" + dirtyShader.lexically_relative(Tools::getShaderPath()).replace_extension(".spv").string(), shader);
-                if (dirtyShader.string().contains("postprocessing")) engine.recreatePostprocessingPipeline(dirtyShader.filename().replace_extension(".spv"));
+                if (dirtyShader.string().contains("postprocessing")) engine.graphicsManager.recreatePostprocessingPipeline(dirtyShader.filename().replace_extension(".spv"));
             }
         }));
     }

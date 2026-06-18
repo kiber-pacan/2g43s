@@ -9,25 +9,30 @@
 #include <vector>
 #include <ranges>
 
-#include "PhysicsBus.h"
+#include "PhysicsBus.hpp"
 #include "ModelInstance.hpp"
 #include "ParsedModel.hpp"
-#include "Images.hpp"
-#include "ModelGroup.h"
+#include "ModelGroup.hpp"
+#include "ModelRegion.h"
 #include "Random.hpp"
 
 struct ModelEntityManager {
+    ModelEntityManager() = default;
+
     std::vector<std::string> indexedFiles{};
-    std::unordered_map<std::string, ModelGroup> groups{};
+    std::vector<ModelGroup> groups{};
+
+    std::unordered_map<std::string, size_t> indices{};
     std::unordered_map<JPH::BodyID, std::pair<std::string, size_t>> bodyID{};
+
+    std::vector<ModelRegion> regions{};
+    std::vector<std::vector<size_t>> modelRegions{};
 
     std::mutex bodyID_mutex;
     std::array<bool, 4> dirty{true, true, true, true};
 
     PhysicsBus physicsBus{};
-    Logger LOGGER{"MEM"};
-
-    ModelEntityManager() = default;
+    Logger LOGGER{"ModelEntityManager"};
 
     #pragma region sizes
     VkDeviceSize getIndexBufferSize() const;
@@ -62,12 +67,12 @@ struct ModelEntityManager {
 
 
 
-    uint32_t getIndexCount(const std::string& name) const;
+    uint32_t getIndexCount(const std::string& name);
 
     static uint32_t getIndexCount(const std::shared_ptr<ParsedModel>& model);
 
 
-    int32_t getVertexCount(const std::string& name) const;
+    int32_t getVertexCount(const std::string& name);
 
     static int32_t getVertexCount(const std::shared_ptr<ParsedModel>& model);
     #pragma endregion
@@ -76,22 +81,22 @@ struct ModelEntityManager {
 
     JPH::ShapeRefC staticShape(const std::string& file);
 
-    void addBody(JPH::BodyID id, std::string file, size_t index);
+    void addBody(JPH::BodyID id, const std::string& file, size_t index);
 
     void randomVolume(const std::string& file, size_t count, float mass, const glm::vec3& min, const glm::vec3& max);
 
     void square(const std::string& file, size_t count, double gap);
 
     /// TIP args: pos, rot, scl (MAX 3 ELEMENTS)
-    void instance(const JPH::BodyCreationSettings body_settings, const std::string& file, const glm::vec3 impulse, const auto&... args) {
+    void instance(const JPH::BodyCreationSettings& settings, const std::string& file, const glm::vec3 impulse, const auto&... args) {
         static_assert(sizeof...(args) <= 3, "Maximum 3 arguments allowed!");
 
-        if (groups.contains(file)) {
-            groups[file].instances.emplace_back(groups[file].model, args...);
+        if (indices.contains(file)) {
+            groups[indices[file]].instances.emplace_back(groups[indices[file]].model, args...);
             dirty.fill(true);
 
-            const auto id = physicsBus.createBody(body_settings);
-            addBody(id, file, groups[file].instances.size() - 1);
+            const auto id = physicsBus.createBody(settings);
+            addBody(id, file, groups[indices[file]].instances.size() - 1);
 
             JPH::BodyInterface &body_interface = physicsBus.physics_system->GetBodyInterface();
             body_interface.SetLinearVelocity(id, JPH::Vec3(impulse.x, impulse.y, impulse.z));
@@ -100,17 +105,21 @@ struct ModelEntityManager {
         }
     }
 
-    void instance(const JPH::BodyCreationSettings body_settings, const std::string& file, const auto&... args) {
-        instance(body_settings, file, glm::vec3(0), args...);
+    void instance(const JPH::BodyCreationSettings& settings, const std::string& file, const auto&... args) {
+        instance(settings, file, glm::vec3(0), args...);
     }
 
 
     void loadModels(const std::string& location) {
+        static uint32_t index = 0;
         for (const auto& file : indexedFiles) {
-            groups.insert(
-                {file, ModelGroup(std::make_shared<ParsedModel>(location + file))}
-                );
+            regions.emplace_back(index);
+            modelRegions.emplace_back(index);
+
+            indices.insert({file, index++});
+            groups.emplace_back(std::make_shared<ParsedModel>(std::string{PROJECT_ROOT} + location + file));
         }
+        index = 0;
     }
 
     void staticInstance(const std::string& file, glm::vec4 pos);

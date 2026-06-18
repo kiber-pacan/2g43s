@@ -2,13 +2,18 @@
 // Created by down1 on 29.12.2025.
 //
 
-#include "Buffers.hpp"
+#include "BuffersRegistry.hpp"
 
 #include "Vertex.hpp"
 #include "ModelEntityManager.hpp"
 
 // Generic
-void Buffers::createBuffer(const VkDevice& device, const VkPhysicalDevice& physicalDevice, const VkDeviceSize size, const VkBufferUsageFlags usage, const VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory) {
+void BuffersRegistry::createBuffer(
+    VkDevice device, VkPhysicalDevice physicalDevice,
+    VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties,
+    VkBuffer& buffer, VkDeviceMemory& bufferMemory
+    ) {
+
     VkBufferCreateInfo bufferInfo{};
     bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
     bufferInfo.size = size;
@@ -40,7 +45,13 @@ void Buffers::createBuffer(const VkDevice& device, const VkPhysicalDevice& physi
     vkBindBufferMemory(device, buffer, bufferMemory, 0);
 }
 
-void Buffers::copyBuffer(const VkDevice& device, const VkCommandPool& commandPool, const VkQueue& graphicsQueue, const VkBuffer& srcBuffer, const VkBuffer& dstBuffer, const VkDeviceSize& size) {
+void BuffersRegistry::copyBuffer(
+    VkDevice device,
+    VkCommandPool commandPool, VkQueue graphicsQueue,
+    VkBuffer srcBuffer, VkBuffer dstBuffer,
+    VkDeviceSize size
+    ) {
+
     const VkCommandBuffer& commandBuffer = Command::beginSingleTimeCommands(device, commandPool);
 
     VkBufferCopy copyRegion{};
@@ -50,7 +61,12 @@ void Buffers::copyBuffer(const VkDevice& device, const VkCommandPool& commandPoo
     Command::endSingleTimeCommands(device, commandBuffer, commandPool, graphicsQueue);
 }
 
-void Buffers::createGenericBuffers(const VkDevice& device, const VkPhysicalDevice& physicalDevice, std::vector<VkBuffer>& buffers, std::vector<VkDeviceMemory>& buffersMemory, std::vector<void*>& buffersMapped, const int& MAX_FRAMES_IN_FLIGHT, VkDeviceSize bufferSize, int usageFlags, int memoryFlags) {
+void BuffersRegistry::createGenericBuffers(
+    VkDevice device, VkPhysicalDevice physicalDevice,
+    std::vector<VkBuffer>& buffers, std::vector<VkDeviceMemory>& buffersMemory, std::vector<void*>& buffersMapped,
+    size_t MAX_FRAMES_IN_FLIGHT, VkDeviceSize bufferSize, int usageFlags, int memoryFlags
+    ) {
+
     buffers.resize(MAX_FRAMES_IN_FLIGHT);
     buffersMemory.resize(MAX_FRAMES_IN_FLIGHT);
     buffersMapped.resize(MAX_FRAMES_IN_FLIGHT);
@@ -62,7 +78,13 @@ void Buffers::createGenericBuffers(const VkDevice& device, const VkPhysicalDevic
     }
 }
 
-void Buffers::createGenericBuffers(const VkDevice& device, const VkPhysicalDevice& physicalDevice, std::vector<uint64_t>& constants, std::vector<VkBuffer>& buffers, std::vector<VkDeviceMemory>& buffersMemory, std::vector<void*>& buffersMapped, const int& MAX_FRAMES_IN_FLIGHT, VkDeviceSize bufferSize, int usageFlags, int memoryFlags) {
+void BuffersRegistry::createGenericBuffers(
+    VkDevice device, VkPhysicalDevice physicalDevice,
+    std::vector<uint64_t>& constants,
+    std::vector<VkBuffer>& buffers, std::vector<VkDeviceMemory>& buffersMemory, std::vector<void*>& buffersMapped,
+    size_t MAX_FRAMES_IN_FLIGHT, VkDeviceSize bufferSize, int usageFlags, int memoryFlags
+    ) {
+
     buffers.resize(MAX_FRAMES_IN_FLIGHT);
     buffersMemory.resize(MAX_FRAMES_IN_FLIGHT);
     buffersMapped.resize(MAX_FRAMES_IN_FLIGHT);
@@ -79,13 +101,24 @@ void Buffers::createGenericBuffers(const VkDevice& device, const VkPhysicalDevic
     }
 }
 
-void Buffers::createGenericBuffer(const VkDevice& device, const VkPhysicalDevice& physicalDevice, VkBuffer& buffer, VkDeviceMemory& bufferMemory, void*& bufferMapped, VkDeviceSize bufferSize, int usageFlags, int memoryFlags) {
+void BuffersRegistry::createGenericBuffer(
+        VkDevice device, VkPhysicalDevice physicalDevice,
+        VkBuffer& buffer, VkDeviceMemory& bufferMemory, void*& bufferMapped,
+        VkDeviceSize bufferSize, int usageFlags, int memoryFlags
+        ) {
+
     createBuffer(device, physicalDevice, bufferSize, usageFlags, memoryFlags, buffer, bufferMemory);
 
     vkMapMemory(device, bufferMemory, 0, bufferSize, 0, &bufferMapped);
 }
 
-void Buffers::createGenericBuffer(const VkDevice& device, const VkPhysicalDevice& physicalDevice, uint64_t& constant, VkBuffer& buffer, VkDeviceMemory& bufferMemory, void*& bufferMapped, VkDeviceSize bufferSize, int usageFlags, int memoryFlags) {
+void BuffersRegistry::createGenericBuffer(
+        VkDevice device, VkPhysicalDevice physicalDevice,
+        uint64_t& constant,
+        VkBuffer& buffer, VkDeviceMemory& bufferMemory, void*& bufferMapped,
+        VkDeviceSize bufferSize, int usageFlags, int memoryFlags
+        ) {
+
     createBuffer(device, physicalDevice, bufferSize, usageFlags, memoryFlags, buffer, bufferMemory);
 
     vkMapMemory(device, bufferMemory, 0, bufferSize, 0, &bufferMapped);
@@ -99,7 +132,12 @@ void Buffers::createGenericBuffer(const VkDevice& device, const VkPhysicalDevice
 
 
 // Main
-void Buffers::createCommandBuffer(const VkDevice& device, const VkCommandPool& commandPool, std::vector<VkCommandBuffer>& commandBuffers, const int& MAX_FRAMES_IN_FLIGHT) {
+void BuffersRegistry::createCommandBuffer(
+        VkDevice device,
+        VkCommandPool commandPool, std::vector<VkCommandBuffer>& commandBuffers,
+        size_t MAX_FRAMES_IN_FLIGHT
+        ) {
+
     commandBuffers.resize(MAX_FRAMES_IN_FLIGHT);
 
     VkCommandBufferAllocateInfo allocInfo{};
@@ -113,14 +151,19 @@ void Buffers::createCommandBuffer(const VkDevice& device, const VkCommandPool& c
     }
 }
 
-void Buffers::createVertexBuffer(const VkDevice& device, const VkPhysicalDevice& physicalDevice, const VkCommandPool& commandPool, const VkQueue& graphicsQueue, VkBuffer& vertexBuffer, VkDeviceMemory& vertexBufferMemory, const ModelEntityManager& mdlBus) {
-    const VkDeviceSize bufferSize = mdlBus.getVertexBufferSize();
+void BuffersRegistry::createVertexBuffer(
+        VkDevice device, VkPhysicalDevice physicalDevice,
+        VkCommandPool commandPool, VkQueue graphicsQueue,
+        VkBuffer& vertexBuffer, VkDeviceMemory& vertexBufferMemory,
+        const ModelEntityManager& mem) {
 
-    VkBuffer stagingBuffer;
-    VkDeviceMemory stagingBufferMemory;
+    const VkDeviceSize bufferSize = mem.getVertexBufferSize();
+
+    VkBuffer stagingBuffer{};
+    VkDeviceMemory stagingBufferMemory{};
     createBuffer(device, physicalDevice, bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
 
-    const std::vector<Vertex> vertices = mdlBus.getAllVertices();
+    const std::vector<Vertex> vertices = mem.getAllVertices();
     void* data;
     vkMapMemory(device, stagingBufferMemory, 0, bufferSize, 0, &data);
 
@@ -135,11 +178,17 @@ void Buffers::createVertexBuffer(const VkDevice& device, const VkPhysicalDevice&
     vkFreeMemory(device, stagingBufferMemory, nullptr);
 }
 
-void Buffers::createIndexBuffer(const VkDevice& device, const VkPhysicalDevice& physicalDevice, const VkCommandPool& commandPool, const VkQueue& graphicsQueue, VkBuffer &indexBuffer, VkDeviceMemory& indexBufferMemory, const ModelEntityManager& mem) {
+void BuffersRegistry::createIndexBuffer(
+        VkDevice device, VkPhysicalDevice physicalDevice,
+        VkCommandPool commandPool, VkQueue graphicsQueue,
+        VkBuffer& indexBuffer, VkDeviceMemory& indexBufferMemory,
+        const ModelEntityManager& mem
+        ) {
+
     const VkDeviceSize bufferSize = mem.getIndexBufferSize();
 
-    VkBuffer stagingBuffer;
-    VkDeviceMemory stagingBufferMemory;
+    VkBuffer stagingBuffer{};
+    VkDeviceMemory stagingBufferMemory{};
     createBuffer(device, physicalDevice, bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
 
     const std::vector<u_int32_t> indices = mem.getAllIndices();

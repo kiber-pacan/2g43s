@@ -7,10 +7,14 @@
 #include <ranges>
 
 #include "ModelEntityManager.hpp"
-#include "UniformPostprocessingBufferObject.hpp"
+#include "Types.hpp"
 
 #pragma region Graphics
-void Descriptor::createGraphicsDescriptorSetLayout(const VkDevice& device, VkDescriptorSetLayout& graphicsDescriptorSetLayout) {
+void Descriptor::createGraphicsDescriptorSetLayout(
+        VkDevice device,
+        VkDescriptorSetLayout& graphicsDescriptorSetLayout
+        ) {
+
     VkDescriptorSetLayoutBinding samplerLayoutBinding{};
     samplerLayoutBinding.binding = 0;
     samplerLayoutBinding.descriptorCount = 256;
@@ -28,7 +32,12 @@ void Descriptor::createGraphicsDescriptorSetLayout(const VkDevice& device, VkDes
     }
 }
 
-void Descriptor::createGraphicsDescriptorPool(const VkDevice& device, const int& MAX_FRAMES_IN_FLIGHT, VkDescriptorPool& graphicsDescriptorPool) {
+void Descriptor::createGraphicsDescriptorPool(
+        VkDevice device,
+        VkDescriptorPool& graphicsDescriptorPool,
+        size_t MAX_FRAMES_IN_FLIGHT
+        ) {
+
     VkDescriptorPoolSize poolSize{};
     poolSize.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
     poolSize.descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT) * 256;
@@ -45,7 +54,13 @@ void Descriptor::createGraphicsDescriptorPool(const VkDevice& device, const int&
     }
 }
 
-void Descriptor::createGraphicsDescriptorSets(const VkDevice& device, const int& MAX_FRAMES_IN_FLIGHT, const VkDescriptorSetLayout& graphicsDescriptorSetLayout, const VkDescriptorPool& graphicsDescriptorPool, std::vector<VkDescriptorSet>& graphicsDescriptorSets, const std::vector<VkBuffer>& uniformBuffers, const VkSampler& textureSampler, const std::vector<VkBuffer>& modelBuffers, const std::vector<VkBuffer>& visibleIndicesBuffers, const ModelEntityManager& mem, const VkImageView& textureImageView, const VkBuffer& textureIndexBuffer, const VkBuffer& textureIndexOffsetBuffer) {
+void Descriptor::createGraphicsDescriptorSets(
+        VkDevice device,
+        VkDescriptorSetLayout& graphicsDescriptorSetLayout, VkDescriptorPool& graphicsDescriptorPool, std::vector<VkDescriptorSet>& graphicsDescriptorSets,
+        VkSampler textureSampler, VkImageView textureImageView,
+        const ModelEntityManager &modelEntityManager, size_t MAX_FRAMES_IN_FLIGHT
+        ) {
+
     const std::vector layouts(MAX_FRAMES_IN_FLIGHT, graphicsDescriptorSetLayout);
     VkDescriptorSetAllocateInfo allocInfo{};
     allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
@@ -68,8 +83,7 @@ void Descriptor::createGraphicsDescriptorSets(const VkDevice& device, const int&
         imageInfo.emplace_back(missingno);
 
         size_t index = 0;
-        for (auto& textures : mem.groups
-        | std::views::values
+        for (auto& textures : modelEntityManager.groups
         | std::views::transform(&ModelGroup::model)
         | std::views::transform(&ParsedModel::textures)
         ) {
@@ -102,7 +116,11 @@ void Descriptor::createGraphicsDescriptorSets(const VkDevice& device, const int&
 #pragma endregion
 
 #pragma region Postprocess
-void Descriptor::createPostprocessDescriptorSetLayout(const VkDevice& device, VkDescriptorSetLayout& postProcessingDescriptorSetLayout) {
+void Descriptor::createPostprocessDescriptorSetLayout(
+        VkDevice device,
+        VkDescriptorSetLayout& postProcessingDescriptorSetLayout
+        ) {
+
     VkDescriptorSetLayoutBinding samplerLayoutBinding{};
     samplerLayoutBinding.binding = 0;
     samplerLayoutBinding.descriptorCount = 1;
@@ -138,7 +156,12 @@ void Descriptor::createPostprocessDescriptorSetLayout(const VkDevice& device, Vk
     }
 }
 
-void Descriptor::createPostprocessDescriptorPool(const VkDevice& device, const int& MAX_FRAMES_IN_FLIGHT, VkDescriptorPool& postProcessingDescriptorPool) {
+void Descriptor::createPostprocessDescriptorPool(
+        VkDevice device,
+        VkDescriptorPool& postProcessingDescriptorPool,
+        size_t MAX_FRAMES_IN_FLIGHT
+        ) {
+
     std::array<VkDescriptorPoolSize, 2> poolSizes{};
     poolSizes[0].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
     poolSizes[0].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT) * 2;
@@ -158,10 +181,13 @@ void Descriptor::createPostprocessDescriptorPool(const VkDevice& device, const i
     }
 }
 
-void Descriptor::createPostprocessDescriptorSets(const VkDevice &device, const int &MAX_FRAMES_IN_FLIGHT, const VkDescriptorSetLayout &postProcessingDescriptorSetLayout, const
-                                                 VkDescriptorPool &postProcessingDescriptorPool, std::vector<VkDescriptorSet> &postProcessingDescriptorSets, const std::
-                                                 vector<VkImageView> &offscreenImageViews, const VkImageView& depthImageView, const VkSampler &textureSampler, const std::vector<VkBuffer> &
-                                                 uniformPostprocessingBuffers) {
+void Descriptor::createPostprocessDescriptorSets(
+        VkDevice device,
+        VkDescriptorSetLayout& postProcessingDescriptorSetLayout, VkDescriptorPool& postProcessingDescriptorPool, std::vector<VkDescriptorSet>& postProcessingDescriptorSets,
+        const std::vector<VkImageView>& offscreenImageViews, VkImageView depthImageView, VkSampler textureSampler,
+        const std::vector<VkBuffer> &uniformPostprocessingBuffers, size_t MAX_FRAMES_IN_FLIGHT
+        ) {
+
     const std::vector layouts(MAX_FRAMES_IN_FLIGHT, postProcessingDescriptorSetLayout);
     VkDescriptorSetAllocateInfo allocInfo{};
     allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
@@ -188,7 +214,7 @@ void Descriptor::createPostprocessDescriptorSets(const VkDevice &device, const i
         VkDescriptorBufferInfo upboBufferInfo{};
         upboBufferInfo.buffer = uniformPostprocessingBuffers[i];
         upboBufferInfo.offset = 0;
-        upboBufferInfo.range = sizeof(UniformPostprocessingBufferObject);
+        upboBufferInfo.range = sizeof(UniformPostprocessingBuffer);
 
         std::array<VkWriteDescriptorSet, 2> descriptorWrites{};
         descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -211,7 +237,13 @@ void Descriptor::createPostprocessDescriptorSets(const VkDevice &device, const i
     }
 }
 
-void Descriptor::updatePostprocessDescriptorSets(const VkDevice &device, const int &MAX_FRAMES_IN_FLIGHT, const std::vector<VkDescriptorSet> &postProcessingDescriptorSets, const std::vector<VkImageView> &offscreenImageViews, const VkImageView &imageViews, const VkSampler &textureSampler) {
+void Descriptor::updatePostprocessDescriptorSets(
+        VkDevice device,
+        const std::vector<VkDescriptorSet>& postProcessingDescriptorSets,
+        const std::vector<VkImageView>& offscreenImageViews, VkImageView imageView, VkSampler textureSampler,
+        size_t MAX_FRAMES_IN_FLIGHT
+        ) {
+
     std::array<VkWriteDescriptorSet, 2> descriptorWrites{};
 
     VkDescriptorImageInfo imageInfos{};
@@ -223,7 +255,7 @@ void Descriptor::updatePostprocessDescriptorSets(const VkDevice &device, const i
         imageInfos.sampler = textureSampler;
 
         depthImageInfos.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-        depthImageInfos.imageView = imageViews;
+        depthImageInfos.imageView = imageView;
         depthImageInfos.sampler = textureSampler;
 
         descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;

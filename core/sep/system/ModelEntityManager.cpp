@@ -8,7 +8,7 @@
 #pragma region buffers
 VkDeviceSize ModelEntityManager::getIndexBufferSize() const {
     VkDeviceSize bufferSize = 0;
-    for (const auto &model : std::views::transform(std::views::values(groups), &ModelGroup::model)) {
+    for (const auto &model : std::views::transform(groups, &ModelGroup::model)) {
         bufferSize += sizeof(model->indices[0]) * model->indices.size();
     }
 
@@ -17,7 +17,7 @@ VkDeviceSize ModelEntityManager::getIndexBufferSize() const {
 
 VkDeviceSize ModelEntityManager::getVertexBufferSize() const {
     VkDeviceSize bufferSize = 0;
-    for (const auto& model : std::views::transform(std::views::values(groups), &ModelGroup::model)) {
+    for (const auto& model : std::views::transform(groups, &ModelGroup::model)) {
         for (const auto& mesh: model->meshes) {
             bufferSize += sizeof(mesh[0]) * mesh.size();
         }
@@ -28,7 +28,7 @@ VkDeviceSize ModelEntityManager::getVertexBufferSize() const {
 
 VkDeviceSize ModelEntityManager::getModelBufferSize() const {
     VkDeviceSize bufferSize = 0;
-    for (const auto& instance : std::views::transform(std::views::values(groups), &ModelGroup::instances)) {
+    for (const auto& instance : std::views::transform(groups, &ModelGroup::instances)) {
         bufferSize += sizeof(instance[0]) * instance.size();
     }
 
@@ -37,7 +37,7 @@ VkDeviceSize ModelEntityManager::getModelBufferSize() const {
 
 VkDeviceSize ModelEntityManager::getModelDataBufferSize() const {
     VkDeviceSize bufferSize = 0;
-    for (const auto& instance : std::views::transform(std::views::values(groups), &ModelGroup::instances)) {
+    for (const auto& instance : std::views::transform(groups, &ModelGroup::instances)) {
         bufferSize += sizeof(glm::vec4) * instance.size() * 3;
     }
 
@@ -49,7 +49,7 @@ VkDeviceSize ModelEntityManager::getModelDataBufferSize() const {
 // Model loading methods
 std::vector<uint32_t> ModelEntityManager::getAllIndices() const {
     std::vector<uint32_t> indices{};
-    for (const auto& model : std::views::transform(std::views::values(groups), &ModelGroup::model)) {
+    for (const auto& model : std::views::transform(groups, &ModelGroup::model)) {
         #if __cpp_lib_containers_ranges >= 202202L
         indices.append_range(model->indices);
         #else
@@ -61,8 +61,8 @@ std::vector<uint32_t> ModelEntityManager::getAllIndices() const {
 }
 
 std::vector<uint32_t> ModelEntityManager::getIndices(const std::string& file) const {
-    if (const auto& it = groups.find(file); it != groups.end()) {
-        return it->second.model->indices;
+    if (const auto& it = indices.find(file); it != indices.end()) {
+        return groups[it->second].model->indices;
     }
     return {};
 }
@@ -71,7 +71,7 @@ std::vector<uint32_t> ModelEntityManager::getIndices(const std::string& file) co
 std::vector<Vertex> ModelEntityManager::getAllVertices() const {
     std::vector<Vertex> vertices{};
 
-    for (const auto& model : std::views::transform(std::views::values(groups), &ModelGroup::model)) {
+    for (const auto& model : std::views::transform(groups, &ModelGroup::model)) {
         for (const auto& mesh: model->meshes) {
             #if __cpp_lib_containers_ranges >= 202202L
             vertices.append_range(mesh);
@@ -87,8 +87,8 @@ std::vector<Vertex> ModelEntityManager::getAllVertices() const {
 std::vector<Vertex> ModelEntityManager::getVertices(const std::string& file) const {
     std::vector<Vertex> vertices{};
 
-    if (const auto& it = groups.find(file); it != groups.end()) {
-        const auto& meshes = it->second.model->meshes;
+    if (const auto& it = indices.find(file); it != indices.end()) {
+        const auto& meshes = groups[it->second].model->meshes;
         std::for_each(meshes.begin(), meshes.end(), [&vertices](const auto& mesh) {
             #if __cpp_lib_containers_ranges >= 202202L
             vertices.append_range(mesh);
@@ -109,14 +109,14 @@ size_t ModelEntityManager::modelsCount() const {
 
 
 size_t ModelEntityManager::getInstanceCount(const std::string& file) const {
-    if (const auto& it = groups.find(file); it != groups.end()) {
-        return it->second.instances.size();
+    if (const auto& it = indices.find(file); it != indices.end()) {
+        return groups[it->second].instances.size();
     }
     return 0;
 }
 
 size_t ModelEntityManager::getTotalInstanceCount() const {
-    const auto& instances = std::views::transform(std::views::values(groups), &ModelGroup::instances);
+    const auto& instances = std::views::transform(groups, &ModelGroup::instances);
 
     return std::accumulate(instances.begin(), instances.end(), 0, [](uint32_t sum, const auto& instance) {
         return sum + instance.size();
@@ -128,8 +128,8 @@ size_t ModelEntityManager::getTotalModelCount() const {
 }
 
 
-uint32_t ModelEntityManager::getIndexCount(const std::string& name) const {
-    return groups.at(name).model->indices.size();
+uint32_t ModelEntityManager::getIndexCount(const std::string& name) {
+    return groups.at(indices[name]).model->indices.size();
 }
 
 uint32_t ModelEntityManager::getIndexCount(const std::shared_ptr<ParsedModel>& model) {
@@ -137,8 +137,8 @@ uint32_t ModelEntityManager::getIndexCount(const std::shared_ptr<ParsedModel>& m
 }
 
 
-int32_t ModelEntityManager::getVertexCount(const std::string& name) const {
-    const auto& meshes = groups.at(name).model->meshes;
+int32_t ModelEntityManager::getVertexCount(const std::string& name) {
+    const auto& meshes = groups.at(indices[name]).model->meshes;
 
     return std::accumulate(meshes.begin(), meshes.end(), 0, [](uint32_t sum, const auto& mesh) {
         return sum + mesh.size();
@@ -158,7 +158,7 @@ JPH::ShapeRefC ModelEntityManager::physShape(const std::string& file) {
     if (const auto it = physicsBus.collisionHulls.find(file); it != physicsBus.collisionMeshes.end()) {
         collisionShape = it->second;
     } else {
-        collisionShape = groups[file].model.get()->createJoltConvexHull();
+        collisionShape = groups[indices[file]].model.get()->createJoltConvexHull();
         physicsBus.collisionHulls.insert({file, collisionShape});
     }
 
@@ -171,7 +171,7 @@ JPH::ShapeRefC ModelEntityManager::staticShape(const std::string& file) {
     if (const auto it = physicsBus.collisionMeshes.find(file); it != physicsBus.collisionMeshes.end()) {
         collisionShape = it->second;
     } else {
-        collisionShape = groups[file].model.get()->createJoltMesh();
+        collisionShape = groups[indices[file]].model.get()->createJoltMesh();
         physicsBus.collisionMeshes.insert({file, collisionShape});
     }
 
@@ -179,14 +179,23 @@ JPH::ShapeRefC ModelEntityManager::staticShape(const std::string& file) {
 }
 
 
-void ModelEntityManager::addBody(const JPH::BodyID id, std::string file, size_t index) {
+void ModelEntityManager::addBody(const JPH::BodyID id, const std::string& file, size_t index) {
     std::lock_guard<std::mutex> lock(bodyID_mutex);
     bodyID[id] = {file, index};
 }
 
 
 void ModelEntityManager::randomVolume(const std::string& file, size_t count, const float mass, const glm::vec3& min, const glm::vec3& max) {
-    auto& group = groups[file];
+    if (!indices.contains(file)) {
+        LOGGER.error("File ${} does not exist", file);
+    }
+
+    uint32_t index = indices[file];
+
+    auto& region = regions[index];
+    region.count += count;
+
+    auto& group = groups[index];
     group.instances.resize(count);
 
     JPH::BodyCreationSettings settings(physShape(file), JPH::RVec3(0, 0, 0), JPH::Quat::sIdentity(), JPH::EMotionType::Dynamic, Layers::MOVING);
@@ -205,7 +214,7 @@ void ModelEntityManager::randomVolume(const std::string& file, size_t count, con
 }
 
 void ModelEntityManager::square(const std::string& file, size_t count, const double gap) {
-    auto& group = groups[file];
+    auto& group = groups[indices[file]];
     group.instances.resize(count * count);
 
     JPH::BodyCreationSettings settings(physShape(file), JPH::RVec3(0, 0, 0), JPH::Quat::sIdentity(), JPH::EMotionType::Dynamic, Layers::MOVING);
@@ -227,6 +236,10 @@ void ModelEntityManager::square(const std::string& file, size_t count, const dou
 }
 
 void ModelEntityManager::staticInstance(const std::string& file, const glm::vec4 pos) {
+    uint32_t index = indices[file];
+
+    regions[index].count += 1;
+
     JPH::BodyCreationSettings settings(staticShape(file), JPH::RVec3(pos.x, pos.y, pos.z), JPH::Quat::sIdentity(), JPH::EMotionType::Static, Layers::NON_MOVING);
     settings.mLinearDamping = 0.05f;
     settings.mAngularDamping = 0.05f;
@@ -275,9 +288,9 @@ void ModelEntityManager::physicsInstance(const std::string& file, const glm::vec
 
 void ModelEntityManager::scene() {
     const auto start1 = std::chrono::high_resolution_clock::now();
-    indexedFiles = {"box_opt.glb", "land2_opt.glb"};
-    loadModels("/home/down1/2g43s/core/models/");
-    //ModelBus::loadModels(groups, "/home/down1/2g43s/core/models/", "box_opt.glb", "land2_opt.glb");
+    indexedFiles = {"land.glb", "box.glb"};
+    loadModels("/home/down/2g43s/core/models/");
+
     const auto end1 = std::chrono::high_resolution_clock::now();
     const std::chrono::duration<double> duration1 = end1 - start1;
 
@@ -285,9 +298,11 @@ void ModelEntityManager::scene() {
 
     const auto start = std::chrono::high_resolution_clock::now();
 
-    staticInstance("land2_opt.glb", glm::vec4(0, 0, -4, 1));
-    physicsInstance("box_opt.glb", glm::vec4(0, 0, 7, 1), 32);
-    //randomVolume("box_opt.glb", 64, 32, glm::vec3(16, 16, 16), glm::vec3(48, 48, 32));
+    //physicsInstance("box.glb", glm::vec4(0, 0, 7, 1), 32);
+    randomVolume("box.glb", 64, 32, glm::vec3(16, 16, 16), glm::vec3(48, 48, 32));
+    staticInstance("land.glb", glm::vec4(0, 0, -4, 1));
+
+
     //square("box_opt.glb", 10, 1);
 
 

@@ -3,55 +3,55 @@
 #extension GL_EXT_buffer_reference2 : require
 #extension GL_EXT_scalar_block_layout : enable
 
-struct MBO{
+struct ModelBufferObject{
     mat4 model;
 };
 
-struct VIBO {
+struct VisibleIndicesBufferObject {
     uint index;
 };
 
-struct TIO {
+struct TextureIndexBufferObject {
     uint firstIndex;
     uint indexCount;
-    uint pad1;
+    uint globalVertexOffset;
     uint pad2;
 };
 
-struct TIOO {
+struct TextureIndexOffsetBufferObject {
     uint indexOffset;
 };
 
-layout(scalar, buffer_reference) readonly buffer UBO {
-    mat4 view;
-    mat4 proj;
+layout(scalar, buffer_reference) readonly buffer UniformBufferObject {
+    mat4 view; // Camera view
+    mat4 projection; // Camera projection
     uint modelCount;
 };
 
-layout(scalar, buffer_reference) readonly buffer MB{
-    MBO objects[];
+layout(scalar, buffer_reference) readonly buffer ModelBuffer{
+    ModelBufferObject objects[];
 };
 
-layout(scalar, buffer_reference) readonly buffer VIB {
-    VIBO objects[];
+layout(scalar, buffer_reference) readonly buffer VisibleIndicesBuffer {
+    VisibleIndicesBufferObject objects[];
 };
 
 
-layout(scalar, buffer_reference) readonly buffer TI {
-    TIO objects[];
+layout(scalar, buffer_reference) readonly buffer TextureIndexBuffer {
+    TextureIndexBufferObject objects[];
 };
 
-layout(scalar, buffer_reference) readonly buffer TIO1 {
-    TIOO objects[];
+layout(scalar, buffer_reference) readonly buffer TextureIndexOffsetBuffer {
+    TextureIndexOffsetBufferObject objects[];
 };
 
 layout(push_constant) uniform Push {
-    UBO ubo;
-    MB mb;
-    VIB vib;
-    TI ti;
-    TIO1 tio;
-} pc;
+    UniformBufferObject uniformBufferObject;
+    ModelBuffer modelBuffer;
+    VisibleIndicesBuffer visibleIndicesBuffer;
+    TextureIndexBuffer textureIndexBuffer;
+    TextureIndexOffsetBuffer textureIndexOffsetBuffer;
+} constants;
 
 
 layout(location = 0) in vec3 inPosition;
@@ -64,19 +64,25 @@ layout(location = 1) out vec2 fragTexCoord;
 layout(location = 2) out flat uint textureIndex;
 
 void main() {
-    uint objIndex = pc.vib.objects[gl_InstanceIndex].index;
-    gl_Position = pc.ubo.proj * pc.ubo.view * pc.mb.objects[objIndex].model * vec4(inPosition, 1.0);
+    uint modelIndex = gl_DrawID;
+    uint instanceIndex = gl_InstanceIndex;
 
+    uint visibleInstanceIndex = constants.visibleIndicesBuffer.objects[instanceIndex].index;
+    gl_Position = constants.uniformBufferObject.projection * constants.uniformBufferObject.view * constants.modelBuffer.objects[visibleInstanceIndex].model * vec4(inPosition, 1.0);
+
+
+    // Texture indexing stuff
     fragColor = inColor;
     fragTexCoord = inTexCoord;
 
-    uint firstIndex = pc.ti.objects[gl_DrawID].firstIndex;
+    uint firstIndex = constants.textureIndexBuffer.objects[modelIndex].firstIndex;
     uint rawIndex = 0;
-    uint models = pc.ubo.modelCount;
+    uint models = constants.uniformBufferObject.modelCount;
 
-    uint textures = pc.ti.objects[gl_DrawID].indexCount;
+    uint textures = constants.textureIndexBuffer.objects[modelIndex].indexCount;
+
     for(uint i = 0; i < textures; i++) {
-        if (gl_VertexIndex > pc.ti.objects[gl_DrawID].pad1 + pc.tio.objects[firstIndex + i].indexOffset) {
+        if (gl_VertexIndex > constants.textureIndexBuffer.objects[modelIndex].globalVertexOffset + constants.textureIndexOffsetBuffer.objects[firstIndex + i].indexOffset) {
             rawIndex++;
         }
     }
@@ -84,5 +90,6 @@ void main() {
     // This probably gonna get me brutally mauled one day
     if (rawIndex == 0) rawIndex = 1;
 
+    //textureIndex = firstIndex + rawIndex;
     textureIndex = firstIndex + rawIndex;
 }

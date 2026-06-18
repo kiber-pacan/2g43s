@@ -67,6 +67,7 @@ layout(push_constant) uniform Push {
 } pc;
 
 bool isSphereInFrustum(vec4 sphere, vec4 f[6]) {
+    return true;
     vec3 center = sphere.xyz;
     float radius = sphere.w;
     for (int i = 0; i < 6; ++i) {
@@ -81,52 +82,30 @@ void main() {
     uint index = gl_GlobalInvocationID.x;
     if (index >= pc.ucbo.data.totalObjects) return;
 
-    // 1. Checking if current instance is actually visible
     bool visible = isSphereInFrustum(pc.mcb.objects[index].sphere, pc.ucbo.data.frustumPlanes);
-
-    // 2. Получаем маску всех видимых потоков в подгруппе
     uvec4 ballot = subgroupBallot(visible);
 
-    // Если в подгруппе вообще никто ничего не видит — выходим сразу
     if (!subgroupAny(visible)) return;
 
     uint modelIndex = pc.mcb.objects[index].index;
-
-    // Work until all the subgroups stop working
     uvec4 processedBallot = uvec4(0);
+
     while (any(notEqual(ballot, processedBallot))) {
-
-        // Находим первый необработанный поток
         uint firstUnprocessed = subgroupBallotFindLSB(ballot ^ processedBallot);
-
-        // Получаем ID модели, которую этот поток хочет отрисовать
         uint candidateID = subgroupBroadcast(modelIndex, firstUnprocessed);
 
-        // Находим все потоки в подгруппе, которые хотят рисовать ЭТУ ЖЕ модель
         uvec4 sameModelBallot = subgroupBallot(visible && (modelIndex == candidateID));
         uint countForThisModel = subgroupBallotBitCount(sameModelBallot);
 
         uint baseIdx = 0;
 
-        // Только один поток (лидер этой группы в подгруппе) делает атомарную операцию
+        // Только один поток (лидер) делает атомарную операцию для всей подгруппы
         if (gl_SubgroupInvocationID == firstUnprocessed) {
             baseIdx = atomicAdd(pc.dcsb.objects[candidateID].instanceCount, countForThisModel);
-
-            // Если это первые инстансы этой модели — увеличиваем счетчик команд
-            if (baseIdx == 0) {
-                uint count = atomicAdd(pc.counter.count, 1);
-                pc.dcb.objects[count].indexCount = pc.dcsb.objects[candidateID].indexCount;
-                pc.dcb.objects[count].instanceCount = pc.dcsb.objects[candidateID].instanceCount;
-                pc.dcb.objects[count].firstIndex = pc.dcsb.objects[candidateID].firstIndex;
-                pc.dcb.objects[count].vertexOffset = pc.dcsb.objects[candidateID].vertexOffset;
-                pc.dcb.objects[count].firstInstance = pc.dcsb.objects[candidateID].firstInstance;
-            }
         }
 
-        // Рассылаем полученный baseIdx всем потокам с этой же моделью
         baseIdx = subgroupBroadcast(baseIdx, firstUnprocessed);
 
-        // Если текущий поток относится к этой модели — пишем результат
         if (visible && (modelIndex == candidateID)) {
             uint localOffset = subgroupBallotExclusiveBitCount(sameModelBallot);
             uint firstInstance = pc.dcsb.objects[candidateID].firstInstance;
@@ -134,7 +113,6 @@ void main() {
             pc.vib.objects[baseIdx + localOffset + firstInstance].index = index;
         }
 
-        // Помечаем эти потоки как обработанные
         processedBallot |= sameModelBallot;
     }
 }

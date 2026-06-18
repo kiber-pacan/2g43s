@@ -91,8 +91,9 @@ add_executable(${EXECUTABLE_NAME}
         core/Engine.hpp
 
         # Graphics
-        core/sep/graphics/Buffers.cpp
-        core/sep/graphics/Buffers.hpp
+	
+        core/sep/graphics/BuffersRegistry.cpp
+        core/sep/graphics/BuffersRegistry.hpp
         core/sep/graphics/command/Command.cpp
         core/sep/graphics/command/Command.hpp
         core/sep/graphics/command/Barrier.cpp
@@ -134,22 +135,6 @@ add_executable(${EXECUTABLE_NAME}
         # Camera
         core/sep/camera/Camera.hpp
 
-
-        # Buffer
-        core/sep/buffers/culling/ModelCullingBufferObject.hpp
-        core/sep/buffers/culling/VisibleIndicesBufferObject.hpp
-
-        core/sep/buffers/main/AtomicCounterBufferObject.hpp
-        core/sep/buffers/main/DrawCommandsBufferObject.hpp
-        core/sep/buffers/main/uniform/UniformBufferObject.hpp
-        core/sep/buffers/main/uniform/UniformPostprocessingBufferObject.hpp
-        core/sep/buffers/main/uniform/UniformCullingBufferObject.hpp
-        core/sep/buffers/main/indices/TextureIndexOffsetBufferObject.hpp
-        core/sep/buffers/main/indices/TextureIndexBufferObject.h
-
-        core/sep/buffers/matrices/ModelBufferObject.hpp
-        core/sep/buffers/matrices/ModelDataBufferObject.hpp
-
         # Model
         core/sep/model/ModelInstance.hpp
         core/sep/model/ParsedModel.hpp
@@ -176,12 +161,21 @@ add_executable(${EXECUTABLE_NAME}
 
         core/sep/images/Texture.hpp
         core/sep/model/managing/PhysicsBus.cpp
-        core/sep/model/managing/PhysicsBus.h
-        core/sep/model/managing/PhysicsBus.h
+        core/sep/model/managing/PhysicsBus.hpp
         core/sep/graphics/helper/Sync.hpp
-        core/sep/model/managing/ModelEntityManager.hpp
-        core/sep/model/managing/ModelEntityManager.cpp
-        core/sep/model/managing/ModelGroup.h
+        core/sep/system/ModelEntityManager.hpp
+        core/sep/system/ModelEntityManager.cpp
+        core/sep/model/managing/ModelGroup.hpp
+        core/sep/system/BufferManager.cpp
+        core/sep/system/BufferManager.hpp
+        core/sep/system/GraphicsManager.cpp
+        core/sep/system/GraphicsManager.hpp
+        core/sep/system/SwapchainManager.cpp
+        core/sep/system/SwapchainManager.hpp
+        core/sep/util/glmMath.h
+        core/sep/buffers/Types.hpp
+        core/sep/model/managing/ModelRegion.h
+        core/sep/model/managing/ModelRegion.h
 )
 
 target_include_directories(${EXECUTABLE_NAME} PRIVATE
@@ -196,11 +190,7 @@ target_include_directories(${EXECUTABLE_NAME} PRIVATE
         core/sep/device
         core/sep/controls
         core/sep/camera
-        core/sep/buffers/culling
-        core/sep/buffers/main
-        core/sep/buffers/main/uniform
-        core/sep/buffers/main/indices
-        core/sep/buffers/matrices
+        core/sep/buffers
         core/sep/model/
         core/sep/model/bus
         core/sep/model/managing
@@ -210,6 +200,7 @@ target_include_directories(${EXECUTABLE_NAME} PRIVATE
         core/sep/graphics/shaders/constants/
         core/sep/images/
         core/sep/graphics/shaders/
+        core/sep/system
 )
 
 find_package(Boost REQUIRED)

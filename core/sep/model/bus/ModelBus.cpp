@@ -3,9 +3,9 @@
 #include "ParsedModel.hpp"
 
 #pragma region parsedModels
-void ModelBus::loadModelTextures(std::unordered_map<std::string, ModelGroup>& groups, const VkDevice& device, const VkCommandPool& commandPool, const VkQueue& graphicsQueue, const VkPhysicalDevice& physicalDevice, VkBuffer& stagingBuffer, VkDeviceMemory& stagingBufferMemory) {
+void ModelBus::loadModelTextures(std::vector<ModelGroup>& groups, const VkDevice& device, const VkCommandPool& commandPool, const VkQueue& graphicsQueue, const VkPhysicalDevice& physicalDevice, VkBuffer& stagingBuffer, VkDeviceMemory& stagingBufferMemory) {
     int globalIndex = 0;
-    for (const auto& model : std::views::transform(groups | std::views::values, &ModelGroup::model)) {
+    for (const auto& model : groups | std::views::transform(&ModelGroup::model)) {
         for (auto & texture : model->textures) {
             Images::createTextureImage(device, commandPool, graphicsQueue, physicalDevice, stagingBuffer, stagingBufferMemory, texture);
             Images::createTextureImageView(device, texture.textureImage, texture.textureImageView, VK_FORMAT_BC7_UNORM_BLOCK);

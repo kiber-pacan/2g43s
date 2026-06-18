@@ -11,7 +11,7 @@
 #include "Texture.hpp"
 #include <stdexcept>
 
-#include "Buffers.hpp"
+#include "BuffersRegistry.hpp"
 #include "Command.hpp"
 #include "../graphics/helper/Helper.hpp"
 

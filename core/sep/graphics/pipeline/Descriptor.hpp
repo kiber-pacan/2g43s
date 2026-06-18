@@ -12,30 +12,49 @@ struct ModelEntityManager;
 
 struct Descriptor {
     // Graphics
-    static void createGraphicsDescriptorSetLayout(const VkDevice& device, VkDescriptorSetLayout& graphicsDescriptorSetLayout);
+    static void createGraphicsDescriptorSetLayout(
+        VkDevice device,
+        VkDescriptorSetLayout& graphicsDescriptorSetLayout
+        );
 
-    static void createGraphicsDescriptorPool(const VkDevice& device, const int& MAX_FRAMES_IN_FLIGHT, VkDescriptorPool& graphicsDescriptorPool);
+    static void createGraphicsDescriptorPool(
+        VkDevice device,
+        VkDescriptorPool& graphicsDescriptorPool,
+        size_t MAX_FRAMES_IN_FLIGHT
+        );
 
-    static void createGraphicsDescriptorSets(const VkDevice& device, const int& MAX_FRAMES_IN_FLIGHT, const VkDescriptorSetLayout& graphicsDescriptorSetLayout,
-                                             const VkDescriptorPool& graphicsDescriptorPool, std::vector<VkDescriptorSet>& graphicsDescriptorSets,
-                                             const std::vector<VkBuffer>& uniformBuffers, const VkSampler& textureSampler, const std::vector<VkBuffer>& modelBuffers,
-                                             const std::vector<VkBuffer>& visibleIndicesBuffers, const ModelEntityManager& mem, const VkImageView& textureImageView,
-                                             const VkBuffer& textureIndexBuffer, const VkBuffer& textureIndexOffsetBuffer);
+    static void createGraphicsDescriptorSets(
+        VkDevice device,
+        VkDescriptorSetLayout& graphicsDescriptorSetLayout, VkDescriptorPool& graphicsDescriptorPool, std::vector<VkDescriptorSet>& graphicsDescriptorSets,
+        VkSampler textureSampler, VkImageView textureImageView,
+        const ModelEntityManager &modelEntityManager, size_t MAX_FRAMES_IN_FLIGHT
+        );
 
 
     // Postprocess
-    static void createPostprocessDescriptorSetLayout(const VkDevice& device, VkDescriptorSetLayout& postProcessingDescriptorSetLayout);
+    static void createPostprocessDescriptorSetLayout(
+        VkDevice device,
+        VkDescriptorSetLayout& postProcessingDescriptorSetLayout
+        );
 
-    static void createPostprocessDescriptorPool(const VkDevice& device, const int& MAX_FRAMES_IN_FLIGHT, VkDescriptorPool& postProcessingDescriptorPool);
+    static void createPostprocessDescriptorPool(
+        VkDevice device,
+        VkDescriptorPool& postProcessingDescriptorPool,
+        size_t MAX_FRAMES_IN_FLIGHT
+        );
 
-    static void createPostprocessDescriptorSets(const VkDevice &device, const int &MAX_FRAMES_IN_FLIGHT, const VkDescriptorSetLayout &postProcessingDescriptorSetLayout, const
-                                                VkDescriptorPool &postProcessingDescriptorPool, std::vector<VkDescriptorSet> &postProcessingDescriptorSets, const std::
-                                                vector<VkImageView> &offscreenImageViews, const VkImageView& depthImage, const VkSampler &textureSampler, const std::vector<VkBuffer>&
-                                                uniformPostprocessingBuffers);
+    static void createPostprocessDescriptorSets(
+        VkDevice device,
+        VkDescriptorSetLayout& postProcessingDescriptorSetLayout, VkDescriptorPool& postProcessingDescriptorPool, std::vector<VkDescriptorSet>& postProcessingDescriptorSets,
+        const std::vector<VkImageView> &offscreenImageViews, VkImageView depthImageView, VkSampler textureSampler,
+        const std::vector<VkBuffer> &uniformPostprocessingBuffers, size_t MAX_FRAMES_IN_FLIGHT);
 
-    static void updatePostprocessDescriptorSets(const VkDevice &device, const int &MAX_FRAMES_IN_FLIGHT, const std::vector<VkDescriptorSet> &postProcessingDescriptorSets,
-                                                const std::vector<VkImageView> &offscreenImageViews, const VkImageView& ImageView, const VkSampler &textureSampler);
-
+    static void updatePostprocessDescriptorSets(
+        VkDevice device,
+        const std::vector<VkDescriptorSet>& postProcessingDescriptorSets,
+        const std::vector<VkImageView> &offscreenImageViews, VkImageView imageView, VkSampler textureSampler,
+        size_t MAX_FRAMES_IN_FLIGHT
+        );
 };
 
 

@@ -12,6 +12,7 @@
 struct ModelGroup {
     std::shared_ptr<ParsedModel> model{};
     std::vector<ModelInstance> instances{};
+    uint32_t globalIndex = 0;
 
     ModelGroup() = default;
 

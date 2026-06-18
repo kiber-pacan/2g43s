@@ -4,38 +4,17 @@
 #include <cmath>
 #include <thread>
 
-#include <vulkan/vulkan.h>
 #define GLM_FORCE_RADIANS
 #include <imgui_impl_sdl3.h>
 #include <glm/glm.hpp>
 #include <omp.h>
 #include <basisu_transcoder.h>
 
-
 #include "KeyListener.hpp"
 #include "MouseListener.hpp"
 #include "Random.hpp"
 #include "Engine.hpp"
 #include "Logger.hpp"
-#include "Tools.hpp"
-
-#include <Jolt/Jolt.h>
-
-// Jolt includes
-#include <Jolt/RegisterTypes.h>
-#include <Jolt/Core/Factory.h>
-#include <Jolt/Core/TempAllocator.h>
-#include <Jolt/Core/JobSystemThreadPool.h>
-#include <Jolt/Physics/PhysicsSettings.h>
-#include <Jolt/Physics/PhysicsSystem.h>
-#include <Jolt/Physics/Collision/ObjectLayer.h>
-#include <Jolt/Physics/Collision/Shape/BoxShape.h>
-#include <Jolt/Physics/Collision/Shape/SphereShape.h>
-#include <Jolt/Physics/Body/BodyCreationSettings.h>
-#include <Jolt/Physics/Body/BodyActivationListener.h>
-
-#include "AtomicCounterBufferObject.hpp"
-#include "AtomicCounterBufferObject.hpp"
 
 
 class PhysicsBus;
@@ -47,9 +26,9 @@ struct AppContext {
     MouseListener* mL;
 
     SDL_Thread* tickThread = nullptr;
+    double desiredFrameRate = 200;
+    uint64_t sleepTimeTotalNS = 1 / desiredFrameRate * 1'000'000'000.0;
 };
-
-
 
 int TickThread(void* ptr) {
     constexpr uint TICK_RATE = 256;
@@ -60,8 +39,7 @@ int TickThread(void* ptr) {
     while (!app->engine->quit) {
         const uint64_t start = SDL_GetTicksNS();
 
-        const int cCollisionSteps = 1;
-        if (app->engine->initialized) app->engine->mem.physicsBus.iterateJPH(*app->engine);
+        //if (app->engine->initialized) app->engine->modelEntityManager.physicsBus.iterateJPH(*app->engine);
 
         const uint64_t elapsed = SDL_GetTicksNS() - start;
         double sleepTime = dt - static_cast<double>(elapsed) / 1'000'000'000.0;
@@ -90,7 +68,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
     }
 
     // Create a window
-    SDL_Window* window = SDL_CreateWindow("Window", WIDTH, HEIGHT, SDL_WINDOW_RESIZABLE | SDL_WINDOW_VULKAN);
+    SDL_Window* window = SDL_CreateWindow("Window", width, height, SDL_WINDOW_RESIZABLE | SDL_WINDOW_VULKAN);
     if (!window){
         return SDL_Fail();
     }
@@ -112,9 +90,6 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
 
     // Set up Vulkan engine
     Engine* vulkan_engine = new Engine();
-    vulkan_engine->mem.physicsBus.initializeJPH();
-    vulkan_engine->init(window);
-
 
     // set up the application data
     *appstate = new AppContext{
@@ -124,6 +99,12 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
     };
 
     auto* app = static_cast<AppContext*>(*appstate);
+
+    vulkan_engine->desiredFrameRate = &app->desiredFrameRate;
+    vulkan_engine->sleepTimeTotalNS = &app->sleepTimeTotalNS;
+    vulkan_engine->modelEntityManager.physicsBus.initializeJPH();
+    vulkan_engine->initialize(window);
+
     app->tickThread = SDL_CreateThread(TickThread, "TickThread", app);
 
     if (!app->tickThread) {
@@ -170,7 +151,16 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *e) {
         if (e->button.button == SDL_BUTTON_LEFT) {
             glm::vec3 impulse = app->engine->camera.look;
             impulse*=16;
-            app->engine->mem.physicsInstance("box_opt.glb", glm::vec4(app->engine->camera.pos, 1), 256, impulse);
+            //app->engine->modelEntityManager.physicsInstance("box.glb", glm::vec4(app->engine->camera.pos, 1), 256);
+            app->engine->bufferManager.addModel(
+                "box.glb",
+                glm::vec4(
+                    app->engine->camera.pos.x,
+                    app->engine->camera.pos.y,
+                    app->engine->camera.pos.z,
+                    0
+                    )
+                );
         }
     }
 
@@ -178,29 +168,29 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *e) {
 }
 
 
-static std::chrono::duration<double> duration;
+static uint64_t renderDurationNs;
 
 SDL_AppResult SDL_AppIterate(void *appstate) {
-    const auto start = std::chrono::high_resolution_clock::now();
+    const uint64_t start = SDL_GetTicksNS();
 
-    auto* app = static_cast<AppContext *>(appstate);
-    const auto& sleepTime = app->engine->sleepTimeTotalSeconds;
+    const auto* app = static_cast<AppContext *>(appstate);
+    const uint64_t& sleepTime = app->sleepTimeTotalNS;
 
     app->engine->delta.calculateDelta();
     app->kL->iterateKeys(*app->engine);
 
-    app->engine->drawFrame();
+    app->engine->graphicsManager.drawFrame();
 
-    duration = std::chrono::high_resolution_clock::now() - start;
+    renderDurationNs = SDL_GetTicksNS() - start;
 
     #pragma region fpsLimit
-    if (duration.count() > sleepTime) return SDL_APP_CONTINUE;
+    if (renderDurationNs > sleepTime) return SDL_APP_CONTINUE;
 
-    std::this_thread::sleep_for(std::chrono::duration<double>(sleepTime - duration.count() - sleepTime / 32)); // Rough sleep
+    SDL_DelayNS(static_cast<uint64_t>(static_cast<long double>(sleepTime - renderDurationNs) / 1.25L)); // Rough sleep
 
     // Precise sleep loop
-    while (duration.count() < sleepTime) {
-        duration = std::chrono::high_resolution_clock::now() - start;
+    while (renderDurationNs < sleepTime) {
+        renderDurationNs = SDL_GetTicksNS() - start;
     }
     #pragma endregion
 
@@ -210,7 +200,7 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
 void SDL_AppQuit(void *appstate, SDL_AppResult result) {
     // Cleanup
     if (const auto* app = static_cast<AppContext *>(appstate)) {
-        app->engine->mem.physicsBus.shutdownJPH();
+        app->engine->modelEntityManager.physicsBus.shutdownJPH();
         app->engine->cleanup();
         SDL_DestroyWindow(app->engine->window);
         delete app;

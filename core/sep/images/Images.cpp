@@ -96,7 +96,7 @@ void Images::createTextureImage(const VkDevice& device, const VkCommandPool& com
     VkDeviceSize imageSize = info.m_total_blocks * bytesPerBlock;
 
 
-    Buffers::createBuffer(device, physicalDevice, imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
+    BuffersRegistry::createBuffer(device, physicalDevice, imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
 
     void* mappedData;
     vkMapMemory(device, stagingBufferMemory, 0, imageSize, 0, &mappedData);
@@ -133,7 +133,7 @@ void Images::createTextureImage(const VkDevice& device, const VkCommandPool& com
         return;
     }
 
-    Buffers::createBuffer(device, physicalDevice, texture.imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
+    BuffersRegistry::createBuffer(device, physicalDevice, texture.imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
 
     void* data;
     vkMapMemory(device, stagingBufferMemory, 0, texture.imageSize, 0, &data);
